@@ -1,0 +1,78 @@
+### 설계 문서 (로컬에서만 관리) ###
+docs/
+
+### AI 도구 설정 ###
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+AGENTS.md
+.codex/
+GEMINI.md
+.gemini/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurfrules
+.aider*
+.continue/
+.github/copilot-instructions.md
+.mcp.json
+.superloopy/
+
+### 비밀값 ###
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+*.local.yml
+*.local.yaml
+
+### Java / Gradle ###
+.gradle/
+build/
+out/
+bin/
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.ipr
+*.iws
+
+### Eclipse / STS ###
+.project
+.classpath
+.settings/
+.factorypath
+.apt_generated/
+.sts4-cache/
+
+### VS Code ###
+.vscode/
+
+### 프론트엔드 (React + Vite) ###
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+### 로컬 실행 데이터 ###
+mysql-data/
+load-test/results/
+
+### OS ###
+.DS_Store
+Thumbs.db

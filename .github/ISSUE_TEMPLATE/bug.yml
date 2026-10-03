@@ -1,0 +1,84 @@
+name: 버그
+description: 원인이 바로 보이는 오류 (원인 분석이 필요하면 '트러블슈팅'으로)
+title: "[버그] "
+labels: ["fix"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        공개 저장소다. 로그와 스크린샷에 비밀값(키, 토큰, 비밀번호)과 개인정보(이메일, 연락 수단)가 없는지 확인한다.
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 증상
+      description: 무엇이 잘못됐는지
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 절차
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작과 실제 동작
+      value: |
+        - 기대:
+        - 실제:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: found
+    attributes:
+      label: 발견 경로
+      options:
+        - 개발 중
+        - 테스트
+        - 출시 전 검증
+        - 운영 지표·알림
+        - 사용자 제보
+    validations:
+      required: true
+
+  - type: dropdown
+    id: env
+    attributes:
+      label: 환경
+      options:
+        - 로컬
+        - 운영
+    validations:
+      required: true
+
+  - type: input
+    id: related
+    attributes:
+      label: 관련 기능·정책
+      placeholder: "F-13, BC-08"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 로그·추적 ID
+      description: 응답 헤더의 X-Trace-Id가 있으면 함께 적는다
+      render: shell
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 확인
+      options:
+        - label: 로그와 첨부에 비밀값·개인정보가 없다
+          required: true
+        - label: 고칠 때 재현 테스트를 먼저 만든다
+          required: true
