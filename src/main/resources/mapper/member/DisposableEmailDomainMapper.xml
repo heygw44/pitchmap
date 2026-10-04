@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.member.infra.DisposableEmailDomainMapper">
+
+    <insert id="insertPublicIfAbsent">
+        INSERT IGNORE INTO disposable_email_domain (domain, source, created_at)
+        VALUES
+        <foreach collection="domains" item="domain" separator=",">
+            (#{domain}, 'PUBLIC', #{createdAt})
+        </foreach>
+    </insert>
+</mapper>
