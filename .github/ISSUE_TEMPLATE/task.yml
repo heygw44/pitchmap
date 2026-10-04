@@ -1,10 +1,11 @@
 name: 작업
-description: 기능·인프라·테스트·문서 작업 (마일스톤의 BJ-xxx 이슈)
-title: "[BJ-000] "
+description: 기능·인프라·테스트·문서 작업
+title: "feat: "
 body:
   - type: markdown
     attributes:
       value: |
+        제목은 `유형: 내용` 형식이다. 기본값 `feat`를 작업 유형(`feat` `test` `infra` `docs` `chore`)에 맞게 바꾼다.
         이슈 하나는 PR 하나로 끝낼 수 있는 크기로 만든다. 하루 이틀 안에 끝나지 않을 것 같으면 나눈다.
         라벨은 유형(`feat` `test` `infra` `docs` `chore`), 모듈, 우선순위(`must` `should` `could`)를 하나씩 붙인다.
 
