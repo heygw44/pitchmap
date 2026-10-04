@@ -1,0 +1,29 @@
+# 로컬 개발 전용. 앱은 호스트에서 ./gradlew bootRun으로 실행하고 MySQL만 띄운다.
+# compose와 앱(local 프로필)이 같은 .env를 읽는다.
+name: pitchmap
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?.env에 DB_ROOT_PASSWORD를 채우세요}
+      MYSQL_DATABASE: ${DB_NAME:-pitchmap}
+      MYSQL_USER: ${DB_USERNAME:-pitchmap}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?.env에 DB_PASSWORD를 채우세요}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      # DB 시간은 UTC로 둔다.
+      - --default-time-zone=+00:00
+    ports:
+      # 로컬 전용이라 외부 인터페이스에 열지 않는다.
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1(TCP): 초기화 중 임시 서버는 네트워크를 막아 두므로 준비가 끝나기 전에는 healthy가 되지 않는다.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
