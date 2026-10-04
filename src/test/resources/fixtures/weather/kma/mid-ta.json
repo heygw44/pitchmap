@@ -1,0 +1,63 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "00",
+      "resultMsg": "NORMAL_SERVICE"
+    },
+    "body": {
+      "dataType": "JSON",
+      "items": {
+        "item": [
+          {
+            "regId": "11B10101",
+            "taMin4": 10,
+            "taMin4Low": 1,
+            "taMin4High": 1,
+            "taMax4": 25,
+            "taMax4Low": 1,
+            "taMax4High": 1,
+            "taMin5": 11,
+            "taMin5Low": 1,
+            "taMin5High": 1,
+            "taMax5": 25,
+            "taMax5Low": 1,
+            "taMax5High": 1,
+            "taMin6": 13,
+            "taMin6Low": 1,
+            "taMin6High": 1,
+            "taMax6": 25,
+            "taMax6Low": 1,
+            "taMax6High": 1,
+            "taMin7": 14,
+            "taMin7Low": 1,
+            "taMin7High": 1,
+            "taMax7": 26,
+            "taMax7Low": 1,
+            "taMax7High": 1,
+            "taMin8": 14,
+            "taMin8Low": 0,
+            "taMin8High": 2,
+            "taMax8": 25,
+            "taMax8Low": 0,
+            "taMax8High": 2,
+            "taMin9": 14,
+            "taMin9Low": 0,
+            "taMin9High": 2,
+            "taMax9": 22,
+            "taMax9Low": 0,
+            "taMax9High": 2,
+            "taMin10": 11,
+            "taMin10Low": 0,
+            "taMin10High": 3,
+            "taMax10": 21,
+            "taMax10Low": 0,
+            "taMax10High": 3
+          }
+        ]
+      },
+      "pageNo": 1,
+      "numOfRows": 10,
+      "totalCount": 1
+    }
+  }
+}

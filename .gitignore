@@ -71,6 +71,8 @@ pnpm-debug.log*
 
 ### 로컬 실행 데이터 ###
 mysql-data/
+# 공공데이터 원본 파일 (용량이 크고 출처에서 다시 받을 수 있음)
+data/raw/
 load-test/results/
 
 ### OS ###
