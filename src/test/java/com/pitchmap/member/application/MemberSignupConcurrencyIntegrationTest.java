@@ -25,6 +25,7 @@ class MemberSignupConcurrencyIntegrationTest {
 
     private static final int THREADS = 10;
     private static final String VALID_PASSWORD = "Passw0rd!xyz";
+    private static final String REQUEST_IP = "203.0.113.7";
 
     @Autowired
     MemberSignupService memberSignupService;
@@ -40,7 +41,7 @@ class MemberSignupConcurrencyIntegrationTest {
 
         // when
         List<Throwable> failures =
-                signUpConcurrently(i -> new SignupCommand(email, VALID_PASSWORD, TestSequence.nickname()));
+                signUpConcurrently(i -> new SignupCommand(email, VALID_PASSWORD, TestSequence.nickname(), REQUEST_IP));
 
         // then
         assertOnlyDuplicateFailures(failures, MemberErrorCode.MEMBER_EMAIL_DUPLICATED);
@@ -56,7 +57,7 @@ class MemberSignupConcurrencyIntegrationTest {
 
         // when
         List<Throwable> failures =
-                signUpConcurrently(i -> new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname));
+                signUpConcurrently(i -> new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname, REQUEST_IP));
 
         // then
         assertOnlyDuplicateFailures(failures, MemberErrorCode.MEMBER_NICKNAME_DUPLICATED);

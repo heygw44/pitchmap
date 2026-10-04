@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.member.infra.EmailVerificationMapper">
+
+    <update id="incrementAttempt">
+        UPDATE email_verification
+        SET attempt_count = attempt_count + 1,
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND verified_at IS NULL
+          AND attempt_count &lt; #{maxAttempts}
+    </update>
+
+    <update id="markVerified">
+        UPDATE email_verification
+        SET verified_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND verified_at IS NULL
+          AND attempt_count &lt; #{maxAttempts}
+    </update>
+</mapper>

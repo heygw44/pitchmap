@@ -1,7 +1,7 @@
 package com.pitchmap.member.api;
 
+import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;

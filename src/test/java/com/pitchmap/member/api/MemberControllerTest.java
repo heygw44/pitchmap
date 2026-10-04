@@ -1,11 +1,11 @@
 package com.pitchmap.member.api;
 
+import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.pitchmap.common.error.GlobalExceptionHandler;
 import com.pitchmap.common.security.SecurityConfig;
@@ -32,6 +32,8 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 class MemberControllerTest {
 
     private static final String VALID_PASSWORD = "Valid-pass-1!";
+    // MockMvc가 요청에 기본으로 넣는 원격 주소
+    private static final String MOCK_REMOTE_ADDR = "127.0.0.1";
 
     @Autowired
     private MockMvcTester mvc;
@@ -49,7 +51,8 @@ class MemberControllerTest {
         assertThat(result).hasStatus(HttpStatus.CREATED);
         assertThat(result).bodyJson().extractingPath("$.memberId").isEqualTo(12);
         assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("UNVERIFIED");
-        verify(memberSignupService).signUp(new SignupCommand("hiker@example.com", VALID_PASSWORD, "hiker"));
+        verify(memberSignupService)
+                .signUp(new SignupCommand("hiker@example.com", VALID_PASSWORD, "hiker", MOCK_REMOTE_ADDR));
     }
 
     @Test

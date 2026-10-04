@@ -1,5 +1,6 @@
 package com.pitchmap.member.application;
 
+import com.pitchmap.common.outbox.OutboxEventRecorder;
 import com.pitchmap.member.domain.DisposableEmailDomainRepository;
 import com.pitchmap.member.domain.Email;
 import com.pitchmap.member.domain.Member;
@@ -27,6 +28,7 @@ public class MemberSignupService {
     private final DisposableEmailDomainRepository disposableEmailDomainRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final OutboxEventRecorder outboxEventRecorder;
 
     @Transactional
     public SignupResult signUp(SignupCommand command) {
@@ -38,6 +40,11 @@ public class MemberSignupService {
         String passwordHash = passwordEncoder.encode(password.value());
         Member member = Member.register(email, passwordHash, command.nickname(), Instant.now(clock));
         Member saved = saveOrTranslate(member);
+        outboxEventRecorder.record(
+                EmailVerificationEvents.EVENT_TYPE,
+                EmailVerificationEvents.AGGREGATE_TYPE,
+                saved.getId(),
+                new EmailVerificationEvents.Payload(command.requestIp()));
         return new SignupResult(saved.getId(), saved.getStatus());
     }
 

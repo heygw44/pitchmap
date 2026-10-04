@@ -6,11 +6,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderNotFoundException;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
@@ -37,6 +39,52 @@ public class SecurityConfig {
     private static final String[] PUBLIC_POST_PATTERNS = {
         "/api/members", "/api/auth/login", "/api/auth/password-reset/request", "/api/auth/password-reset/confirm",
     };
+
+    // 이메일 인증을 마친 회원만 부를 수 있는 엔드포인트다. docs/07 3절 표에서 권한이 인증 회원, 본인확인, 캠프 리더인 행이 모두 여기에 든다.
+    // 본인확인과 캠프 리더도 이메일 인증을 먼저 마친 회원이기 때문이다. 신뢰 단계나 캠프 리더 자격 자체는 각 서비스가 회원 ID로 검사한다.
+    private static final String[] VERIFIED_GET_PATTERNS = {
+        "/api/members/*/companion-reviews", "/api/me/companion-reviews/pending", "/api/basecamps/*/applications",
+    };
+
+    private static final String[] VERIFIED_POST_PATTERNS = {
+        "/api/me/identity-verification",
+        "/api/bakjis",
+        "/api/bakjis/*/confirmations",
+        "/api/bakjis/*/reports",
+        "/api/spots/*/reviews",
+        "/api/basecamps",
+        "/api/basecamps/*/close",
+        "/api/basecamps/*/reopen",
+        "/api/basecamps/*/confirm",
+        "/api/basecamps/*/cancel",
+        "/api/basecamps/*/applications",
+        "/api/basecamps/*/applications/*/approve",
+        "/api/basecamps/*/applications/*/reject",
+        "/api/basecamps/*/members/*/kick",
+        "/api/basecamps/*/companion-reviews",
+        "/api/member-reports",
+        "/api/programs/*/applications",
+        "/api/programs/*/vacancy-alerts",
+        "/api/program-applications/*/pay",
+        "/api/program-applications/*/cancel",
+    };
+
+    private static final String[] VERIFIED_PUT_PATTERNS = {"/api/basecamps/*/contact"};
+
+    private static final String[] VERIFIED_PATCH_PATTERNS = {
+        "/api/me", "/api/bakjis/*", "/api/reviews/*", "/api/basecamps/*",
+    };
+
+    private static final String[] VERIFIED_DELETE_PATTERNS = {
+        "/api/bakjis/*",
+        "/api/reviews/*",
+        "/api/basecamps/*/applications/me",
+        "/api/basecamps/*/members/me",
+        "/api/programs/*/vacancy-alerts",
+    };
+
+    private static final AuthorizationManager<RequestAuthorizationContext> EMAIL_VERIFIED =
+            new EmailVerifiedAuthorizationManager();
 
     private static final String[] INFRASTRUCTURE_PATTERNS = {"/actuator/health", "/swagger-ui/**", "/v3/api-docs/**"};
 
@@ -74,7 +122,17 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers(INFRASTRUCTURE_PATTERNS)
                 .permitAll()
-                // 인증 회원, 본인확인, 캠프 리더 같은 세부 자격은 각 서비스가 회원 ID로 검사한다. 여기서는 로그인 여부만 본다.
+                .requestMatchers(HttpMethod.GET, VERIFIED_GET_PATTERNS)
+                .access(EMAIL_VERIFIED)
+                .requestMatchers(HttpMethod.POST, VERIFIED_POST_PATTERNS)
+                .access(EMAIL_VERIFIED)
+                .requestMatchers(HttpMethod.PUT, VERIFIED_PUT_PATTERNS)
+                .access(EMAIL_VERIFIED)
+                .requestMatchers(HttpMethod.PATCH, VERIFIED_PATCH_PATTERNS)
+                .access(EMAIL_VERIFIED)
+                .requestMatchers(HttpMethod.DELETE, VERIFIED_DELETE_PATTERNS)
+                .access(EMAIL_VERIFIED)
+                // 위에 나열하지 않은 /api 경로는 로그인 여부만 본다. 캠프 리더나 작성자 같은 세부 자격은 각 서비스가 회원 ID로 검사한다.
                 .requestMatchers("/api/**")
                 .authenticated()
                 .anyRequest()

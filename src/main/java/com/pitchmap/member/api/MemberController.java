@@ -2,6 +2,7 @@ package com.pitchmap.member.api;
 
 import com.pitchmap.member.application.MemberSignupService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +24,7 @@ class MemberController {
     @Operation(summary = "회원가입")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    SignupResponse signUp(@Valid @RequestBody SignupRequest request) {
-        return SignupResponse.from(memberSignupService.signUp(request.toCommand()));
+    SignupResponse signUp(@Valid @RequestBody SignupRequest request, HttpServletRequest httpRequest) {
+        return SignupResponse.from(memberSignupService.signUp(request.toCommand(httpRequest.getRemoteAddr())));
     }
 }
