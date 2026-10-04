@@ -42,7 +42,7 @@
 실행 후 리포트는 `build/reports/` 아래에 생긴다.
 
 - 테스트 결과: `tests/test/index.html`, `tests/integrationTest/index.html`
-- 커버리지(JaCoCo): `jacoco/test/html/index.html`. `test`와 `integrationTest`를 합친 참고용 리포트이고 기준선은 없다.
+- 커버리지(JaCoCo): `jacoco/test/html/index.html`. JaCoCo가 `test`와 `integrationTest`의 실행 정보를 합쳐 만든 참고용 리포트이고 기준선은 없다.
 
 ### CI
 
@@ -51,5 +51,5 @@ PR과 `develop`·`main` 푸시마다 GitHub Actions(`.github/workflows/ci.yml`, 
 ### 문제 해결
 
 - 3306 포트가 이미 쓰이면 `.env`의 `DB_PORT`를 바꾼다.
-- 비밀번호를 바꿨다면 `mysql-data/`를 지우고 다시 띄운다. MySQL 초기 비밀번호는 데이터 디렉터리를 처음 만들 때만 적용된다.
+- 비밀번호를 바꿨다면 `mysql-data/`를 지우고 다시 띄운다. 왜냐하면 MySQL은 초기 비밀번호를 데이터 디렉터리를 처음 만들 때만 적용하기 때문이다.
 - 앱이 `Access denied`로 시작하지 못하면 `.env`의 `DB_PASSWORD`가 비어 있거나 `mysql-data/`를 처음 만들 때 쓴 값과 다른지 확인한다.

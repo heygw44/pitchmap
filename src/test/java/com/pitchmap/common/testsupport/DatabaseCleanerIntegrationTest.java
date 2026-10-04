@@ -50,7 +50,7 @@ class DatabaseCleanerIntegrationTest {
     @Test
     @DisplayName("정리한 뒤에는 FK 검사가 다시 켜져 있다")
     void foreignKeyChecksAreEnabledAfterClean() throws SQLException {
-        // given: 풀 크기나 연결 재사용 여부와 무관하게 같은 물리 연결에서 정리하고 확인한다
+        // given: 풀 크기나 연결 재사용 여부와 상관없이 같은 물리 연결에서 정리하고 확인하려고, 연결 하나를 직접 넘긴다
         seedRows();
 
         try (Connection connection = dataSource.getConnection()) {

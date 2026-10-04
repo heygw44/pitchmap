@@ -11,8 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
-// 설정을 메타 어노테이션 하나로 모아 모든 통합 테스트가 같은 컨텍스트 캐시 키와 MySQL 컨테이너를 공유하게 한다.
-// 컨텍스트가 공유되므로 테스트가 끝날 때마다 DB 행과 이동 가능한 시계를 처음 상태로 되돌린다.
+// 이 어노테이션 하나에 설정을 모아서, 모든 통합 테스트가 같은 컨텍스트 캐시 키와 MySQL 컨테이너를 공유하게 한다.
+// 컨텍스트를 공유하므로, 확장이 테스트가 끝날 때마다 DB 행과 이동 가능한 시계를 처음 상태로 되돌린다.
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented

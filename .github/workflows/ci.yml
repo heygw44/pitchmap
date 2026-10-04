@@ -28,7 +28,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # 단위·통합·포맷 실패를 한 번에 보려고 --continue를 쓴다
+      # 우리는 단위·통합·포맷 실패를 한 번에 보려고 --continue를 쓴다
       - run: ./gradlew check --continue --console=plain
 
       - uses: actions/upload-artifact@v7

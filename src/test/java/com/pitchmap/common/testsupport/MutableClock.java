@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * 테스트에서 시간을 직접 움직이는 시계. 움직이기 전까지는 멈춰 있다.
  *
- * <p>기본 시각은 한국 시간으로 한낮이라 날짜 경계가 테스트에 끼어들지 않는다.
+ * <p>기본 시각은 한국 시간(KST)으로 한낮이다. 그래서 날짜 경계가 테스트에 끼어들지 않는다.
  *
- * <p>{@link #withZone(ZoneId)}는 복사본이 아니라 같은 시간 원천을 공유하는 뷰를 돌려준다.
+ * <p>{@link #withZone(ZoneId)}를 호출하면 복사본이 아니라 같은 시간 원천을 공유하는 뷰를 돌려준다.
  * 서비스가 {@code clock.withZone(KST)}를 필드에 저장해 두더라도 이후의 시간 이동을 따라가야 하기 때문이다.
  */
 public final class MutableClock extends Clock {
@@ -63,7 +63,7 @@ public final class MutableClock extends Clock {
         source.current.updateAndGet(current -> current.plus(duration));
     }
 
-    /** 이 시계를 만들 때의 시각으로 되돌린다. 같은 시간 원천을 쓰는 모든 뷰에 적용된다. */
+    /** 호출하면 시계를 만들 때의 시각으로 되돌린다. 같은 시간 원천을 쓰는 모든 뷰도 함께 되돌아간다. */
     public void reset() {
         source.current.set(source.initial);
     }

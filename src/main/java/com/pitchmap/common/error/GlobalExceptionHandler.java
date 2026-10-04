@@ -39,7 +39,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(errorCode.httpStatus()).body(ErrorResponse.of(errorCode, e.getMessage()));
     }
 
-    // 마지막 방어선: 어떤 예외도 스택 트레이스가 로그에 남고 원인은 응답에 새지 않아야 한다
+    // 여기가 마지막 방어선이다. 예상하지 못한 예외가 와도 서버는 스택 트레이스를 로그에 남기고, 원인은 응답에 담지 않는다.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception e) {
         log.error("unexpected exception", e);

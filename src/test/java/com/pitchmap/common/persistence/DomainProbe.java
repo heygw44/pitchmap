@@ -9,7 +9,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 혼합 영속성 테스트 전용 엔티티. 운영 테이블 하나를 JPA 쪽에서 다룬다. */
+/** 혼합 영속성(JPA와 MyBatis를 함께 쓰는 구성) 테스트 전용 엔티티. 운영 테이블 하나를 JPA로 읽고 쓸 때 쓴다. */
 @Entity
 @Table(name = "disposable_email_domain")
 @Getter

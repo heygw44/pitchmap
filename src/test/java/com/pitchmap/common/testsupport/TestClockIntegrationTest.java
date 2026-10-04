@@ -25,7 +25,7 @@ class TestClockIntegrationTest {
         Instant startedAt = clock.instant();
 
         // when
-        // 주입받은 Clock과 MutableClock이 같은 객체라면 한쪽을 옮기면 다른 쪽도 움직인다.
+        // 주입받은 Clock과 MutableClock이 같은 객체이므로, 한쪽을 옮기면 다른 쪽도 함께 움직인다.
         mutableClock.advance(Duration.ofMinutes(1));
 
         // then

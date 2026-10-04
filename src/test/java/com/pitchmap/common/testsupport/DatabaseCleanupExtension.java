@@ -6,7 +6,8 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
- * 테스트가 끝날 때마다 DB를 비운다. 실패한 테스트 뒤에도 실행되므로 다음 테스트가 깨끗한 DB에서 시작한다.
+ * JUnit이 테스트가 끝날 때마다 이 확장을 실행해서 DB를 비운다.
+ * 테스트가 실패해도 실행되므로, 다음 테스트는 항상 깨끗한 DB에서 시작한다.
  */
 public class DatabaseCleanupExtension implements AfterEachCallback {
 

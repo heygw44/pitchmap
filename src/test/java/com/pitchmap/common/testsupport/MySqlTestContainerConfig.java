@@ -5,8 +5,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.mysql.MySQLContainer;
 
-// 컨테이너를 빈으로 두면 같은 설정을 쓰는 통합 테스트가 Spring 컨텍스트 캐시와 함께 컨테이너 하나를 재사용한다.
-// @Testcontainers/@Container는 클래스마다 컨테이너를 멈춰서 캐시된 컨텍스트와 충돌한다.
+// 컨테이너를 빈으로 두면, 같은 설정을 쓰는 통합 테스트가 Spring 컨텍스트 캐시와 함께 컨테이너 하나를 재사용한다.
+// 반면 @Testcontainers/@Container를 쓰면 JUnit이 클래스마다 컨테이너를 멈추므로, 캐시된 컨텍스트와 충돌한다.
 @TestConfiguration(proxyBeanMethods = false)
 public class MySqlTestContainerConfig {
 

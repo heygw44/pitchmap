@@ -1,5 +1,6 @@
-# 통합 테스트용 프로필이다. DataSource는 설정하지 않는다.
-# DB 접속 정보는 Testcontainers의 @ServiceConnection이 넣어 주므로 .env를 읽는 local 설정이 섞이지 않는다.
+# 통합 테스트용 프로필이다. 이 프로필에서는 DataSource를 설정하지 않는다.
+# DB 접속 정보는 Spring Boot가 Testcontainers의 @ServiceConnection 설정을 읽어 DataSource에 넣어 주므로,
+# .env를 읽는 local 설정이 섞이지 않는다.
 logging:
   level:
     org.testcontainers: INFO

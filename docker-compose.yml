@@ -13,15 +13,16 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
-      # DB 시간은 UTC로 둔다.
+      # 우리는 DB 시간을 UTC로 둔다.
       - --default-time-zone=+00:00
     ports:
-      # 로컬 전용이라 외부 인터페이스에 열지 않는다.
+      # 로컬 전용이라 우리는 포트를 외부 인터페이스에 열지 않는다.
       - "127.0.0.1:${DB_PORT:-3306}:3306"
     volumes:
       - ./mysql-data:/var/lib/mysql
     healthcheck:
-      # -h 127.0.0.1(TCP): 초기화 중 임시 서버는 네트워크를 막아 두므로 준비가 끝나기 전에는 healthy가 되지 않는다.
+      # healthcheck는 -h 127.0.0.1(TCP)로 접속한다.
+      # 초기화 중 임시 서버는 네트워크를 막아 두므로, 준비가 끝나기 전에는 healthy가 되지 않는다.
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 5s
       timeout: 3s
