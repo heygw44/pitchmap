@@ -8,7 +8,6 @@ import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationState;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +22,6 @@ class FlywayMigrationIntegrationTest {
 
     @Autowired
     Flyway flyway;
-
-    @AfterEach
-    void cleanUp() {
-        jdbcTemplate.update("DELETE FROM login_history");
-        jdbcTemplate.update("DELETE FROM member");
-    }
 
     @Test
     @DisplayName("[ADR-001] 빈 DB에 마이그레이션이 모두 적용되고 회원·세션 테이블이 만들어진다")

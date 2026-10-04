@@ -7,7 +7,6 @@ import com.pitchmap.common.testsupport.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.ZoneId;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,11 +37,6 @@ class MixedPersistenceIntegrationTest {
 
     @Autowired
     private DomainProbeMapper mapper;
-
-    @AfterEach
-    void cleanUp() {
-        jdbcTemplate.update("DELETE FROM disposable_email_domain");
-    }
 
     @Test
     @DisplayName("[ADR-009] 한 트랜잭션에서 JPA와 MyBatis로 쓴 내용은 커밋 뒤 함께 보인다")
