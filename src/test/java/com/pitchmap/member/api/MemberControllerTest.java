@@ -5,8 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.pitchmap.common.error.GlobalExceptionHandler;
+import com.pitchmap.common.security.SecurityConfig;
 import com.pitchmap.common.trace.TraceIdFilter;
 import com.pitchmap.member.application.MemberSignupService;
 import com.pitchmap.member.application.SignupCommand;
@@ -26,7 +28,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 @WebMvcTest(MemberController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class})
+@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityConfig.class})
 class MemberControllerTest {
 
     private static final String VALID_PASSWORD = "Valid-pass-1!";
@@ -142,6 +144,7 @@ class MemberControllerTest {
     void missingPasswordReturnsFieldError() {
         MvcTestResult result = mvc.post()
                 .uri("/api/members")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"hiker@example.com\",\"nickname\":\"hiker\"}")
                 .exchange();
@@ -172,6 +175,7 @@ class MemberControllerTest {
         String body = "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"%s\"}".formatted(email, password, nickname);
         return mvc.post()
                 .uri("/api/members")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .exchange();
