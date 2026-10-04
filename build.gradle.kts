@@ -1,5 +1,6 @@
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.diffplug.spotless") version "8.10.3"
@@ -36,6 +37,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-mysql")
+    testImplementation("com.tngtech.archunit:archunit:1.5.1")
     testCompileOnly("org.projectlombok:lombok")
     testAnnotationProcessor("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -64,8 +66,23 @@ val integrationTest by tasks.registering(Test::class) {
     shouldRunAfter(tasks.test)
 }
 
+jacoco {
+    // Java 25 클래스 파일은 0.8.14부터 정식 지원한다.
+    toolVersion = "0.8.15"
+}
+
+tasks.jacocoTestReport {
+    // 단위 테스트와 통합 테스트의 실행 정보를 한 리포트로 합친다. 참고용이라 기준선은 두지 않는다.
+    dependsOn(tasks.test, integrationTest)
+    executionData(tasks.test.get(), integrationTest.get())
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
 tasks.check {
-    dependsOn(integrationTest)
+    dependsOn(integrationTest, tasks.jacocoTestReport)
 }
 
 spotless {

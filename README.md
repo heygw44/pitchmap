@@ -33,11 +33,16 @@
 
 ### 자동 테스트
 
-- `./gradlew test`: 단위·웹 계층 테스트. Docker가 필요 없다.
-- `./gradlew integrationTest`: Testcontainers가 MySQL 8.4를 띄우는 통합 테스트. Docker가 필요하다. 테스트는 로컬 `.env`와 compose DB를 쓰지 않는다.
-- `./gradlew check`: 위 둘과 Spotless 검사.
+- `./gradlew test`: 단위·웹 계층·아키텍처(ArchUnit) 테스트. Docker가 필요 없다.
+- `./gradlew integrationTest`: JUnit 태그 `integration` 테스트. Testcontainers가 MySQL 8.4 컨테이너를 실행당 하나만 띄워 모든 테스트가 나눠 쓰고, 테스트 하나가 끝날 때마다 테이블을 비운다. Docker가 필요하다. 테스트는 로컬 `.env`와 compose DB를 쓰지 않는다.
+- `./gradlew check`: 위 둘과 Spotless 검사, JaCoCo 리포트.
 
 `integrationTest`와 `check`를 실행하기 전에 Docker가 켜져 있어야 한다.
+
+실행 후 리포트는 `build/reports/` 아래에 생긴다.
+
+- 테스트 결과: `tests/test/index.html`, `tests/integrationTest/index.html`
+- 커버리지(JaCoCo): `jacoco/test/html/index.html`. `test`와 `integrationTest`를 합친 참고용 리포트이고 기준선은 없다.
 
 ### 문제 해결
 
