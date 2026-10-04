@@ -1,6 +1,10 @@
 spring:
   application:
     name: pitchmap
+  profiles:
+    # bootRun을 플래그 없이 실행하기 위한 기본값이다.
+    # 운영은 SPRING_PROFILES_ACTIVE=prod로, 테스트는 @ActiveProfiles("test")로 덮어쓴다.
+    default: local
 
 management:
   endpoints:
