@@ -31,13 +31,15 @@ class SecurityProbeController {
         return ResponseEntity.noContent().build();
     }
 
+    // emailVerified를 생략하면 이메일 인증 전(UNVERIFIED) 회원으로 로그인한다.
     @PostMapping("/login")
     ResponseEntity<Void> login(
             @RequestParam long memberId,
             @RequestParam String role,
+            @RequestParam(defaultValue = "false") boolean emailVerified,
             HttpServletRequest request,
             HttpServletResponse response) {
-        loginSessionManager.login(new LoginMember(memberId, role), request, response);
+        loginSessionManager.login(new LoginMember(memberId, role, emailVerified), request, response);
         return ResponseEntity.noContent().build();
     }
 

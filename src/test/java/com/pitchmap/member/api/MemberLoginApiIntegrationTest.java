@@ -1,8 +1,8 @@
 package com.pitchmap.member.api;
 
+import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.jayway.jsonpath.JsonPath;
 import com.pitchmap.common.testsupport.IntegrationTest;
