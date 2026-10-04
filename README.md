@@ -46,7 +46,7 @@
 
 ### CI
 
-PR과 `develop`·`main` 푸시마다 GitHub Actions(`.github/workflows/ci.yml`, 작업 이름 `check`)가 `./gradlew check`를 실행한다. 단위·아키텍처·통합 테스트와 Spotless, JaCoCo가 모두 들어 있다. 실행 화면의 Artifacts에서 `test-reports`(테스트 HTML 리포트와 JUnit XML)와 `jacoco-report`를 내려받을 수 있고, 테스트가 실패해도 올라간다.
+PR과 `develop`·`main` 푸시마다 GitHub Actions(`.github/workflows/ci.yml`, 작업 이름 `check`)가 `./gradlew check`를 실행한다. 단위·아키텍처·통합 테스트와 Spotless, JaCoCo가 모두 들어 있고, `main`·`develop`에는 이 작업이 통과해야 머지할 수 있다. 실행 화면의 Artifacts에서 `test-reports`(테스트 HTML 리포트와 JUnit XML)와 `jacoco-report`를 내려받을 수 있다. `test-reports`는 테스트가 실패해도 올라가고, `jacoco-report`는 테스트가 모두 통과했을 때만 만들어진다.
 
 ### 문제 해결
 
