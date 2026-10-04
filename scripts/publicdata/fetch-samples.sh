@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 공공데이터 API 응답 샘플을 받아 테스트 픽스처로 저장한다.
+# 이 스크립트는 공공데이터 API 응답 샘플을 받아 테스트 픽스처로 저장한다.
 # 사용법: ./scripts/publicdata/fetch-samples.sh  (실행하면 공공데이터포털 Decoding 키를 묻는다)
-# 키는 화면·셸 기록·저장 파일에 남지 않는다. 저장 후 파일에 키가 들어 있는지 검사한다.
+# 스크립트는 키를 화면·셸 기록·저장 파일에 남기지 않는다. 또한 저장한 뒤 파일에 키가 들어 있는지 검사한다.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -32,7 +32,8 @@ kst_yesterday() {
 TODAY=$(kst +%Y%m%d)
 HOUR=$(kst +%H)
 
-# 단기예보는 02·05·08·11·14·17·20·23시에 발표하고 10분쯤 뒤부터 조회된다. 오늘 05시 발표를 쓰고, 그 전이면 전날 23시를 쓴다.
+# 단기예보는 02·05·08·11·14·17·20·23시에 발표하고 10분쯤 뒤부터 조회된다.
+# 그래서 우리는 06시 이후에는 오늘 05시 발표를, 그 전에는 전날 23시 발표를 쓴다.
 if [ "$HOUR" -ge 6 ]; then
   VILAGE_DATE=$TODAY; VILAGE_TIME=0500
 else
@@ -61,7 +62,7 @@ fetch() {
     echo "실패(연결): ${out#"$ROOT"/}" >&2
     failed=1; rm -f "$tmp"; return
   fi
-  # 성공은 resultCode 00(기상청·천문연) 또는 0000(고캠핑)이다. 인증 오류는 resultCode 없이 errMsg로 온다.
+  # 성공은 resultCode 00(기상청·천문연) 또는 0000(고캠핑)이다. 반면 인증 오류는 resultCode 없이 errMsg로 온다.
   if ! grep -q -E '"resultCode" *: *"(00|0000)"|<resultCode>(00|0000)</resultCode>' "$tmp"; then
     echo "실패(오류 응답): ${out#"$ROOT"/}" >&2
     head -c 300 "$tmp" >&2; echo >&2
@@ -103,7 +104,7 @@ fetch "$FIXTURES/weather/kasi/rise-set.xml" xml \
   "$BASE/B090041/openapi/service/RiseSetInfoService/getLCRiseSetInfo" \
   -d locdate="$TODAY" -d longitude="$LNG" -d latitude="$LAT" -d dnYn=Y
 
-# 저장한 파일에 키(원문·URL 인코딩)가 들어 있으면 지운다. 공개 저장소에 올라가는 파일이다.
+# 저장한 파일에 키(원문·URL 인코딩)가 들어 있으면 지운다. 왜냐하면 이 파일은 공개 저장소에 올라가기 때문이다.
 ENCODED_KEY=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$KEY")
 for f in ${saved[@]+"${saved[@]}"}; do
   if grep -q -F -e "$KEY" -e "$ENCODED_KEY" "$f"; then

@@ -18,10 +18,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 모듈·계층 의존 규칙(ADR-005).
+ * 모듈·계층 의존 규칙. 모듈러 모놀리스로 만들고 모듈 경계를 ArchUnit으로 검사하기로 한 결정(ADR-005)을 코드로 옮겼다.
  *
- * <p>모듈은 루트 패키지 바로 아래 첫 패키지, 계층은 그 아래 둘째 패키지다. 규칙은 루트 패키지를 인자로 받아서 운영 코드와 규칙 자체 검증용
- * 픽스처에 같은 정의를 쓴다. 루트 패키지 밖의 클래스(JDK, 프레임워크)는 모듈 규칙의 대상이 아니다.
+ * <p>모듈은 루트 패키지 바로 아래 첫 패키지, 계층은 그 아래 둘째 패키지다. 규칙은 루트 패키지를 인자로 받으므로,
+ * 운영 코드와 규칙 자체 검증용 픽스처가 같은 정의를 쓴다. 루트 패키지 밖의 클래스(JDK, 프레임워크)는 모듈 규칙의 대상이 아니다.
  */
 public final class ArchitectureRules {
 
@@ -42,8 +42,9 @@ public final class ArchitectureRules {
             COMMON);
 
     /**
-     * 클래스 의존이 허용되는 모듈 방향(키 → 값). 여기 없는 방향은 금지다. 모든 모듈이 {@code common}에 의존하는 것은 항상 허용이라 적지 않는다.
-     * 알림 같은 이벤트 연동은 DB 아웃박스 행으로만 하므로 의존으로 나타나지 않는다.
+     * 클래스 의존이 허용되는 모듈 방향(키 → 값). 여기 없는 방향은 금지다. 모든 모듈이 {@code common}에 의존하는 것은
+     * 항상 허용이므로 적지 않는다. 알림 같은 이벤트 연동은 DB 아웃박스 행(발행할 이벤트를 DB에 저장한 행)으로만 하므로,
+     * 클래스 의존으로 나타나지 않는다.
      */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
             "admin", Set.of("trust", "program", "spot", "member"),
@@ -114,8 +115,10 @@ public final class ArchitectureRules {
     }
 
     /**
-     * R4: {@code api}는 영속 계층을 직접 쓰지 않는다. {@code infra} 패키지, 프로젝트 안의 {@code *Repository}·{@code *Mapper} 클래스, Spring
-     * Data 리포지토리 구현이 대상이다. 이름 검사를 프로젝트 클래스로 한정하는 것은 Jackson {@code ObjectMapper} 같은 프레임워크 클래스를 잘못 잡지 않기 위해서다.
+     * R4(api의 영속 계층 접근 금지): {@code api}는 영속 계층을 직접 쓰지 않는다. 검사 대상은 {@code infra} 패키지,
+     * 프로젝트 안의 {@code *Repository}·{@code *Mapper} 클래스, Spring Data 리포지토리 구현이다.
+     * 이름 검사를 프로젝트 클래스로 한정하는 것은 Jackson {@code ObjectMapper} 같은 프레임워크 클래스를
+     * 잘못 잡지 않기 위해서다.
      */
     public static ArchRule apiPersistenceRule(String rootPackage) {
         Scope scope = new Scope(rootPackage);
@@ -228,7 +231,7 @@ public final class ArchitectureRules {
     @FunctionalInterface
     private interface DependencyJudge {
 
-        /** 금지된 의존이면 사유를 돌려주고, 허용되면 비어 있다. */
+        /** 호출하면 금지된 의존일 때 사유를 돌려주고, 허용된 의존이면 빈 값을 돌려준다. */
         Optional<String> violation(Location source, Dependency dependency);
     }
 

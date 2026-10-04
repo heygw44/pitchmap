@@ -12,8 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 규칙이 실제로 위반을 잡는지 검증한다. 운영 코드에는 아직 모듈 클래스가 거의 없어서 규칙이 빈 대상에 항상 통과하므로,
- * 위반 픽스처마다 "그 규칙만" 실패하고 나머지 규칙은 통과하는지 함께 확인한다.
+ * 이 테스트는 규칙이 실제로 위반을 잡는지 검증한다. 운영 코드에는 아직 모듈 클래스가 거의 없어서 규칙이 빈 대상에 항상 통과한다.
+ * 그래서 위반 픽스처마다 "그 규칙만" 실패하고 나머지 규칙은 통과하는지 함께 확인한다.
  */
 class ArchitectureRulesTest {
 
@@ -134,7 +134,7 @@ class ArchitectureRulesTest {
                 "member.api.MemberController");
     }
 
-    /** 대상 규칙은 픽스처 클래스 이름을 담은 메시지로 실패하고, 나머지 규칙은 같은 픽스처에서 통과해야 한다. */
+    /** 호출하면 대상 규칙이 픽스처 클래스 이름을 담은 메시지로 실패하는지, 나머지 규칙은 같은 픽스처에서 통과하는지 검증한다. */
     private static void assertOnlyRuleFails(Rule failing, String subRoot, String... expectedFixtures) {
         for (Rule rule : Rule.values()) {
             if (rule != failing) {

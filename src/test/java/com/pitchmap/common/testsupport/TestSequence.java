@@ -3,7 +3,7 @@ package com.pitchmap.common.testsupport;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * UNIQUE 컬럼의 기본값을 만드는 JVM 전역 순번. 난수가 아니라 순번이라 실패를 그대로 재현할 수 있다.
+ * UNIQUE 컬럼의 기본값을 만드는 JVM 전역 순번. 난수가 아니라 순번이므로, 개발자는 실패를 그대로 재현할 수 있다.
  *
  * <p>테스트 데이터 빌더는 생성 시점이 아니라 {@code build()} 시점에 값을 꺼내야 한다.
  * 그래야 빌더 하나로 서로 다른 행을 여러 개 만들 수 있다.

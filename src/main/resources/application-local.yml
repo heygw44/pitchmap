@@ -1,11 +1,11 @@
 spring:
   config:
-    # docker compose와 같은 .env를 한 번만 채우면 되도록 저장소 루트의 .env를 읽는다.
-    # 파일이 없으면 무시하고, 같은 이름의 OS 환경 변수가 있으면 그쪽이 우선한다.
+    # 개발자가 docker compose와 같은 .env를 한 번만 채우면 되도록, Spring은 저장소 루트의 .env를 읽는다.
+    # 파일이 없으면 Spring은 무시하고, 같은 이름의 OS 환경 변수가 있으면 그쪽이 우선한다.
     import: optional:file:.env[.properties]
   datasource:
     url: jdbc:mysql://localhost:${DB_PORT:3306}/${DB_NAME:pitchmap}
     username: ${DB_USERNAME:pitchmap}
     # 비밀번호는 설정 파일에 두지 않는다. 값이 없으면 ${DB_PASSWORD} 문자열이 그대로 비밀번호로 쓰여
-    # 시작할 때 Flyway의 DB 접속이 거부되고 앱이 뜨지 않는다.
+    # 시작할 때 Flyway가 DB에 접속하면 MySQL이 거부하므로 앱이 뜨지 않는다.
     password: ${DB_PASSWORD}

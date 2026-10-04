@@ -62,18 +62,18 @@ val integrationTest by tasks.registering(Test::class) {
     useJUnitPlatform {
         includeTags("integration")
     }
-    // UTC가 아닌 JVM에서도 시각이 UTC로 저장되는지 확인하려고 일부러 KST로 띄운다.
+    // 우리는 UTC가 아닌 JVM에서도 시각이 UTC로 저장되는지 확인하려고, 일부러 한국 표준시(KST)로 JVM을 띄운다.
     jvmArgs("-Duser.timezone=Asia/Seoul")
     shouldRunAfter(tasks.test)
 }
 
 jacoco {
-    // Java 25 클래스 파일은 0.8.14부터 정식 지원한다.
+    // JaCoCo는 Java 25 클래스 파일을 0.8.14부터 정식 지원한다.
     toolVersion = "0.8.15"
 }
 
 tasks.jacocoTestReport {
-    // 단위 테스트와 통합 테스트의 실행 정보를 한 리포트로 합친다. 참고용이라 기준선은 두지 않는다.
+    // 단위 테스트와 통합 테스트의 실행 정보를 한 리포트로 합친다. 참고용이라 우리는 기준선을 두지 않는다.
     dependsOn(tasks.test, integrationTest)
     executionData(tasks.test.get(), integrationTest.get())
     reports {

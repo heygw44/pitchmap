@@ -2,30 +2,33 @@ spring:
   application:
     name: pitchmap
   profiles:
-    # bootRun을 플래그 없이 실행하기 위한 기본값이다.
-    # 운영은 SPRING_PROFILES_ACTIVE=prod로, 테스트는 @ActiveProfiles("test")로 덮어쓴다.
+    # 개발자가 bootRun을 플래그 없이 실행할 수 있도록 local을 기본값으로 둔다.
+    # 운영에서는 SPRING_PROFILES_ACTIVE=prod를, 테스트에서는 @ActiveProfiles("test")를 지정해 이 값을 덮어쓴다.
     default: local
   datasource:
     hikari:
       data-source-properties:
-        # 시각은 UTC로 저장한다. JVM 기본 시간대와 무관하게 드라이버가 UTC로 변환해야 MyBatis가 쓴 Instant가 밀리지 않는다.
+        # 시각은 UTC로 저장한다. JVM 기본 시간대와 무관하게 드라이버가 UTC로 변환해야
+        # MyBatis가 쓴 Instant가 밀리지 않는다.
         connectionTimeZone: UTC
   jpa:
-    # 트랜잭션은 application 계층에서만 연다. 요청 내내 커넥션을 쥐는 OSIV는 끈다.
+    # 우리는 트랜잭션을 application 계층에서만 연다.
+    # 또한 요청이 끝날 때까지 DB 커넥션을 붙잡는 OSIV(Open Session In View)는 끈다.
     open-in-view: false
     hibernate:
-      # 스키마는 Flyway만 만든다. 엔티티가 스키마와 어긋나면 시작할 때 실패한다.
+      # 스키마는 Flyway만 만든다. 엔티티가 스키마와 어긋나면 Hibernate가 시작할 때 검증에 실패한다.
       ddl-auto: validate
 
 mybatis:
-  # 매퍼 인터페이스는 com.pitchmap.{모듈}.infra에 @Mapper로, XML은 mapper/{모듈}/ 아래에 둔다.
-  # classpath*: 여야 main과 test 리소스 루트를 모두 읽는다.
+  # 우리는 매퍼 인터페이스를 com.pitchmap.{모듈}.infra에 @Mapper로, XML을 mapper/{모듈}/ 아래에 둔다.
+  # classpath*:를 써야 Spring이 main과 test 리소스 루트를 모두 읽는다.
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    # record 조회 DTO를 열 순서가 아니라 이름으로 매핑한다.
+    # 이 설정을 켜면 MyBatis가 record 조회 DTO를 열 순서가 아니라 이름으로 매핑한다.
     arg-name-based-constructor-auto-mapping: true
-    # 같은 트랜잭션에서 같은 쿼리를 다시 실행하면 세션 1차 캐시가 이전 결과를 돌려줘서, 그 사이 JPA가 flush한 변경이 보이지 않는다.
+    # 같은 트랜잭션에서 같은 쿼리를 다시 실행하면 MyBatis가 세션 1차 캐시의 이전 결과를 돌려준다.
+    # 그래서 그 사이 JPA가 flush한 변경이 보이지 않는다.
     local-cache-scope: statement
 
 management:

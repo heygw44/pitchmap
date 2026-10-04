@@ -9,7 +9,8 @@ import java.util.List;
 import javax.sql.DataSource;
 
 /**
- * 현재 스키마의 모든 테이블 행을 지운다. 테이블 목록은 information_schema에서 읽으므로 마이그레이션이 늘어도 고칠 곳이 없다.
+ * 호출하면 현재 스키마의 모든 테이블 행을 지운다. 테이블 목록은 information_schema에서 읽으므로,
+ * 마이그레이션이 늘어도 이 클래스를 고칠 필요가 없다.
  */
 public final class DatabaseCleaner {
 
@@ -34,11 +35,14 @@ public final class DatabaseCleaner {
 
     private void deleteAllRows(Statement statement) throws SQLException {
         List<String> tables = findTables(statement);
-        // 부모·자식 삭제 순서를 계산하지 않으려고 FK 검사를 끈다. 이 세션 변수는 풀의 물리 연결에 남으므로 반드시 되돌린다.
+        // 부모·자식 삭제 순서를 직접 계산하지 않으려고, 우리는 FK(외래 키) 검사를 끈다.
+        // 이 세션 변수는 커넥션 풀의 물리 연결에 남으므로, 정리가 끝나면 반드시 되돌린다.
         statement.execute("SET FOREIGN_KEY_CHECKS = 0");
         try {
             for (String table : tables) {
-                // TRUNCATE는 DDL이라 암묵적 커밋이 일어나고 테이블이 많으면 테스트마다 훨씬 느리다.
+                // DELETE를 쓰고 TRUNCATE는 쓰지 않는다.
+                // TRUNCATE는 DDL(테이블 구조를 다루는 명령)이라 암묵적 커밋이 일어나고,
+                // 테이블이 많으면 테스트마다 훨씬 느려지기 때문이다.
                 statement.executeUpdate("DELETE FROM `" + table + "`");
             }
         } finally {
@@ -56,7 +60,8 @@ public final class DatabaseCleaner {
         return tables;
     }
 
-    // Flyway 이력을 지우면 다음 컨텍스트가 마이그레이션을 다시 적용하려 해서 실패한다.
+    // Flyway 이력 테이블은 지우지 않는다.
+    // 지우면 Flyway가 다음 컨텍스트에서 마이그레이션을 처음부터 다시 적용하려 해서 실패한다.
     private void addIfNotFlywayHistory(List<String> tables, String table) {
         if (FLYWAY_HISTORY_TABLE.equalsIgnoreCase(table)) {
             return;

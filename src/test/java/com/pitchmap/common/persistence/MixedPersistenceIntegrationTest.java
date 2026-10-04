@@ -19,7 +19,7 @@ class MixedPersistenceIntegrationTest {
     private static final String SOURCE_ADMIN = "ADMIN";
     private static final String SOURCE_PUBLIC = "PUBLIC";
     private static final Instant CREATED_AT = Instant.parse("2026-10-04T01:02:03.456789Z");
-    // KST로는 다음 날(10-05 00:30)로 넘어가는 UTC 시각
+    // KST(한국 표준시, UTC+9)로 바꾸면 다음 날(10-05 00:30)로 넘어가는 UTC 시각
     private static final Instant UTC_LATE_NIGHT = Instant.parse("2026-10-04T15:30:45.123456Z");
     private static final String UTC_LATE_NIGHT_WALL_CLOCK = "2026-10-04 15:30:45.123456";
 
@@ -66,7 +66,8 @@ class MixedPersistenceIntegrationTest {
         // when
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
                     entityManager.persist(new DomainProbe(jpaDomain, SOURCE_ADMIN, CREATED_AT));
-                    // flush 없이는 JPA INSERT가 DB에 나가지 않아 롤백을 시험할 수 없다
+                    // JPA는 flush하기 전에는 INSERT를 DB에 보내지 않는다.
+                    // 그래서 flush를 먼저 해야 롤백이 실제로 일어나는지 시험할 수 있다.
                     entityManager.flush();
                     mapper.insert(myBatisDomain, SOURCE_PUBLIC, CREATED_AT);
                     throw new IllegalStateException("롤백 유도");
@@ -78,8 +79,10 @@ class MixedPersistenceIntegrationTest {
         assertThat(countByDomain(myBatisDomain)).isZero();
     }
 
-    // MyBatis는 JPA의 쓰기 지연 큐를 모른다. 이 테스트가 "MyBatis로 읽기 전에 flush한다"는 규칙의 이유를 코드로 남긴다.
-    // 같은 쿼리를 두 번 실행한다. mybatis.configuration.local-cache-scope가 statement가 아니면 flush한 뒤에도 첫 결과(빈 값)가 재사용돼 실패한다.
+    // MyBatis는 JPA의 쓰기 지연 큐를 모른다.
+    // 개발자는 이 테스트를 보고 "MyBatis로 읽기 전에 flush한다"는 규칙이 왜 필요한지 알 수 있다.
+    // 같은 쿼리를 두 번 실행한다. mybatis.configuration.local-cache-scope가 statement가 아니면
+    // flush한 뒤에도 첫 결과(빈 값)가 재사용돼 테스트가 실패한다.
     @Test
     @DisplayName("[ADR-009] JPA 변경은 flush하기 전에는 MyBatis 조회에 보이지 않고 flush하면 보인다")
     void jpaChangeIsInvisibleToMyBatisUntilFlush() {
@@ -118,7 +121,8 @@ class MixedPersistenceIntegrationTest {
     @Test
     @DisplayName("시각은 JVM 시간대와 무관하게 UTC로 저장되고 JPA·MyBatis가 같은 값을 읽는다")
     void instantIsStoredAsUtcAndReadIdenticallyByJpaAndMyBatis() {
-        // given: integrationTest가 JVM 시간대를 KST로 띄운다. 이 가드가 없으면 UTC JVM에서 테스트가 조용히 의미를 잃는다.
+        // given: integrationTest 작업이 JVM 시간대를 KST로 띄운다.
+        // 먼저 시간대를 확인하는 것은, UTC JVM에서 실행하면 이 테스트가 조용히 의미를 잃기 때문이다.
         assertThat(ZoneId.systemDefault()).isEqualTo(ZoneId.of("Asia/Seoul"));
         String jpaDomain = "utc-jpa.example.com";
         String myBatisDomain = "utc-mybatis.example.com";
@@ -128,11 +132,11 @@ class MixedPersistenceIntegrationTest {
                 status -> repository.save(new DomainProbe(jpaDomain, SOURCE_ADMIN, UTC_LATE_NIGHT)));
         transactionTemplate.executeWithoutResult(status -> mapper.insert(myBatisDomain, SOURCE_PUBLIC, UTC_LATE_NIGHT));
 
-        // then: 저장된 날 값이 UTC 벽시계다
+        // then: DB에 저장된 날짜·시각 값이 UTC 시각 그대로다
         assertThat(storedWallClock(jpaDomain)).isEqualTo(UTC_LATE_NIGHT_WALL_CLOCK);
         assertThat(storedWallClock(myBatisDomain)).isEqualTo(UTC_LATE_NIGHT_WALL_CLOCK);
 
-        // then: 서로 상대편이 쓴 행을 읽어도 원래 Instant가 나온다
+        // then: JPA와 MyBatis가 서로 상대편이 쓴 행을 읽어도 원래 Instant가 나온다
         DomainProbeView readByMyBatis = mapper.findByDomain(jpaDomain).orElseThrow();
         DomainProbe readByJpa =
                 transactionTemplate.execute(status -> entityManager.find(DomainProbe.class, myBatisDomain));

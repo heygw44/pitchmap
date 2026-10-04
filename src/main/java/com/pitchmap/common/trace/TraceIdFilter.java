@@ -21,7 +21,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
 
     private static final int TRACE_ID_LENGTH = 12;
 
-    // 클라이언트가 보낸 X-Trace-Id는 로그 주입에 쓰일 수 있어 믿지 않고 항상 새로 만든다.
+    // 클라이언트가 보낸 X-Trace-Id는 로그 주입 공격에 쓰일 수 있다. 그래서 서버는 이 값을 믿지 않고 항상 새로 만든다.
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
