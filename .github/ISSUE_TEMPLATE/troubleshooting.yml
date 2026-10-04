@@ -1,6 +1,6 @@
 name: 트러블슈팅
 description: 원인을 찾기 위해 분석이 필요한 문제 (성능 저하, 간헐적 실패, 장애 등)
-title: "[트러블슈팅] "
+title: "troubleshooting: "
 labels: ["troubleshooting"]
 body:
   - type: markdown

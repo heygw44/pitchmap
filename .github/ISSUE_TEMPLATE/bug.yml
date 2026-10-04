@@ -1,6 +1,6 @@
 name: 버그
 description: 원인이 바로 보이는 오류 (원인 분석이 필요하면 '트러블슈팅'으로)
-title: "[버그] "
+title: "fix: "
 labels: ["fix"]
 body:
   - type: markdown
