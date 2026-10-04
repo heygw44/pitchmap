@@ -1,5 +1,6 @@
 package com.pitchmap.common.testsupport;
 
+import com.pitchmap.notification.application.RecordingOutboxEventHandler;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -19,6 +20,6 @@ import org.springframework.test.context.ActiveProfiles;
 @Tag("integration")
 @SpringBootTest
 @ActiveProfiles("test")
-@Import({MySqlTestContainerConfig.class, TestClockConfig.class})
+@Import({MySqlTestContainerConfig.class, TestClockConfig.class, RecordingOutboxEventHandler.Config.class})
 @ExtendWith({DatabaseCleanupExtension.class, ClockResetExtension.class})
 public @interface IntegrationTest {}
