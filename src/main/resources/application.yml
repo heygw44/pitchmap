@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: pitchmap
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  paths-to-match: /api/**
+
+logging:
+  pattern:
+    correlation: "[%X{traceId:-}] "
