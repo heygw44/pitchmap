@@ -44,6 +44,10 @@
 - 테스트 결과: `tests/test/index.html`, `tests/integrationTest/index.html`
 - 커버리지(JaCoCo): `jacoco/test/html/index.html`. `test`와 `integrationTest`를 합친 참고용 리포트이고 기준선은 없다.
 
+### CI
+
+PR과 `develop`·`main` 푸시마다 GitHub Actions(`.github/workflows/ci.yml`, 작업 이름 `check`)가 `./gradlew check`를 실행한다. 단위·아키텍처·통합 테스트와 Spotless, JaCoCo가 모두 들어 있다. 실행 화면의 Artifacts에서 `test-reports`(테스트 HTML 리포트와 JUnit XML)와 `jacoco-report`를 내려받을 수 있고, 테스트가 실패해도 올라간다.
+
 ### 문제 해결
 
 - 3306 포트가 이미 쓰이면 `.env`의 `DB_PORT`를 바꾼다.
