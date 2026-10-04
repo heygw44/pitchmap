@@ -1,6 +1,7 @@
 package com.pitchmap.member.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
@@ -123,6 +124,7 @@ class MemberSignupApiIntegrationTest {
         String body = "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"%s\"}".formatted(email, password, nickname);
         return mvc.post()
                 .uri("/api/members")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .exchange();

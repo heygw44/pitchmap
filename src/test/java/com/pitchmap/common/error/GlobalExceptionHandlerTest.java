@@ -6,13 +6,26 @@ import com.pitchmap.common.trace.TraceIdFilter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +36,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.TestController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class, GlobalExceptionHandlerTest.TestController.class})
+@Import({
+    GlobalExceptionHandler.class,
+    TraceIdFilter.class,
+    GlobalExceptionHandlerTest.TestController.class,
+    GlobalExceptionHandlerTest.PermitAllSecurityConfig.class
+})
 class GlobalExceptionHandlerTest {
 
     @Autowired
@@ -164,6 +182,58 @@ class GlobalExceptionHandlerTest {
         assertThat(result).bodyJson().doesNotHavePath("$.fieldErrors");
     }
 
+    @ParameterizedTest(name = "{0}ms -> {1}초")
+    @CsvSource({"0,1", "1,1", "1000,1", "1001,2", "90000,90"})
+    @DisplayName("[PW-03][EV-03] 요청 과다 예외는 429와 올림한 초 단위 Retry-After 헤더, 일반 오류 본문으로 응답한다")
+    void rateLimitedExceptionAddsRetryAfterHeader(long retryAfterMillis, String expectedSeconds) {
+        MvcTestResult result =
+                mvc.get().uri("/test/rate-limited?millis=" + retryAfterMillis).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo(expectedSeconds);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("TOO_MANY_REQUESTS");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.message")
+                .isEqualTo(CommonErrorCode.TOO_MANY_REQUESTS.message());
+        assertThat(result).bodyJson().extractingPath("$.traceId").asString().isNotBlank();
+        assertThat(result).bodyJson().doesNotHavePath("$.fieldErrors");
+    }
+
+    @Test
+    @DisplayName("요청 과다가 아닌 BusinessException에는 Retry-After 헤더를 붙이지 않는다")
+    void businessExceptionHasNoRetryAfterHeader() {
+        MvcTestResult result = mvc.get().uri("/test/business").exchange();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)).isNull();
+    }
+
+    @Test
+    @DisplayName("예외가 extraFields를 알려 주면 응답 JSON 최상위에 덧붙이고 기본 필드는 그대로 둔다")
+    void extraFieldsAreAppendedToTopLevelOfBody() {
+        MvcTestResult result = mvc.get().uri("/test/extra").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("SAMPLE_CONFLICT");
+        assertThat(result).bodyJson().extractingPath("$.message").isEqualTo("샘플 충돌");
+        assertThat(result).bodyJson().extractingPath("$.traceId").asString().isNotBlank();
+        assertThat(result).bodyJson().extractingPath("$.until").isEqualTo("2026-10-05T03:00:00Z");
+        assertThat(result).bodyJson().doesNotHavePath("$.extraFields");
+        assertThat(result).bodyJson().doesNotHavePath("$.additionalFields");
+    }
+
+    @Test
+    @DisplayName("extraFields가 없는 예외의 응답에는 기본 필드 외의 키가 없다")
+    void bodyHasOnlyDefaultFieldsWithoutExtraFields() {
+        MvcTestResult result = mvc.get().uri("/test/domain").exchange();
+
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$")
+                .asInstanceOf(InstanceOfAssertFactories.MAP)
+                .containsOnlyKeys("code", "message", "traceId");
+    }
+
     enum SampleErrorCode implements ErrorCode {
         SAMPLE_CONFLICT(HttpStatus.CONFLICT, "샘플 충돌");
 
@@ -190,6 +260,32 @@ class GlobalExceptionHandlerTest {
 
         SampleConflictException() {
             super(SampleErrorCode.SAMPLE_CONFLICT);
+        }
+    }
+
+    static class SampleDetailedException extends BusinessException {
+
+        SampleDetailedException() {
+            super(SampleErrorCode.SAMPLE_CONFLICT);
+        }
+
+        @Override
+        public Map<String, Object> extraFields() {
+            return Map.of("until", Instant.parse("2026-10-05T03:00:00Z"));
+        }
+    }
+
+    // 이 테스트는 오류 응답 처리를 검사하는 것이 목적이다. 그래서 인증과 CSRF는 끄고 모든 요청을 통과시킨다.
+    // 실제 보안 규칙은 SecurityConfigIntegrationTest가 검사한다.
+    @TestConfiguration(proxyBeanMethods = false)
+    @EnableWebSecurity
+    static class PermitAllSecurityConfig {
+
+        @Bean
+        SecurityFilterChain permitAllFilterChain(HttpSecurity http) throws Exception {
+            http.authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
+                    .csrf(AbstractHttpConfigurer::disable);
+            return http.build();
         }
     }
 
@@ -227,6 +323,16 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/post-only")
         String postOnly() {
             return "ok";
+        }
+
+        @GetMapping("/rate-limited")
+        String rateLimited(@RequestParam long millis) {
+            throw new RateLimitedException(CommonErrorCode.TOO_MANY_REQUESTS, Duration.ofMillis(millis));
+        }
+
+        @GetMapping("/extra")
+        String extra() {
+            throw new SampleDetailedException();
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.pitchmap.common.error;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -36,7 +37,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         } else {
             log.debug("business exception code={} message={}", errorCode.name(), e.getMessage());
         }
-        return ResponseEntity.status(errorCode.httpStatus()).body(ErrorResponse.of(errorCode, e.getMessage()));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(errorCode.httpStatus());
+        if (e instanceof RateLimitedException rateLimited) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds(rateLimited.retryAfter())));
+        }
+        return response.body(ErrorResponse.of(errorCode, e.getMessage(), e.extraFields()));
+    }
+
+    // Retry-After는 정수 초만 받는다. 그래서 소수 초는 올리고, 0초 이하는 1초로 맞춰 클라이언트가 바로 재시도하지 않게 한다.
+    private static long retryAfterSeconds(Duration retryAfter) {
+        long seconds = retryAfter.getSeconds() + (retryAfter.getNano() > 0 ? 1 : 0);
+        return Math.max(1, seconds);
     }
 
     // 여기가 마지막 방어선이다. 예상하지 못한 예외가 와도 서버는 스택 트레이스를 로그에 남기고, 원인은 응답에 담지 않는다.
