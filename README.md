@@ -17,6 +17,7 @@
 4. 확인
    - `curl http://localhost:8080/actuator/health` 응답의 `status`가 `UP`이다(DB 연결 포함). 예: `{"groups":["liveness","readiness"],"status":"UP"}`. MySQL을 멈추면 503 `DOWN`이 된다.
    - Swagger UI: http://localhost:8080/swagger-ui/index.html
+   - 앱이 시작될 때 Flyway가 `src/main/resources/db/migration`의 마이그레이션을 적용한다. 테이블은 `docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" pitchmap -e "SHOW TABLES"'`로 확인한다.
 
 ### 종료
 
@@ -30,8 +31,16 @@
 | `test` | 자동 테스트 | 테스트 컨테이너가 DB를 제공 |
 | `prod` | 운영 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경 변수 필수 |
 
+### 자동 테스트
+
+- `./gradlew test`: 단위·웹 계층 테스트. Docker가 필요 없다.
+- `./gradlew integrationTest`: Testcontainers가 MySQL 8.4를 띄우는 통합 테스트. Docker가 필요하다. 테스트는 로컬 `.env`와 compose DB를 쓰지 않는다.
+- `./gradlew check`: 위 둘과 Spotless 검사.
+
+`integrationTest`와 `check`를 실행하기 전에 Docker가 켜져 있어야 한다.
+
 ### 문제 해결
 
 - 3306 포트가 이미 쓰이면 `.env`의 `DB_PORT`를 바꾼다.
 - 비밀번호를 바꿨다면 `mysql-data/`를 지우고 다시 띄운다. MySQL 초기 비밀번호는 데이터 디렉터리를 처음 만들 때만 적용된다.
-- 앱은 뜨는데 health가 `DOWN`이면 `.env`의 `DB_PASSWORD`가 비어 있거나 `mysql-data/`를 처음 만들 때 쓴 값과 다른지 확인한다.
+- 앱이 `Access denied`로 시작하지 못하면 `.env`의 `DB_PASSWORD`가 비어 있거나 `mysql-data/`를 처음 만들 때 쓴 값과 다른지 확인한다.

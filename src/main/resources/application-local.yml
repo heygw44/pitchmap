@@ -6,6 +6,6 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:${DB_PORT:3306}/${DB_NAME:pitchmap}
     username: ${DB_USERNAME:pitchmap}
-    # 비밀번호는 설정 파일에 두지 않는다. 값이 없으면 ${DB_PASSWORD} 문자열이
-    # 그대로 비밀번호로 쓰여 접속이 거부된다(health가 DOWN).
+    # 비밀번호는 설정 파일에 두지 않는다. 값이 없으면 ${DB_PASSWORD} 문자열이 그대로 비밀번호로 쓰여
+    # 시작할 때 Flyway의 DB 접속이 거부되고 앱이 뜨지 않는다.
     password: ${DB_PASSWORD}
