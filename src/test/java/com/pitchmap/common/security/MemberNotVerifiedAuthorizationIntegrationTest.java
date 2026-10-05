@@ -49,7 +49,7 @@ class MemberNotVerifiedAuthorizationIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // 02-1 3절과 07 3절 표에서 권한이 인증 회원, 본인확인, 캠프 리더인 행이다.
+    // 이메일 인증을 마친 회원만 부를 수 있는 엔드포인트다. 인증 회원, 본인확인, 캠프 리더 권한이 필요한 것이 모두 여기에 든다.
     static Stream<Arguments> verifiedOnlyEndpoints() {
         return Stream.of(
                 Arguments.of(HttpMethod.PATCH, "/api/me"),

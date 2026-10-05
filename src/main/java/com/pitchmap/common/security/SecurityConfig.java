@@ -40,8 +40,9 @@ public class SecurityConfig {
         "/api/members", "/api/auth/login", "/api/auth/password-reset/request", "/api/auth/password-reset/confirm",
     };
 
-    // 이메일 인증을 마친 회원만 부를 수 있는 엔드포인트다. docs/07 3절 표에서 권한이 인증 회원, 본인확인, 캠프 리더인 행이 모두 여기에 든다.
-    // 본인확인과 캠프 리더도 이메일 인증을 먼저 마친 회원이기 때문이다. 신뢰 단계나 캠프 리더 자격 자체는 각 서비스가 회원 ID로 검사한다.
+    // 이메일 인증을 마친 회원만 부를 수 있는 엔드포인트다. 이메일 인증 전의 회원은 읽기만 할 수 있어서 대부분 쓰기 엔드포인트이지만,
+    // 동행 후기와 신청 목록 조회처럼 인증 회원에게만 열린 조회도 있다. 본인확인이나 캠프 리더 권한이 필요한 엔드포인트도 여기에 든다.
+    // 그 회원들도 이메일 인증을 먼저 마친 회원이기 때문이다. 신뢰 단계나 캠프 리더 자격 자체는 각 서비스가 회원 ID로 검사한다.
     private static final String[] VERIFIED_GET_PATTERNS = {
         "/api/members/*/companion-reviews", "/api/me/companion-reviews/pending", "/api/basecamps/*/applications",
     };
