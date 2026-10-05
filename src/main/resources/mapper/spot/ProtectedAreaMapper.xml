@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.ProtectedAreaMapper">
+
+    <select id="selectKeysBySource" resultType="com.pitchmap.spot.infra.ProtectedAreaKeyRow">
+        SELECT id AS id,
+               area_type AS area_type,
+               name AS name
+        FROM protected_area
+        WHERE source = #{source}
+    </select>
+
+    <!-- MySQL은 SRID 4326 WKT를 기본으로 (위도 경도) 순서로 읽는다. 하지만 경계 파일의 WKT는 SHP와 JTS를 따라 (경도 위도) 순서다.
+         그래서 axis-order=long-lat 옵션을 빼면 MySQL이 경도를 위도로 읽어, 한국 좌표는 위도 범위를 넘었다며 거부한다. -->
+    <insert id="insert">
+        INSERT INTO protected_area (name, area_type, source, source_date, boundary, created_at, updated_at)
+        VALUES (#{area.name},
+                #{area.areaType},
+                #{area.source},
+                #{area.sourceDate},
+                ST_GeomFromText(#{area.boundaryWkt}, 4326, 'axis-order=long-lat'),
+                #{now},
+                #{now})
+    </insert>
+
+    <update id="updateBoundary">
+        UPDATE protected_area
+        SET boundary = ST_GeomFromText(#{area.boundaryWkt}, 4326, 'axis-order=long-lat'),
+            source_date = #{area.sourceDate},
+            updated_at = #{now}
+        WHERE id = #{area.id}
+    </update>
+
+</mapper>

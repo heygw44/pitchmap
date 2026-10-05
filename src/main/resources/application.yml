@@ -92,3 +92,8 @@ pitchmap:
       # 적재 서비스는 파일 이름 끝의 _YYYYMMDD.csv에서 기준일을 읽으므로, 받은 파일 이름을 바꾸지 않는다.
       # 값이 없으면 앱은 뜨지만 적재를 실행하면 실패로 기록된다.
       file: ${PUBLICDATA_FOREST_FILE:}
+    park-boundary:
+      # 공원 경계 TSV 파일 경로다. 개발자가 KDPA 보호지역 SHP를 받아 scripts/publicdata/extract-park-boundaries.py로 만든 파일을 서버에 두고,
+      # 파일은 저장소에 커밋하지 않는다. 적재 서비스는 파일 이름 끝의 _YYYYMMDD.tsv에서 기준일을 읽는다.
+      # 값이 없으면 앱은 뜨지만 적재를 실행하면 실패로 기록된다.
+      file: ${PUBLICDATA_PARK_BOUNDARY_FILE:}
