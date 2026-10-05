@@ -73,6 +73,8 @@ pnpm-debug.log*
 mysql-data/
 # 공공데이터 원본 파일 (용량이 크고 출처에서 다시 받을 수 있음)
 data/raw/
+# 전처리 스크립트가 만든 파일 (원본에서 다시 만들 수 있음)
+data/processed/
 load-test/results/
 
 ### OS ###

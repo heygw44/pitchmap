@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.publicdata.infra.SyncJobRunMapper">
+
+    <select id="selectRuns" resultType="com.pitchmap.publicdata.infra.SyncJobRunRow">
+        SELECT id AS id,
+               job_type AS job_type,
+               status AS status,
+               processed_count AS processed_count,
+               skipped_count AS skipped_count,
+               error_message AS error_message,
+               started_at AS started_at,
+               finished_at AS finished_at
+        FROM sync_job_run
+        <where>
+            <if test="jobType != null">
+                job_type = #{jobType}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

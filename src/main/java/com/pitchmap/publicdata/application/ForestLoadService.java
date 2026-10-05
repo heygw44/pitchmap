@@ -54,16 +54,26 @@ public class ForestLoadService {
     }
 
     Optional<ForestLoadResult> load(Path file) {
-        Optional<SyncJobStart> start = syncJobRunService.begin(SyncJobType.FOREST, properties.staleAfter());
-        if (start.isEmpty()) {
-            return Optional.empty();
-        }
-        long runId = start.get().runId();
+        return syncJobRunService
+                .begin(SyncJobType.FOREST, properties.staleAfter())
+                .map(start -> run(start, file));
+    }
+
+    /**
+     * 호출하면 이미 시작한 실행 기록으로 설정한 경로의 휴양림 파일을 적재하고 결과를 돌려준다. 실행 기록은 호출하는 쪽이
+     * {@link SyncJobRunService#begin}으로 먼저 만들어 넘긴다. 성공하면 실행 기록을 COMPLETED로, 실패하면 FAILED로 남기고 받은 예외를 그대로 다시 던진다.
+     */
+    public ForestLoadResult run(SyncJobStart start) {
+        return run(start, properties.file());
+    }
+
+    private ForestLoadResult run(SyncJobStart start, Path file) {
+        long runId = start.runId();
         try {
             ForestLoadResult result = loadFile(runId, requireConfigured(file));
             syncJobRunService.complete(runId);
             logCompleted(runId, result);
-            return Optional.of(result);
+            return result;
         } catch (RuntimeException e) {
             recordFailure(runId, e);
             throw e;

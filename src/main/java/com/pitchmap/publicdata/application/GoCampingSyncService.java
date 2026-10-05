@@ -47,18 +47,24 @@ public class GoCampingSyncService {
      * 실패하면 실행 기록을 FAILED로 남기고 받은 예외를 그대로 다시 던진다.
      */
     public Optional<GoCampingSyncResult> sync() {
-        Optional<SyncJobStart> start = syncJobRunService.begin(SyncJobType.GOCAMPING, syncProperties.staleAfter());
-        if (start.isEmpty()) {
-            return Optional.empty();
-        }
-        long runId = start.get().runId();
+        return syncJobRunService
+                .begin(SyncJobType.GOCAMPING, syncProperties.staleAfter())
+                .map(this::run);
+    }
+
+    /**
+     * 호출하면 이미 시작한 실행 기록으로 동기화를 실행하고 결과를 돌려준다. 실행 기록은 호출하는 쪽이 {@link SyncJobRunService#begin}으로 먼저
+     * 만들어 넘긴다. 성공하면 실행 기록을 COMPLETED로, 실패하면 FAILED로 남기고 받은 예외를 그대로 다시 던진다.
+     */
+    public GoCampingSyncResult run(SyncJobStart start) {
+        long runId = start.runId();
         try {
-            int firstPage = firstPage(start.get().resumeCursor());
+            int firstPage = firstPage(start.resumeCursor());
             log.info("gocamping sync started runId={} firstPage={}", runId, firstPage);
             GoCampingSyncResult result = syncPages(runId, firstPage);
             syncJobRunService.complete(runId);
             logCompleted(result);
-            return Optional.of(result);
+            return result;
         } catch (RuntimeException e) {
             recordFailure(runId, e);
             throw e;

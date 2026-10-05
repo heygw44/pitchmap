@@ -9,8 +9,10 @@ public interface SyncJobRunRepository {
     Optional<SyncJobRun> findById(Long id);
 
     /**
-     * 호출하면 그 작업 종류의 가장 최근 실행 기록을 쓰기 잠금으로 읽는다. 잠금은 호출한 트랜잭션이 끝날 때까지 유지된다.
-     * 그래서 같은 작업을 동시에 시작하려는 호출은 한 줄로 서고, 뒤의 호출은 앞의 호출이 만든 실행 기록을 보게 된다.
+     * 호출하면 그 작업 종류의 가장 최근 실행 기록을 잠그지 않고 읽는다. 같은 종류를 동시에 시작하는 호출은 DB의 유니크 제약이 하나만 받는다.
      */
     Optional<SyncJobRun> findFirstByJobTypeOrderByIdDesc(SyncJobType jobType);
+
+    /** 호출하면 이 트랜잭션에서 바꾼 실행 기록을 바로 DB에 쓴다. */
+    void flush();
 }
