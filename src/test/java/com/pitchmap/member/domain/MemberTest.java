@@ -74,6 +74,41 @@ class MemberTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {" nick", "nick ", " nick ", "\tnick", "nick\n", "ni ck "})
+    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있으면 INVALID_INPUT으로 거부한다")
+    void register_rejectsSurroundingWhitespace(String nickname) {
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
+    }
+
+    @Test
+    @DisplayName("[F-01] 닉네임 가운데 공백은 허용한다")
+    void register_acceptsInnerWhitespace() {
+        assertThat(Member.register(EMAIL, HASH, "백패커 민수", NOW).getNickname()).isEqualTo("백패커 민수");
+    }
+
+    @Test
+    @DisplayName("[F-01] 닉네임 길이는 UTF-16 문자 수가 아니라 실제 글자 수로 센다")
+    void register_countsNicknameLengthInCodePoints() {
+        String twentyEmoji = "😀".repeat(20);
+
+        assertThat(Member.register(EMAIL, HASH, twentyEmoji, NOW).getNickname()).isEqualTo(twentyEmoji);
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, "😀".repeat(21), NOW));
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, "😀", NOW));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" nick", "nick "})
+    @DisplayName("닉네임을 앞뒤 공백이 있는 값으로 바꾸려 하면 INVALID_INPUT이고 닉네임과 수정 시각은 그대로다")
+    void changeNickname_rejectsSurroundingWhitespace(String nickname) {
+        Member member = Member.register(EMAIL, HASH, "nick", NOW);
+
+        assertInvalidInput(() -> member.changeNickname(nickname, LATER));
+
+        assertThat(member.getNickname()).isEqualTo("nick");
+        assertThat(member.getUpdatedAt()).isEqualTo(NOW);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     @DisplayName("[F-01] 비밀번호 해시가 비어 있으면 거부한다")
     void register_rejectsBlankHash(String hash) {

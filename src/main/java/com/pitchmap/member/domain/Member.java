@@ -23,9 +23,10 @@ public class Member {
 
     public static final int NICKNAME_MIN_LENGTH = 2;
     public static final int NICKNAME_MAX_LENGTH = 20;
+    public static final int EMAIL_MAX_LENGTH = 254;
 
-    private static final String NICKNAME_RULE_MESSAGE =
-            "닉네임은 공백이 아닌 %d~%d자여야 합니다.".formatted(NICKNAME_MIN_LENGTH, NICKNAME_MAX_LENGTH);
+    public static final String NICKNAME_RULE_MESSAGE =
+            "닉네임은 앞뒤 공백 없이 " + NICKNAME_MIN_LENGTH + "~" + NICKNAME_MAX_LENGTH + "자여야 합니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -133,12 +134,22 @@ public class Member {
         this.updatedAt = now;
     }
 
+    /**
+     * 호출하면 닉네임이 규칙을 지키는지 알려 준다. 앞뒤에 공백이 없어야 하고, 길이는 실제 글자(코드포인트) 수로 센다.
+     * 앞뒤 공백을 허용하면 화면에서 똑같이 보이는 닉네임이 DB 유니크 제약을 통과해 사칭을 막을 수 없다.
+     * 이모지처럼 UTF-16 문자 두 개로 이뤄진 글자도 DB 컬럼 길이 기준과 맞추려고 한 글자로 센다.
+     */
+    public static boolean isValidNickname(String nickname) {
+        if (nickname == null || !nickname.equals(nickname.strip())) {
+            return false;
+        }
+        int length = nickname.codePointCount(0, nickname.length());
+        return length >= NICKNAME_MIN_LENGTH && length <= NICKNAME_MAX_LENGTH;
+    }
+
     // 닉네임은 회원이 직접 입력하는 값이라, 가입과 닉네임 변경 모두 규칙을 어기면 같은 입력 오류 예외를 던진다.
     private static void validateNickname(String nickname) {
-        if (nickname == null
-                || nickname.isBlank()
-                || nickname.length() < NICKNAME_MIN_LENGTH
-                || nickname.length() > NICKNAME_MAX_LENGTH) {
+        if (!isValidNickname(nickname)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT, NICKNAME_RULE_MESSAGE);
         }
     }

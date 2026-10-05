@@ -290,7 +290,12 @@ class PasswordResetApiIntegrationTest {
     @Test
     @DisplayName("[PW-04] 이메일이 비었거나 형식이 틀리면 400 INVALID_INPUT이고, CSRF 토큰이 없으면 두 경로 모두 403 ACCESS_DENIED다")
     void validationAndCsrf() {
-        for (String body : List.of("{\"email\":\"\"}", "{\"email\":\"not-an-email\"}", "{}")) {
+        for (String body : List.of(
+                "{\"email\":\"\"}",
+                "{\"email\":\"not-an-email\"}",
+                "{\"email\":\"user@localhost\"}",
+                "{\"email\":\"user@[127.0.0.1]\"}",
+                "{}")) {
             MvcTestResult result = postJson(REQUEST_PATH, body, null);
 
             assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);

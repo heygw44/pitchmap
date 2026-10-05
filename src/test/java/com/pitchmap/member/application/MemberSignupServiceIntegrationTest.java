@@ -3,6 +3,8 @@ package com.pitchmap.member.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pitchmap.common.error.BusinessException;
+import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
@@ -89,6 +91,38 @@ class MemberSignupServiceIntegrationTest {
                 .isInstanceOfSatisfying(
                         MemberException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_EMAIL_DUPLICATED));
+        assertThat(memberJpaRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[F-01][EV-06] 악센트만 다른 이메일은 다른 이메일이라 둘 다 가입된다")
+    void emailsDifferingOnlyByAccentAreDistinct() {
+        // given
+        memberSignupService.signUp(new SignupCommand("tomás@example.com", VALID_PASSWORD, nickname(), REQUEST_IP));
+
+        // when
+        SignupResult second = memberSignupService.signUp(
+                new SignupCommand("tomas@example.com", VALID_PASSWORD, nickname(), REQUEST_IP));
+
+        // then
+        assertThat(memberJpaRepository.findById(second.memberId()).orElseThrow().getEmail())
+                .isEqualTo("tomas@example.com");
+        assertThat(memberJpaRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("[F-01] 앞뒤 공백만 다른 닉네임은 서비스에서도 INVALID_INPUT이고 회원이 만들어지지 않는다")
+    void nicknameWithSurroundingWhitespaceIsRejected() {
+        // given
+        String nickname = nickname();
+        memberSignupService.signUp(new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname, REQUEST_IP));
+        SignupCommand padded = new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname + " ", REQUEST_IP);
+
+        // when & then
+        assertThatThrownBy(() -> memberSignupService.signUp(padded))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));
         assertThat(memberJpaRepository.count()).isEqualTo(1);
     }
 

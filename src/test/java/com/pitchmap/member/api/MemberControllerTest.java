@@ -18,6 +18,8 @@ import com.pitchmap.member.domain.MemberException;
 import com.pitchmap.member.domain.MemberStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -140,6 +142,51 @@ class MemberControllerTest {
         MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, "   ");
 
         assertInvalidInput(result, "nickname");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" hiker", "hiker ", "hi ker ", "\\thiker"})
+    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있으면 nickname 필드 오류로 400을 응답한다")
+    void nicknameWithSurroundingWhitespaceReturnsFieldError(String nickname) {
+        MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, nickname);
+
+        assertInvalidInput(result, "nickname");
+    }
+
+    @Test
+    @DisplayName("[F-01] 닉네임 길이는 실제 글자 수로 센다: 이모지 20개는 받고 21개는 거부한다")
+    void nicknameLengthCountsCodePoints() {
+        when(memberSignupService.signUp(any())).thenReturn(new SignupResult(12L, MemberStatus.UNVERIFIED));
+
+        MvcTestResult twenty = post("hiker@example.com", VALID_PASSWORD, "😀".repeat(20));
+
+        assertThat(twenty).hasStatus(HttpStatus.CREATED);
+
+        MvcTestResult twentyOne = post("hiker@example.com", VALID_PASSWORD, "😀".repeat(21));
+
+        assertThat(twentyOne).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(twentyOne)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='nickname')]")
+                .asList()
+                .isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-01] 닉네임이 이모지 1글자면 최소 길이에 못 미쳐 거부한다")
+    void singleEmojiNicknameIsTooShort() {
+        MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, "😀");
+
+        assertInvalidInput(result, "nickname");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"hiker@localhost", "hiker@[127.0.0.1]"})
+    @DisplayName("[F-01][EV-06] 도메인에 점이 없거나 IP 주소인 이메일이면 email 필드 오류로 400을 응답한다")
+    void emailWithoutMailableDomainReturnsFieldError(String email) {
+        MvcTestResult result = post(email, VALID_PASSWORD, "hiker");
+
+        assertInvalidInput(result, "email");
     }
 
     @Test
