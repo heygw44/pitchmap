@@ -29,6 +29,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -121,6 +122,17 @@ class GlobalExceptionHandlerTest {
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.fieldErrors[0].field").isEqualTo("size");
+    }
+
+    @Test
+    @DisplayName("모델 속성의 값 형식이 틀리면 자바 타입 이름을 싣지 않고 필드 오류를 담아 400으로 응답한다")
+    void modelAttributeBindingFailureDoesNotLeakInternalTypeNames() {
+        MvcTestResult result = mvc.get().uri("/test/search?page=abc").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors[0].field").isEqualTo("page");
+        assertThat(result).body().asString().doesNotContain("java.");
     }
 
     @Test
@@ -291,6 +303,8 @@ class GlobalExceptionHandlerTest {
 
     record SampleRequest(@NotBlank(message = "이름은 필수입니다.") String name) {}
 
+    record SampleSearch(Integer page) {}
+
     @RestController
     @RequestMapping("/test")
     static class TestController {
@@ -313,6 +327,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/size")
         String size(@RequestParam @Min(1) int size) {
             return String.valueOf(size);
+        }
+
+        @GetMapping("/search")
+        String search(@Valid @ModelAttribute SampleSearch search) {
+            return String.valueOf(search.page());
         }
 
         @GetMapping("/unexpected")
