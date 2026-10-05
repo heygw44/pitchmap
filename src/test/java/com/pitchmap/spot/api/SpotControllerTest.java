@@ -14,6 +14,10 @@ import com.pitchmap.spot.application.SpotAreaResult;
 import com.pitchmap.spot.application.SpotCluster;
 import com.pitchmap.spot.application.SpotMapQueryService;
 import com.pitchmap.spot.application.SpotMarker;
+import com.pitchmap.spot.application.SpotNearbyItem;
+import com.pitchmap.spot.application.SpotNearbyPage;
+import com.pitchmap.spot.application.SpotNearbyQuery;
+import com.pitchmap.spot.application.SpotNearbyQueryService;
 import com.pitchmap.spot.domain.SpotType;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,12 +43,16 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 class SpotControllerTest {
 
     private static final String PATH = "/api/spots";
+    private static final String NEARBY_PATH = "/api/spots/nearby";
 
     @Autowired
     private MockMvcTester mvc;
 
     @MockitoBean
     private SpotMapQueryService spotMapQueryService;
+
+    @MockitoBean
+    private SpotNearbyQueryService spotNearbyQueryService;
 
     @Test
     @DisplayName("[F-03] 로그인하지 않은 사용자가 영역을 조회하면 200과 함께 마커 7개 필드와 빈 묶음 배열을 응답한다")
@@ -244,6 +252,187 @@ class SpotControllerTest {
         verifyNoInteractions(spotMapQueryService);
     }
 
+    @Test
+    @DisplayName("[F-04] 로그인하지 않은 사용자가 CSRF 토큰 없이 반경 검색을 하면 200과 함께 장소 8개 필드와 페이지 정보를 응답한다")
+    void anonymousNearbyQueryReturnsPage() {
+        // given
+        SpotNearbyItem campsite =
+                new SpotNearbyItem(102L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.01, false, true, 2.23);
+        SpotNearbyItem bakji = new SpotNearbyItem(101L, SpotType.BAKJI, "능선 끝 평지", 37.61, 127.05, true, false, 12.5);
+        when(spotNearbyQueryService.findNearby(any()))
+                .thenReturn(new SpotNearbyPage(List.of(campsite, bakji), 0, 20, true));
+
+        // when
+        MvcTestResult result = getNearby(validNearbyParams());
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {
+                  "content": [
+                    { "spotId": 102, "type": "CAMPSITE", "name": "숲속 야영장", "lat": 37.52, "lng": 127.01,
+                      "parkWarning": false, "closedNow": true, "distanceKm": 2.23 },
+                    { "spotId": 101, "type": "BAKJI", "name": "능선 끝 평지", "lat": 37.61, "lng": 127.05,
+                      "parkWarning": true, "closedNow": false, "distanceKm": 12.5 }
+                  ],
+                  "page": 0,
+                  "size": 20,
+                  "hasNext": true
+                }
+                """);
+    }
+
+    @Test
+    @DisplayName("[F-04] 중심 좌표와 반경만 주면 모든 유형을 필터 없이 첫 페이지 20개로 조회한다")
+    void omittedNearbyOptionsUseDefaults() {
+        // given
+        whenNearbyServiceReturnsEmpty();
+
+        // when
+        MvcTestResult result = getNearby(validNearbyParams());
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(capturedNearbyQuery())
+                .isEqualTo(new SpotNearbyQuery(37.5, 127.0, 10.0, Set.of(), false, false, false, 0, 20));
+    }
+
+    @Test
+    @DisplayName("[F-04] 쉼표로 구분한 유형, 필터 값, 페이지 번호와 크기를 조회 조건으로 바꿔 서비스에 넘긴다")
+    void nearbyFiltersAndPagingAreParsedIntoQuery() {
+        // given
+        whenNearbyServiceReturnsEmpty();
+        Map<String, String> params = validNearbyParams();
+        params.put("types", "CAMPSITE,BAKJI");
+        params.put("hasToilet", "true");
+        params.put("excludeWarning", "true");
+        params.put("page", "2");
+        params.put("size", "50");
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(capturedNearbyQuery())
+                .isEqualTo(new SpotNearbyQuery(
+                        37.5, 127.0, 10.0, Set.of(SpotType.CAMPSITE, SpotType.BAKJI), false, true, true, 2, 50));
+    }
+
+    @Test
+    @DisplayName("[F-04] 같은 이름으로 여러 번 보낸 유형도 모두 반경 검색 조건에 넣는다")
+    void repeatedTypesAreParsedIntoNearbyQuery() {
+        // given
+        whenNearbyServiceReturnsEmpty();
+        MockMvcRequestBuilder request = mvc.get().uri(NEARBY_PATH);
+        validNearbyParams().forEach(request::param);
+
+        // when
+        MvcTestResult result =
+                request.param("types", "FOREST").param("types", "BAKJI").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(capturedNearbyQuery().types()).containsExactlyInAnyOrder(SpotType.FOREST, SpotType.BAKJI);
+    }
+
+    @Test
+    @DisplayName("[F-04] 반경이 정확히 50km이면 받는다")
+    void radiusOfFiftyKmIsAccepted() {
+        // given
+        whenNearbyServiceReturnsEmpty();
+        Map<String, String> params = validNearbyParams();
+        params.put("radiusKm", "50");
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(capturedNearbyQuery().radiusKm()).isEqualTo(50.0);
+    }
+
+    @Test
+    @DisplayName("[F-04] 반경이 50km를 넘으면 400 SPOT_RADIUS_TOO_LARGE를 응답하고 조회하지 않는다")
+    void radiusOverFiftyKmReturnsRadiusTooLarge() {
+        // given
+        Map<String, String> params = validNearbyParams();
+        params.put("radiusKm", "50.1");
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("SPOT_RADIUS_TOO_LARGE");
+        verifyNoInteractions(spotNearbyQueryService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"lat", "lng", "radiusKm"})
+    @DisplayName("[F-04] 중심 좌표나 반경이 빠지면 그 필드 오류로 400 INVALID_INPUT을 응답하고 조회하지 않는다")
+    void missingNearbyParameterReturnsFieldError(String name) {
+        // given
+        Map<String, String> params = validNearbyParams();
+        params.remove(name);
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertNearbyInvalidInput(result, name);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "radiusKm, 0",
+        "radiusKm, -1",
+        "radiusKm, abc",
+        "lat, 90.1",
+        "lat, -90.1",
+        "lng, 180.1",
+        "lng, -180.1",
+        "lat, abc",
+        "page, -1",
+        "page, abc",
+        "size, 0",
+        "size, 51"
+    })
+    @DisplayName("[F-04] 반경·좌표·페이지 값이 범위를 벗어나거나 숫자가 아니면 그 필드 오류로 400 INVALID_INPUT을 응답한다")
+    void outOfRangeNearbyParameterReturnsFieldError(String name, String value) {
+        // given
+        Map<String, String> params = validNearbyParams();
+        params.put(name, value);
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertNearbyInvalidInput(result, name);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"UNKNOWN", "campsite", "CAMPSITE,PARK", "CAMPSITE,,FOREST"})
+    @DisplayName("[F-04] 반경 검색에 모르는 유형이나 빈 유형이 있으면 400 INVALID_INPUT을 응답하고 조회하지 않는다")
+    void unknownTypeReturnsInvalidInputForNearby(String types) {
+        // given
+        Map<String, String> params = validNearbyParams();
+        params.put("types", types);
+
+        // when
+        MvcTestResult result = getNearby(params);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field =~ /types.*/)]")
+                .asList()
+                .isNotEmpty();
+        verifyNoInteractions(spotNearbyQueryService);
+    }
+
     private void assertInvalidInput(MvcTestResult result, String field) {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
@@ -282,6 +471,41 @@ class SpotControllerTest {
         params.put("neLat", neLat);
         params.put("neLng", neLng);
         params.put("zoom", zoom);
+        return params;
+    }
+
+    private void assertNearbyInvalidInput(MvcTestResult result, String field) {
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='" + field + "')]")
+                .asList()
+                .isNotEmpty();
+        verifyNoInteractions(spotNearbyQueryService);
+    }
+
+    private void whenNearbyServiceReturnsEmpty() {
+        when(spotNearbyQueryService.findNearby(any())).thenReturn(new SpotNearbyPage(List.of(), 0, 20, false));
+    }
+
+    private SpotNearbyQuery capturedNearbyQuery() {
+        ArgumentCaptor<SpotNearbyQuery> captor = ArgumentCaptor.forClass(SpotNearbyQuery.class);
+        verify(spotNearbyQueryService).findNearby(captor.capture());
+        return captor.getValue();
+    }
+
+    private MvcTestResult getNearby(Map<String, String> params) {
+        MockMvcRequestBuilder request = mvc.get().uri(NEARBY_PATH);
+        params.forEach(request::param);
+        return request.exchange();
+    }
+
+    private static Map<String, String> validNearbyParams() {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("lat", "37.5");
+        params.put("lng", "127");
+        params.put("radiusKm", "10");
         return params;
     }
 }
