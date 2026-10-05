@@ -6,19 +6,29 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.pitchmap.common.error.BusinessException;
+import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
 import com.pitchmap.common.security.SecurityConfig;
 import com.pitchmap.common.trace.TraceIdFilter;
+import com.pitchmap.spot.application.PublicSpotOperatingStatus;
+import com.pitchmap.spot.application.PublicSpotSource;
 import com.pitchmap.spot.application.SpotAreaQuery;
 import com.pitchmap.spot.application.SpotAreaResult;
+import com.pitchmap.spot.application.SpotBakjiDetail;
 import com.pitchmap.spot.application.SpotCluster;
+import com.pitchmap.spot.application.SpotDetail;
+import com.pitchmap.spot.application.SpotDetailQueryService;
+import com.pitchmap.spot.application.SpotFacilities;
 import com.pitchmap.spot.application.SpotMapQueryService;
 import com.pitchmap.spot.application.SpotMarker;
 import com.pitchmap.spot.application.SpotNearbyItem;
 import com.pitchmap.spot.application.SpotNearbyPage;
 import com.pitchmap.spot.application.SpotNearbyQuery;
 import com.pitchmap.spot.application.SpotNearbyQueryService;
+import com.pitchmap.spot.application.SpotPublicDetail;
 import com.pitchmap.spot.domain.SpotType;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +63,9 @@ class SpotControllerTest {
 
     @MockitoBean
     private SpotNearbyQueryService spotNearbyQueryService;
+
+    @MockitoBean
+    private SpotDetailQueryService spotDetailQueryService;
 
     @Test
     @DisplayName("[F-03] 로그인하지 않은 사용자가 영역을 조회하면 200과 함께 마커 7개 필드와 빈 묶음 배열을 응답한다")
@@ -431,6 +444,115 @@ class SpotControllerTest {
                 .asList()
                 .isNotEmpty();
         verifyNoInteractions(spotNearbyQueryService);
+    }
+
+    @Test
+    @DisplayName("[F-05] 로그인하지 않은 사용자가 박지 상세를 조회하면 박지 상세와 제보자를 받고, publicDetail은 null이며 아직 채우지 않는 항목은 빈 값이다")
+    void anonymousReadsBakjiDetail() {
+        // given
+        SpotBakjiDetail bakji = new SpotBakjiDetail("능선 끝 평지", false, true, "WEAK", 12L, 31L, "새벽능선");
+        when(spotDetailQueryService.findDetail(101L))
+                .thenReturn(
+                        new SpotDetail(101L, SpotType.BAKJI, "능선 끝 평지", 37.71, 128.75, "강원 평창군", true, bakji, null));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/101").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {
+                  "spotId": 101, "type": "BAKJI", "name": "능선 끝 평지", "lat": 37.71, "lng": 128.75,
+                  "address": "강원 평창군",
+                  "bakji": {
+                    "description": "능선 끝 평지", "hasWater": false, "hasToilet": true, "signalLevel": "WEAK",
+                    "confirmationCount": 12, "reporter": { "memberId": 31, "nickname": "새벽능선" }
+                  },
+                  "publicDetail": null,
+                  "parkWarning": { "warned": true },
+                  "rating": { "average": null, "count": 0 },
+                  "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [], "weather": null
+                }
+                """);
+    }
+
+    @Test
+    @DisplayName("[F-05] 야영장 상세를 조회하면 원천 정보와 시설, 휴장 여부를 받고, bakji는 null이다")
+    void readsCampsiteDetail() {
+        // given
+        SpotFacilities facilities = new SpotFacilities("4", "2", "3", "개별", "전기,온수", null, "산책로", "계곡", "불가능");
+        SpotPublicDetail publicDetail = new SpotPublicDetail(
+                PublicSpotSource.GOCAMPING,
+                "일반야영장,자동차야영장",
+                facilities,
+                "033-000-0000",
+                "https://camp.example.com",
+                LocalDate.of(2025, 12, 31),
+                PublicSpotOperatingStatus.OPERATING,
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 31),
+                true);
+        when(spotDetailQueryService.findDetail(102L))
+                .thenReturn(new SpotDetail(
+                        102L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, false, null, publicDetail));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/102").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {
+                  "spotId": 102, "type": "CAMPSITE", "name": "숲속 야영장", "lat": 37.52, "lng": 127.81,
+                  "address": null,
+                  "bakji": null,
+                  "publicDetail": {
+                    "source": "GOCAMPING", "category": "일반야영장,자동차야영장",
+                    "facilities": {
+                      "toiletCount": "4", "showerCount": "2", "sinkCount": "3", "brazier": "개별",
+                      "amenities": "전기,온수", "amenitiesEtc": null, "nearbyFacilities": "산책로",
+                      "nearbyFacilitiesEtc": "계곡", "petPolicy": "불가능"
+                    },
+                    "phone": "033-000-0000", "homepage": "https://camp.example.com", "sourceDate": "2025-12-31",
+                    "operatingStatus": "OPERATING", "closedFrom": "2026-10-01", "closedUntil": "2026-10-31",
+                    "closedNow": true
+                  },
+                  "parkWarning": { "warned": false },
+                  "rating": { "average": null, "count": 0 },
+                  "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [], "weather": null
+                }
+                """);
+    }
+
+    @Test
+    @DisplayName("[F-05] 서비스가 장소를 찾지 못하면 404 NOT_FOUND를 응답한다")
+    void missingSpotReturnsNotFound() {
+        // given
+        when(spotDetailQueryService.findDetail(999L)).thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/999").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("[F-05] 장소 ID가 숫자가 아니면 400 INVALID_INPUT과 spotId 필드 오류를 응답한다")
+    void nonNumericSpotIdReturnsInvalidInput() {
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/abc").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='spotId')]")
+                .asList()
+                .isNotEmpty();
+        verifyNoInteractions(spotDetailQueryService);
     }
 
     private void assertInvalidInput(MvcTestResult result, String field) {
