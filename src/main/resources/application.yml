@@ -79,3 +79,6 @@ pitchmap:
   mail:
     # 네이버 SMTP는 발신 주소가 인증한 계정과 다르면 메일을 거부한다. 그래서 기본값을 SMTP 계정으로 둔다.
     from: ${spring.mail.username:}
+  web:
+    # 메일 안의 링크에 쓰는 프론트엔드 주소다. 로컬 기본값은 Vite 개발 서버다.
+    base-url: ${WEB_BASE_URL:http://localhost:5173}

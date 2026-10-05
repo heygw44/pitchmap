@@ -7,8 +7,6 @@ import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.session.FindByIndexNameSessionRepository;
-import org.springframework.session.Session;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +20,7 @@ public class UnverifiedMemberCleanupService {
     static final int BATCH_SIZE = 500;
 
     private final UnverifiedMemberMapper unverifiedMemberMapper;
-    private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
+    private final MemberSessions memberSessions;
     private final Clock clock;
 
     /**
@@ -50,13 +48,7 @@ public class UnverifiedMemberCleanupService {
     }
 
     // 회원 행만 지우면 세션이 남아서, 삭제된 회원의 쿠키가 한동안 로그인 상태로 통한다.
-    // 세션의 principal 이름은 회원 ID 문자열이다.
     private void deleteSessionsOf(List<Long> memberIds) {
-        for (Long memberId : memberIds) {
-            sessionRepository
-                    .findByPrincipalName(String.valueOf(memberId))
-                    .keySet()
-                    .forEach(sessionRepository::deleteById);
-        }
+        memberIds.forEach(memberSessions::invalidateAll);
     }
 }
