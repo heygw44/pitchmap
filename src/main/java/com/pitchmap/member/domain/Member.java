@@ -1,5 +1,7 @@
 package com.pitchmap.member.domain;
 
+import com.pitchmap.common.error.BusinessException;
+import com.pitchmap.common.error.CommonErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,6 +24,9 @@ public class Member {
     public static final int NICKNAME_MIN_LENGTH = 2;
     public static final int NICKNAME_MAX_LENGTH = 20;
 
+    private static final String NICKNAME_RULE_MESSAGE =
+            "닉네임은 공백이 아닌 %d~%d자여야 합니다.".formatted(NICKNAME_MIN_LENGTH, NICKNAME_MAX_LENGTH);
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -42,11 +47,13 @@ public class Member {
     @Enumerated(EnumType.STRING)
     private MemberRole role;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "self_age_group")
-    private String selfAgeGroup;
+    private SelfAgeGroup selfAgeGroup;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "self_gender")
-    private String selfGender;
+    private SelfGender selfGender;
 
     @Column(name = "email_verified_at")
     private Instant emailVerifiedAt;
@@ -73,6 +80,10 @@ public class Member {
         this.updatedAt = now;
     }
 
+    /**
+     * 미인증 일반 회원을 만든다. 닉네임이 공백이거나 길이가 범위를 벗어나면 닉네임을 바꿀 때와 같은 입력 오류 예외를 던진다.
+     * 이메일, 비밀번호 해시, 시각이 비어 있으면 호출하는 쪽의 버그라서 {@link IllegalArgumentException}을 던진다.
+     */
     public static Member register(Email email, String passwordHash, String nickname, Instant now) {
         if (email == null || passwordHash == null || now == null) {
             throw new IllegalArgumentException("회원 생성에 필요한 값이 null입니다.");
@@ -80,13 +91,7 @@ public class Member {
         if (passwordHash.isBlank()) {
             throw new IllegalArgumentException("비밀번호 해시가 비어 있습니다.");
         }
-        if (nickname == null
-                || nickname.isBlank()
-                || nickname.length() < NICKNAME_MIN_LENGTH
-                || nickname.length() > NICKNAME_MAX_LENGTH) {
-            throw new IllegalArgumentException(
-                    "닉네임은 공백이 아닌 %d~%d자여야 합니다.".formatted(NICKNAME_MIN_LENGTH, NICKNAME_MAX_LENGTH));
-        }
+        validateNickname(nickname);
         return new Member(email, passwordHash, nickname, now);
     }
 
@@ -101,5 +106,46 @@ public class Member {
         this.passwordHash = passwordHash;
         this.passwordChangedAt = now;
         this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 공백이거나 길이가 범위를 벗어나면 입력 오류 예외를 던지고
+     * 아무것도 바꾸지 않는다.
+     */
+    public void changeNickname(String nickname, Instant now) {
+        validateNickname(nickname);
+        requireNow(now);
+        this.nickname = nickname;
+        this.updatedAt = now;
+    }
+
+    /** 호출하면 스스로 밝힌 연령대와 수정 시각을 바꾼다. null을 넘기면 연령대를 지운다. */
+    public void changeSelfAgeGroup(SelfAgeGroup selfAgeGroup, Instant now) {
+        requireNow(now);
+        this.selfAgeGroup = selfAgeGroup;
+        this.updatedAt = now;
+    }
+
+    /** 호출하면 스스로 밝힌 성별과 수정 시각을 바꾼다. null을 넘기면 성별을 지운다. */
+    public void changeSelfGender(SelfGender selfGender, Instant now) {
+        requireNow(now);
+        this.selfGender = selfGender;
+        this.updatedAt = now;
+    }
+
+    // 닉네임은 회원이 직접 입력하는 값이라, 가입과 닉네임 변경 모두 규칙을 어기면 같은 입력 오류 예외를 던진다.
+    private static void validateNickname(String nickname) {
+        if (nickname == null
+                || nickname.isBlank()
+                || nickname.length() < NICKNAME_MIN_LENGTH
+                || nickname.length() > NICKNAME_MAX_LENGTH) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT, NICKNAME_RULE_MESSAGE);
+        }
+    }
+
+    private static void requireNow(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("수정 시각이 null입니다.");
+        }
     }
 }

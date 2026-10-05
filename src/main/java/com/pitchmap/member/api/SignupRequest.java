@@ -1,6 +1,7 @@
 package com.pitchmap.member.api;
 
 import com.pitchmap.member.application.SignupCommand;
+import com.pitchmap.member.domain.Member;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,7 +15,11 @@ public record SignupRequest(
 
         @NotNull(message = "비밀번호는 필수입니다.") String password,
 
-        @NotBlank(message = "닉네임은 필수입니다.") @Size(min = 2, max = 20, message = "닉네임은 2~20자여야 합니다.")
+        @NotBlank(message = "닉네임은 필수입니다.")
+        @Size(
+                min = Member.NICKNAME_MIN_LENGTH,
+                max = Member.NICKNAME_MAX_LENGTH,
+                message = "닉네임은 " + Member.NICKNAME_MIN_LENGTH + "~" + Member.NICKNAME_MAX_LENGTH + "자여야 합니다.")
         String nickname) {
 
     public SignupCommand toCommand(String requestIp) {
