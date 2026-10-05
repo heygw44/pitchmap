@@ -82,3 +82,8 @@ pitchmap:
   web:
     # 메일 안의 링크에 쓰는 프론트엔드 주소다. 로컬 기본값은 Vite 개발 서버다.
     base-url: ${WEB_BASE_URL:http://localhost:5173}
+  publicdata:
+    gocamping:
+      # 공공데이터포털 인증키(Decoding 키)다. 비밀값이라 파일에 쓰지 않고 환경 변수로만 받는다.
+      # 값이 없으면 앱은 뜨지만 고캠핑 API가 인증 오류를 돌려주므로 동기화가 실패한다.
+      service-key: ${PUBLICDATA_SERVICE_KEY:}

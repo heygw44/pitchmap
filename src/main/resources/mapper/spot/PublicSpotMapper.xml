@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.PublicSpotMapper">
+
+    <select id="selectBySourceAndExternalIds" resultType="com.pitchmap.spot.infra.PublicSpotRow">
+        SELECT d.spot_id AS spot_id,
+               d.external_id AS external_id,
+               s.name AS name,
+               s.address AS address,
+               ST_Latitude(s.location) AS latitude,
+               ST_Longitude(s.location) AS longitude,
+               d.category AS category,
+               d.facilities AS facilities,
+               d.phone AS phone,
+               d.homepage AS homepage,
+               d.operating_status AS operating_status,
+               d.closed_from AS closed_from,
+               d.closed_until AS closed_until,
+               d.source_removed_at IS NOT NULL AS source_removed
+        FROM public_spot_detail d
+        JOIN spot s ON s.id = d.spot_id
+        WHERE d.source = #{source}
+          AND d.external_id IN
+        <foreach collection="externalIds" item="externalId" open="(" separator="," close=")">
+            #{externalId}
+        </foreach>
+    </select>
+
+    <!-- POINT(x, y)는 SRID가 없는 점을 만들고, ST_SRID가 그 점에 SRID 4326을 붙인다.
+         MySQL은 SRID 4326 점의 내부 저장 형식에서 x를 경도, y를 위도로 읽으므로 경도를 먼저 넘긴다. -->
+    <insert id="insertSpots" useGeneratedKeys="true" keyProperty="spots.spotId" keyColumn="id">
+        INSERT INTO spot (type, name, location, address, weather_nx, weather_ny, status, created_at, updated_at)
+        VALUES
+        <foreach collection="spots" item="spot" separator=",">
+            (#{spotType},
+             #{spot.columns.name},
+             ST_SRID(POINT(#{spot.columns.longitude}, #{spot.columns.latitude}), 4326),
+             #{spot.columns.address},
+             #{spot.columns.weatherNx},
+             #{spot.columns.weatherNy},
+             'ACTIVE',
+             #{now},
+             #{now})
+        </foreach>
+    </insert>
+
+    <insert id="insertDetails">
+        INSERT INTO public_spot_detail
+            (spot_id, source, external_id, category, facilities, phone, homepage,
+             operating_status, closed_from, closed_until, synced_at, created_at, updated_at)
+        VALUES
+        <foreach collection="spots" item="spot" separator=",">
+            (#{spot.spotId},
+             #{source},
+             #{spot.columns.externalId},
+             #{spot.columns.category},
+             CAST(#{spot.columns.facilities} AS JSON),
+             #{spot.columns.phone},
+             #{spot.columns.homepage},
+             #{spot.columns.operatingStatus},
+             #{spot.columns.closedFrom},
+             #{spot.columns.closedUntil},
+             #{now},
+             #{now},
+             #{now})
+        </foreach>
+    </insert>
+
+    <!-- 행마다 값이 달라서, 바꿀 값을 UNION ALL 파생 테이블로 만들고 기본 키로 조인해 한 문장으로 갱신한다.
+         INSERT ... ON DUPLICATE KEY UPDATE와 달리 이 문장은 그사이 행이 없어져도 새 행을 만들지 않는다. -->
+    <update id="updateSpots">
+        UPDATE spot s
+        JOIN (
+        <foreach collection="spots" item="spot" separator="UNION ALL">
+            SELECT #{spot.spotId} AS id,
+                   #{spot.columns.name} AS name,
+                   #{spot.columns.address} AS address,
+                   #{spot.columns.latitude} AS latitude,
+                   #{spot.columns.longitude} AS longitude,
+                   #{spot.columns.weatherNx} AS weather_nx,
+                   #{spot.columns.weatherNy} AS weather_ny
+        </foreach>
+        ) AS changed ON changed.id = s.id
+        SET s.name = changed.name,
+            s.address = changed.address,
+            s.location = ST_SRID(POINT(changed.longitude, changed.latitude), 4326),
+            s.weather_nx = changed.weather_nx,
+            s.weather_ny = changed.weather_ny,
+            s.updated_at = #{now}
+    </update>
+
+    <update id="updateDetails">
+        UPDATE public_spot_detail d
+        JOIN (
+        <foreach collection="spots" item="spot" separator="UNION ALL">
+            SELECT #{spot.spotId} AS spot_id,
+                   #{spot.columns.category} AS category,
+                   #{spot.columns.facilities} AS facilities,
+                   #{spot.columns.phone} AS phone,
+                   #{spot.columns.homepage} AS homepage,
+                   #{spot.columns.operatingStatus} AS operating_status,
+                   #{spot.columns.closedFrom} AS closed_from,
+                   #{spot.columns.closedUntil} AS closed_until
+        </foreach>
+        ) AS changed ON changed.spot_id = d.spot_id
+        SET d.category = changed.category,
+            d.facilities = CAST(changed.facilities AS JSON),
+            d.phone = changed.phone,
+            d.homepage = changed.homepage,
+            d.operating_status = changed.operating_status,
+            d.closed_from = CAST(changed.closed_from AS DATE),
+            d.closed_until = CAST(changed.closed_until AS DATE),
+            d.synced_at = #{now},
+            d.updated_at = #{now}
+    </update>
+
+    <!-- 원천 삭제로 숨겼던 장소를 되돌린다. 조건에 source_removed_at을 쓰므로, 같은 트랜잭션에서 clearSourceRemoved보다 먼저 실행해야 한다.
+         SET은 spot의 열만 바꾼다. 그래서 두 테이블을 조인해도 영향받은 행 수는 spot에서 바뀐 행 수와 같다. -->
+    <update id="restoreSpots">
+        UPDATE spot s
+        JOIN public_spot_detail d ON d.spot_id = s.id
+        SET s.status = 'ACTIVE',
+            s.updated_at = #{now}
+        WHERE s.status = 'HIDDEN'
+          AND d.source_removed_at IS NOT NULL
+          AND s.id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <update id="clearSourceRemoved">
+        UPDATE public_spot_detail
+        SET source_removed_at = NULL,
+            updated_at = #{now}
+        WHERE source_removed_at IS NOT NULL
+          AND spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <select id="selectRemovalCandidateIds" resultType="long">
+        SELECT d.spot_id
+        FROM public_spot_detail d
+        JOIN spot s ON s.id = d.spot_id
+        WHERE d.source = #{source}
+          AND s.status = 'ACTIVE'
+          AND d.source_removed_at IS NULL
+          AND d.external_id IN
+        <foreach collection="externalIds" item="externalId" open="(" separator="," close=")">
+            #{externalId}
+        </foreach>
+    </select>
+
+    <!-- 기본 키로만 읽으므로, 존재하지 않는 키 사이의 틈에는 잠금이 걸리지 않는다. -->
+    <select id="lockRemovalCandidates" resultType="long">
+        SELECT d.spot_id
+        FROM public_spot_detail d
+        JOIN spot s ON s.id = d.spot_id
+        WHERE s.status = 'ACTIVE'
+          AND d.source_removed_at IS NULL
+          AND d.spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+        ORDER BY d.spot_id
+        FOR UPDATE
+    </select>
+
+    <update id="hideSpots">
+        UPDATE spot
+        SET status = 'HIDDEN',
+            updated_at = #{now}
+        WHERE status = 'ACTIVE'
+          AND id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <update id="markSourceRemoved">
+        UPDATE public_spot_detail
+        SET source_removed_at = #{now},
+            updated_at = #{now}
+        WHERE spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+</mapper>
