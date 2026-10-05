@@ -9,3 +9,8 @@ spring:
     # 비밀번호는 설정 파일에 두지 않는다. 값이 없으면 ${DB_PASSWORD} 문자열이 그대로 비밀번호로 쓰여
     # 시작할 때 Flyway가 DB에 접속하면 MySQL이 거부하므로 앱이 뜨지 않는다.
     password: ${DB_PASSWORD}
+pitchmap:
+  publicdata:
+    forest:
+      # 로컬에서는 data/raw/에 받아 둔 파일을 기본으로 쓴다. 상대 경로라 bootRun을 저장소 루트에서 실행해야 이 파일을 찾는다.
+      file: ${PUBLICDATA_FOREST_FILE:data/raw/산림청 국립자연휴양림관리소_국립자연휴양림 예약 정책_20260325.csv}

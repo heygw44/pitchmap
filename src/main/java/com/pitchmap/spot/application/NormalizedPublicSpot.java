@@ -31,7 +31,8 @@ record NormalizedPublicSpot(
         String homepage,
         PublicSpotOperatingStatus operatingStatus,
         LocalDate closedFrom,
-        LocalDate closedUntil) {
+        LocalDate closedUntil,
+        LocalDate sourceDate) {
 
     // 열 크기는 spot, public_spot_detail 테이블 정의와 같다. MySQL VARCHAR는 바이트가 아니라 문자 수로 길이를 센다.
     static final int MAX_EXTERNAL_ID_LENGTH = 50;
@@ -69,7 +70,8 @@ record NormalizedPublicSpot(
                 dropIfTooLong(blankToNull(command.homepage()), MAX_HOMEPAGE_LENGTH),
                 command.operatingStatus(),
                 command.closedFrom(),
-                command.closedUntil());
+                command.closedUntil(),
+                command.sourceDate());
     }
 
     /** 호출하면 spot 테이블에 저장한 이름, 주소, 좌표 중 하나라도 이 값과 다른지 돌려준다. */
@@ -81,7 +83,7 @@ record NormalizedPublicSpot(
     }
 
     /**
-     * 호출하면 public_spot_detail에 저장한 분류, 시설, 전화번호, 홈페이지, 운영 상태, 휴장 기간 중 하나라도 이 값과 다른지 돌려준다. 값이 없는
+     * 호출하면 public_spot_detail에 저장한 분류, 시설, 전화번호, 홈페이지, 운영 상태, 휴장 기간, 기준일 중 하나라도 이 값과 다른지 돌려준다. 값이 없는
      * 쪽(null)과 있는 쪽은 다른 값으로 본다.
      */
     boolean differsInDetailColumns(PublicSpotRow stored, Map<String, String> storedFacilities) {
@@ -91,7 +93,8 @@ record NormalizedPublicSpot(
                 || !Objects.equals(homepage, stored.homepage())
                 || !Objects.equals(operatingStatusName(), stored.operatingStatus())
                 || !Objects.equals(closedFrom, stored.closedFrom())
-                || !Objects.equals(closedUntil, stored.closedUntil());
+                || !Objects.equals(closedUntil, stored.closedUntil())
+                || !Objects.equals(sourceDate, stored.sourceDate());
     }
 
     PublicSpotColumns toColumns(String facilitiesJson) {
@@ -109,7 +112,8 @@ record NormalizedPublicSpot(
                 homepage,
                 operatingStatusName(),
                 closedFrom,
-                closedUntil);
+                closedUntil,
+                sourceDate);
     }
 
     private String operatingStatusName() {

@@ -66,6 +66,7 @@ class PublicSpotSyncServiceIntegrationTest {
                 "https://example.com",
                 null,
                 null,
+                null,
                 null);
 
         // when
@@ -188,6 +189,7 @@ class PublicSpotSyncServiceIntegrationTest {
                 newFacilities,
                 "02-000-0000",
                 "https://example.com",
+                null,
                 null,
                 null,
                 null);
@@ -637,6 +639,69 @@ class PublicSpotSyncServiceIntegrationTest {
         assertThat(spot.syncedAt()).isEqualTo(MutableClock.DEFAULT_INSTANT);
     }
 
+    @Test
+    @DisplayName("[F-06] 자연휴양림 출처로 적재하면 FOREST 장소로 저장하고, 기준일만 바뀌어도 상세를 갱신한다")
+    void forestUpsertStoresSourceDateAndUpdatesWhenOnlySourceDateChanges() {
+        // given
+        LocalDate firstDate = LocalDate.parse("2026-03-25");
+        LocalDate nextDate = LocalDate.parse("2026-09-25");
+        PublicSpotCommand first = forest("F-1", firstDate);
+
+        // when
+        PublicSpotUpsertResult inserted = publicSpotSyncService.upsert(PublicSpotSource.FOREST, List.of(first));
+        PublicSpotUpsertResult again = publicSpotSyncService.upsert(PublicSpotSource.FOREST, List.of(first));
+        clock.advance(NEXT_SYNC);
+        PublicSpotUpsertResult updated =
+                publicSpotSyncService.upsert(PublicSpotSource.FOREST, List.of(forest("F-1", nextDate)));
+
+        // then
+        assertThat(inserted).isEqualTo(new PublicSpotUpsertResult(1, 0, 0, 0));
+        assertThat(again).isEqualTo(new PublicSpotUpsertResult(0, 0, 1, 0));
+        assertThat(updated).isEqualTo(new PublicSpotUpsertResult(0, 1, 0, 0));
+        StoredSpot spot = findSpot(PublicSpotSource.FOREST, "F-1");
+        assertThat(spot.type()).isEqualTo("FOREST");
+        assertThat(spot.detailUpdatedAt()).isEqualTo(MutableClock.DEFAULT_INSTANT.plus(NEXT_SYNC));
+        assertThat(findSourceDate(PublicSpotSource.FOREST, "F-1")).isEqualTo(nextDate);
+    }
+
+    @Test
+    @DisplayName("[F-06] 자연휴양림 출처로 처음 적재하면 기준일을 public_spot_detail.source_date에 저장한다")
+    void forestUpsertStoresSourceDate() {
+        // given
+        LocalDate sourceDate = LocalDate.parse("2026-03-25");
+
+        // when
+        publicSpotSyncService.upsert(PublicSpotSource.FOREST, List.of(forest("F-1", sourceDate)));
+
+        // then
+        assertThat(findSourceDate(PublicSpotSource.FOREST, "F-1")).isEqualTo(sourceDate);
+    }
+
+    private static PublicSpotCommand forest(String externalId, LocalDate sourceDate) {
+        return new PublicSpotCommand(
+                externalId,
+                "솔숲 자연휴양림",
+                CHUNCHEON_LATITUDE,
+                CHUNCHEON_LONGITUDE,
+                "강원 춘천시 남산면 1",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                sourceDate);
+    }
+
+    private LocalDate findSourceDate(PublicSpotSource source, String externalId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT source_date FROM public_spot_detail WHERE source = ? AND external_id = ?",
+                LocalDate.class,
+                source.name(),
+                externalId);
+    }
+
     private static PublicSpotCommand campsite(String externalId, String name, double latitude, double longitude) {
         return campsite(externalId, name, latitude, longitude, null, null, null);
     }
@@ -662,7 +727,8 @@ class PublicSpotSyncServiceIntegrationTest {
                 "https://example.com",
                 operatingStatus,
                 closedFrom,
-                closedUntil);
+                closedUntil,
+                null);
     }
 
     private PublicSpotCommand seoulCampsite(String externalId, String name) {

@@ -21,4 +21,5 @@ public record PublicSpotColumns(
         String homepage,
         String operatingStatus,
         LocalDate closedFrom,
-        LocalDate closedUntil) {}
+        LocalDate closedUntil,
+        LocalDate sourceDate) {}
