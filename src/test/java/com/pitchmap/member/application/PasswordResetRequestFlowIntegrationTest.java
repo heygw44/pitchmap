@@ -33,6 +33,7 @@ class PasswordResetRequestFlowIntegrationTest {
 
     private static final String MAIL_SUBJECT = "[피치맵] 비밀번호 재설정 안내";
     private static final String LINK_PREFIX = "/password-reset#token=";
+    private static final String CLIENT_IP = "203.0.113.7";
 
     @Autowired
     private PasswordResetRequestService requestService;
@@ -74,7 +75,7 @@ class PasswordResetRequestFlowIntegrationTest {
         Instant issuedAt = clock.instant();
 
         // when
-        requestService.request(member.getEmail());
+        requestService.request(member.getEmail(), CLIENT_IP);
 
         // then
         Map<String, Object> event = findOnlyEvent();
@@ -113,12 +114,14 @@ class PasswordResetRequestFlowIntegrationTest {
         Member member = newMember("known@example.com");
 
         // when & then
-        assertThatCode(() -> requestService.request("unknown@example.com")).doesNotThrowAnyException();
+        assertThatCode(() -> requestService.request("unknown@example.com", CLIENT_IP))
+                .doesNotThrowAnyException();
         assertThat(countRows("outbox_event")).isZero();
         assertThat(publisher.publishPending()).isZero();
         assertThat(countRows("password_reset_token")).isZero();
         assertThat(mailSender.sent()).isEmpty();
-        assertThatCode(() -> requestService.request(member.getEmail())).doesNotThrowAnyException();
+        assertThatCode(() -> requestService.request(member.getEmail(), CLIENT_IP))
+                .doesNotThrowAnyException();
         assertThat(countRows("outbox_event")).isEqualTo(1);
     }
 
@@ -130,7 +133,7 @@ class PasswordResetRequestFlowIntegrationTest {
         assertThat(member.getEmail()).isEqualTo("mixed@example.com");
 
         // when
-        requestService.request("MIXED@example.COM");
+        requestService.request("MIXED@example.COM", CLIENT_IP);
         publisher.publishPending();
 
         // then
@@ -151,15 +154,15 @@ class PasswordResetRequestFlowIntegrationTest {
         setStatus(suspended, "SUSPENDED");
 
         // when
-        requestService.request(withdrawn.getEmail());
+        requestService.request(withdrawn.getEmail(), CLIENT_IP);
 
         // then
         assertThat(countRows("outbox_event")).isZero();
 
         // when
-        requestService.request(unverified.getEmail());
-        requestService.request(active.getEmail());
-        requestService.request(suspended.getEmail());
+        requestService.request(unverified.getEmail(), CLIENT_IP);
+        requestService.request(active.getEmail(), CLIENT_IP);
+        requestService.request(suspended.getEmail(), CLIENT_IP);
         publisher.publishPending();
 
         // then
@@ -174,7 +177,7 @@ class PasswordResetRequestFlowIntegrationTest {
     void memberWithdrawnBeforeHandlingGetsNothing() {
         // given
         Member member = newMember("late-withdrawn@example.com");
-        requestService.request(member.getEmail());
+        requestService.request(member.getEmail(), CLIENT_IP);
         setStatus(member, "WITHDRAWN");
 
         // when
@@ -195,7 +198,7 @@ class PasswordResetRequestFlowIntegrationTest {
 
         // when
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
-                    requestService.request(member.getEmail());
+                    requestService.request(member.getEmail(), CLIENT_IP);
                     throw new IllegalStateException("요청 이후 단계 실패");
                 }))
                 .isInstanceOf(IllegalStateException.class);
@@ -213,7 +216,7 @@ class PasswordResetRequestFlowIntegrationTest {
     void rawTokenIsNotStored() {
         // given
         Member member = newMember("hash-only@example.com");
-        requestService.request(member.getEmail());
+        requestService.request(member.getEmail(), CLIENT_IP);
 
         // when
         publisher.publishPending();
@@ -232,7 +235,7 @@ class PasswordResetRequestFlowIntegrationTest {
     void failedMailIsRetriedAfterRetryDelay() {
         // given
         Member member = newMember("retry@example.com");
-        requestService.request(member.getEmail());
+        requestService.request(member.getEmail(), CLIENT_IP);
         mailSender.failNextSends(1);
 
         // when
@@ -263,7 +266,7 @@ class PasswordResetRequestFlowIntegrationTest {
     void duplicateDeliveryIssuesTwoIndependentTokens() {
         // given
         Member member = newMember("twice@example.com");
-        requestService.request(member.getEmail());
+        requestService.request(member.getEmail(), CLIENT_IP);
         OutboxMessage message = toMessage(findOnlyEvent());
 
         // when

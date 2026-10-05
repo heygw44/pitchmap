@@ -34,6 +34,21 @@ class MemberChangePasswordTest {
     }
 
     @Test
+    @DisplayName("[F-02][PW-06] 비밀번호를 바꾸면 바꾼 시각이 기록되고, 가입 직후에는 비어 있다")
+    void recordsPasswordChangedAt() {
+        // given
+        Member member = aMember().build();
+        Instant later = MutableClock.DEFAULT_INSTANT.plus(Duration.ofMinutes(5));
+        assertThat(member.getPasswordChangedAt()).isNull();
+
+        // when
+        member.changePassword(NEW_HASH, later);
+
+        // then
+        assertThat(member.getPasswordChangedAt()).isEqualTo(later);
+    }
+
+    @Test
     @DisplayName("[F-02][PW-02] 비밀번호를 바꿔도 상태와 이메일과 인증 시각은 그대로다")
     void keepsStatusAndEmail() {
         // given
@@ -62,5 +77,17 @@ class MemberChangePasswordTest {
         assertThatThrownBy(() -> member.changePassword(blank, MutableClock.DEFAULT_INSTANT))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(member.getPasswordHash()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("[F-02][PW-06] 변경이 거부되면 바꾼 시각도 그대로다")
+    void keepsPasswordChangedAtWhenRejected() {
+        // given
+        Member member = aMember().build();
+
+        // then
+        assertThatThrownBy(() -> member.changePassword(" ", MutableClock.DEFAULT_INSTANT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(member.getPasswordChangedAt()).isNull();
     }
 }

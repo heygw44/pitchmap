@@ -3,6 +3,7 @@ package com.pitchmap.member.api;
 import com.pitchmap.member.application.PasswordResetConfirmService;
 import com.pitchmap.member.application.PasswordResetRequestService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,11 +28,12 @@ class PasswordResetController {
 
     @Operation(
             summary = "비밀번호 재설정 요청",
-            description = "이메일로 재설정 링크를 보낸다. 가입 여부를 숨기려고 가입된 이메일이든 아니든 항상 204로 응답한다. 링크는 30분 안에 한 번만 쓸 수 있다.")
+            description = "이메일로 재설정 링크를 보낸다. 가입 여부를 숨기려고 가입된 이메일이든 아니든 같은 204로 응답한다. 링크는 30분 안에 한 번만 쓸 수 있다. "
+                    + "한도를 넘으면 429 PASSWORD_RESET_LIMITED와 Retry-After 헤더(풀리기까지 남은 초)를 돌려준다.")
     @PostMapping("/request")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    void request(@Valid @RequestBody PasswordResetRequest request) {
-        passwordResetRequestService.request(request.email());
+    void request(@Valid @RequestBody PasswordResetRequest request, HttpServletRequest httpRequest) {
+        passwordResetRequestService.request(request.email(), httpRequest.getRemoteAddr());
     }
 
     @Operation(
