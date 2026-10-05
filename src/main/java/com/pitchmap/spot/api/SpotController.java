@@ -1,5 +1,6 @@
 package com.pitchmap.spot.api;
 
+import com.pitchmap.spot.application.SpotDetailQueryService;
 import com.pitchmap.spot.application.SpotMapQueryService;
 import com.pitchmap.spot.application.SpotNearbyQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,10 +18,15 @@ class SpotController {
 
     private final SpotMapQueryService spotMapQueryService;
     private final SpotNearbyQueryService spotNearbyQueryService;
+    private final SpotDetailQueryService spotDetailQueryService;
 
-    SpotController(SpotMapQueryService spotMapQueryService, SpotNearbyQueryService spotNearbyQueryService) {
+    SpotController(
+            SpotMapQueryService spotMapQueryService,
+            SpotNearbyQueryService spotNearbyQueryService,
+            SpotDetailQueryService spotDetailQueryService) {
         this.spotMapQueryService = spotMapQueryService;
         this.spotNearbyQueryService = spotNearbyQueryService;
+        this.spotDetailQueryService = spotDetailQueryService;
     }
 
     @Operation(
@@ -60,5 +67,24 @@ class SpotController {
     @GetMapping("/nearby")
     SpotNearbyPageResponse findNearby(@Valid @ParameterObject @ModelAttribute SpotNearbyRequest request) {
         return SpotNearbyPageResponse.from(spotNearbyQueryService.findNearby(request.toQuery()));
+    }
+
+    @Operation(
+            summary = "장소 상세",
+            description = "장소 하나의 기본 정보와 유형별 상세를 돌려준다. 로그인하지 않아도 조회할 수 있다. "
+                    + "박지(BAKJI)이면 서버는 bakji에 설명, 물·화장실 유무, 통신 신호, 다녀온 회원의 확인 수, "
+                    + "제보자(memberId, nickname)를 채우고 publicDetail은 null로 준다. "
+                    + "야영장(CAMPSITE)과 자연휴양림(FOREST)이면 publicDetail에 원천, 분류, 시설, 연락처, 원천 기준일, "
+                    + "운영 상태, 휴장 기간을 채우고 bakji는 null로 준다. 원천에 시설 정보가 없으면 facilities는 null이다. "
+                    + "closedNow는 서버가 오늘 한국 날짜로 계산한 휴장 여부다. 원천의 휴장 정보가 정확하지 않아서 "
+                    + "서버는 휴장 중인 장소도 숨기지 않고 표시만 한다. "
+                    + "parkWarning은 지금은 공원 경계 경고 여부(warned)만 준다. "
+                    + "아직 채우지 않는 항목이 있어서, rating은 average가 null이고 count가 0이며, "
+                    + "recentReviews, expectedPeople, recruitingBasecamps는 빈 배열, weather는 null로 준다. "
+                    + "장소가 없거나 숨김, 삭제, 검토 대기 상태이면 404 NOT_FOUND로 응답한다. "
+                    + "spotId가 숫자가 아니면 400 INVALID_INPUT으로 응답한다.")
+    @GetMapping("/{spotId}")
+    SpotDetailResponse findDetail(@PathVariable long spotId) {
+        return SpotDetailResponse.from(spotDetailQueryService.findDetail(spotId));
     }
 }

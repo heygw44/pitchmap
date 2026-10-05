@@ -202,6 +202,91 @@ class SpotApiIntegrationTest {
                 .isEqualTo(result.getResponse().getHeader(TraceIdFilter.HEADER));
     }
 
+    @Test
+    @DisplayName("[F-05] 로그인하지 않은 사용자가 박지 상세를 조회하면 박지 상세와 확인 수, 제보자 닉네임을 받고 publicDetail은 null이다")
+    void anonymousReadsBakjiDetail() {
+        // given: 제보자 한 명이 박지를 올렸고, 다른 회원 두 명이 확인을 남겼다.
+        long reporterId = insertMember("새벽능선");
+        long spotId = insertBakji("능선 끝 평지", "ACTIVE", reporterId);
+        insertConfirmation(spotId, insertMember("확인자하나"));
+        insertConfirmation(spotId, insertMember("확인자둘"));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/" + spotId).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.spotId").isEqualTo((int) spotId);
+        assertThat(result).bodyJson().extractingPath("$.type").isEqualTo("BAKJI");
+        assertThat(result).bodyJson().extractingPath("$.bakji.hasWater").isEqualTo(true);
+        assertThat(result).bodyJson().extractingPath("$.bakji.hasToilet").isEqualTo(false);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.bakji.confirmationCount")
+                .isEqualTo(2);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.bakji.reporter.memberId")
+                .isEqualTo((int) reporterId);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.bakji.reporter.nickname")
+                .isEqualTo("새벽능선");
+        assertThat(result).bodyJson().extractingPath("$.publicDetail").isNull();
+        assertThat(result).bodyJson().extractingPath("$.parkWarning.warned").isEqualTo(false);
+        assertThat(result).bodyJson().extractingPath("$.rating.count").isEqualTo(0);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.recruitingBasecamps")
+                .asList()
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-05] 로그인하지 않은 사용자가 휴장 중인 야영장 상세를 조회하면 publicDetail과 closedNow true를 받고 bakji는 null이다")
+    void anonymousReadsCampsiteDetail() {
+        // given: 시계는 한국 날짜 2026-10-05이고, 야영장은 그날을 포함한 휴장 기간이 있다.
+        long spotId = insertCampsite("상세 야영장", 37.5, 127.5);
+        insertPublicDetail(spotId, "GC-DETAIL", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/" + spotId).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.type").isEqualTo("CAMPSITE");
+        assertThat(result).bodyJson().extractingPath("$.name").isEqualTo("상세 야영장");
+        assertThat(result).bodyJson().extractingPath("$.bakji").isNull();
+        assertThat(result).bodyJson().extractingPath("$.publicDetail.source").isEqualTo("GOCAMPING");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.publicDetail.operatingStatus")
+                .isEqualTo("OPERATING");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.publicDetail.closedFrom")
+                .isEqualTo("2026-10-01");
+        assertThat(result).bodyJson().extractingPath("$.publicDetail.closedNow").isEqualTo(true);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.publicDetail.facilities")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("[F-05] 숨김 상태인 장소의 상세를 조회하면 404 NOT_FOUND를 응답한다")
+    void hiddenSpotReturnsNotFound() {
+        // given
+        long spotId = insertBakji("숨긴 박지", "HIDDEN", insertMember("숨김제보자"));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/" + spotId).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
     // 서버는 거리를 소수 둘째 자리까지 반올림해서 준다. 구면 거리 계산에 쓰는 지구 반지름 값에 따라
     // 마지막 자리가 달라질 수 있어서, 테스트는 0.01km 남짓한 오차를 허용한다.
     private static void assertDistanceKm(MvcTestResult result, int index, double expectedKm) {
@@ -239,5 +324,45 @@ class SpotApiIntegrationTest {
                 now,
                 now,
                 now);
+    }
+
+    private long insertBakji(String name, String status, long reporterId) {
+        Instant now = MutableClock.DEFAULT_INSTANT;
+        jdbc.update(
+                "INSERT INTO spot (type, name, location, weather_nx, weather_ny, status, created_at, updated_at)"
+                        + " VALUES ('BAKJI', ?, ST_SRID(POINT(128.75, 37.71), 4326), 60, 127, ?, ?, ?)",
+                name,
+                status,
+                now,
+                now);
+        long spotId = jdbc.queryForObject("SELECT id FROM spot WHERE name = ?", Long.class, name);
+        jdbc.update(
+                "INSERT INTO bakji_detail (spot_id, reporter_id, has_water, has_toilet, created_at, updated_at)"
+                        + " VALUES (?, ?, TRUE, FALSE, ?, ?)",
+                spotId,
+                reporterId,
+                now,
+                now);
+        return spotId;
+    }
+
+    private void insertConfirmation(long spotId, long memberId) {
+        jdbc.update(
+                "INSERT INTO bakji_confirmation (spot_id, member_id, created_at) VALUES (?, ?, ?)",
+                spotId,
+                memberId,
+                MutableClock.DEFAULT_INSTANT);
+    }
+
+    private long insertMember(String nickname) {
+        Instant now = MutableClock.DEFAULT_INSTANT;
+        jdbc.update(
+                "INSERT INTO member (email, nickname, status, role, created_at, updated_at)"
+                        + " VALUES (?, ?, 'ACTIVE', 'USER', ?, ?)",
+                nickname + "@example.com",
+                nickname,
+                now,
+                now);
+        return jdbc.queryForObject("SELECT id FROM member WHERE nickname = ?", Long.class, nickname);
     }
 }
