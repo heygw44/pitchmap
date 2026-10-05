@@ -74,6 +74,79 @@ class MemberTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {" nick", "nick ", " nick ", "\tnick", "nick\n", "ni ck ", "ni  ck"})
+    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있거나 공백이 연속하면 INVALID_INPUT으로 거부한다")
+    void register_rejectsMisplacedSpaces(String nickname) {
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                // 공백류: NBSP, 숫자 크기 공백, 좁은 NBSP, 전각 공백, 줄 구분자, 문단 구분자
+                "nick\u00A0",
+                "ni\u00A0ck",
+                "ni\u2007ck",
+                "ni\u202Fck",
+                "ni\u3000ck",
+                "ni\u2028ck",
+                "ni\u2029ck",
+                // 서식 문자: 폭 없는 공백, ZWNJ, ZWJ, 단어 결합자, BOM, 소프트 하이픈, 오른쪽에서 왼쪽 덮어쓰기
+                "ni\u200Bck",
+                "\u200B\u200B",
+                "ni\u200Cck",
+                "ni\u200Dck",
+                "ni\u2060ck",
+                "\uFEFFnick",
+                "ni\u00ADck",
+                "\u202Enick",
+                // 제어 문자
+                "ni\u0000ck",
+                "ni\u0085ck",
+                // 한글 채움 문자
+                "nick\u3164",
+                "\u3164\u3164",
+                "ni\u115Fck",
+                "ni\u1160ck",
+                "ni\uFFA0ck",
+                // ZWJ로 이은 이모지
+                "👨\u200D👩\u200D👧"
+            })
+    @DisplayName("[F-01] 닉네임에 공백류·제어·서식 문자나 한글 채움 문자가 있으면 INVALID_INPUT으로 거부한다")
+    void register_rejectsHiddenCharacters(String nickname) {
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"백패커 민수", "hi ker", "하이커❤\uFE0F", "굿👍\uD83C\uDFFB"})
+    @DisplayName("[F-01] 닉네임 가운데의 일반 공백 한 칸과 이모지의 변이 선택자·피부색 수정자는 허용한다")
+    void register_acceptsInnerSpaceAndEmojiModifiers(String nickname) {
+        assertThat(Member.register(EMAIL, HASH, nickname, NOW).getNickname()).isEqualTo(nickname);
+    }
+
+    @Test
+    @DisplayName("[F-01] 닉네임 길이는 UTF-16 문자 수가 아니라 실제 글자 수로 센다")
+    void register_countsNicknameLengthInCodePoints() {
+        String twentyEmoji = "😀".repeat(20);
+
+        assertThat(Member.register(EMAIL, HASH, twentyEmoji, NOW).getNickname()).isEqualTo(twentyEmoji);
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, "😀".repeat(21), NOW));
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, "😀", NOW));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" nick", "nick ", "ni  ck", "nick\u00A0", "nick\u3164", "ni\u200Bck"})
+    @DisplayName("닉네임을 앞뒤·연속 공백이나 보이지 않는 문자가 든 값으로 바꾸려 하면 INVALID_INPUT이고 닉네임과 수정 시각은 그대로다")
+    void changeNickname_rejectsMisplacedSpacesAndHiddenCharacters(String nickname) {
+        Member member = Member.register(EMAIL, HASH, "nick", NOW);
+
+        assertInvalidInput(() -> member.changeNickname(nickname, LATER));
+
+        assertThat(member.getNickname()).isEqualTo("nick");
+        assertThat(member.getUpdatedAt()).isEqualTo(NOW);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     @DisplayName("[F-01] 비밀번호 해시가 비어 있으면 거부한다")
     void register_rejectsBlankHash(String hash) {

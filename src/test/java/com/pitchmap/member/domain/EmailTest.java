@@ -38,10 +38,12 @@ class EmailTest {
         assertThat(Email.of("x@mailinator.com").domainCandidates()).containsExactly("mailinator.com");
     }
 
-    @Test
-    @DisplayName("[F-01][ID-01] 라벨이 1개인 도메인은 후보가 없다")
-    void domainCandidates_singleLabel() {
-        assertThat(Email.of("x@localhost").domainCandidates()).isEmpty();
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"plain", "@example.com", "user@", "user@localhost", "user@[127.0.0.1]", "user@[IPv6:::1]"})
+    @DisplayName("[F-01][EV-06] 형식이 잘못됐거나 도메인에 점이 없거나 IP 주소인 값은 IllegalArgumentException이다")
+    void of_rejectsInvalid(String raw) {
+        assertThatThrownBy(() -> Email.of(raw)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -59,13 +61,5 @@ class EmailTest {
         assertThat(Email.of("user@example.com").toString())
                 .doesNotContain("user")
                 .doesNotContain("example");
-    }
-
-    @ParameterizedTest
-    @NullSource
-    @ValueSource(strings = {"plain", "@example.com", "user@"})
-    @DisplayName("[F-01][ID-01] 형식이 잘못된 값은 IllegalArgumentException이다")
-    void of_rejectsInvalid(String raw) {
-        assertThatThrownBy(() -> Email.of(raw)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -11,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,9 +24,13 @@ public class Member {
 
     public static final int NICKNAME_MIN_LENGTH = 2;
     public static final int NICKNAME_MAX_LENGTH = 20;
+    public static final int EMAIL_MAX_LENGTH = 254;
 
-    private static final String NICKNAME_RULE_MESSAGE =
-            "닉네임은 공백이 아닌 %d~%d자여야 합니다.".formatted(NICKNAME_MIN_LENGTH, NICKNAME_MAX_LENGTH);
+    // 글자(Lo) 범주라서 범주 검사로는 걸러지지 않지만 화면에는 아무것도 그리지 않는 한글 채움 문자다.
+    private static final Set<Integer> BLANK_LETTERS = Set.of(0x115F, 0x1160, 0x3164, 0xFFA0);
+
+    public static final String NICKNAME_RULE_MESSAGE =
+            "닉네임은 " + NICKNAME_MIN_LENGTH + "~" + NICKNAME_MAX_LENGTH + "자여야 합니다. 앞뒤 공백, 연속 공백, 보이지 않는 문자는 쓸 수 없습니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -81,7 +86,7 @@ public class Member {
     }
 
     /**
-     * 미인증 일반 회원을 만든다. 닉네임이 공백이거나 길이가 범위를 벗어나면 닉네임을 바꿀 때와 같은 입력 오류 예외를 던진다.
+     * 미인증 일반 회원을 만든다. 닉네임이 규칙을 어기면 닉네임을 바꿀 때와 같은 입력 오류 예외를 던진다.
      * 이메일, 비밀번호 해시, 시각이 비어 있으면 호출하는 쪽의 버그라서 {@link IllegalArgumentException}을 던진다.
      */
     public static Member register(Email email, String passwordHash, String nickname, Instant now) {
@@ -91,7 +96,7 @@ public class Member {
         if (passwordHash.isBlank()) {
             throw new IllegalArgumentException("비밀번호 해시가 비어 있습니다.");
         }
-        validateNickname(nickname);
+        requireValidNickname(nickname);
         return new Member(email, passwordHash, nickname, now);
     }
 
@@ -109,11 +114,10 @@ public class Member {
     }
 
     /**
-     * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 공백이거나 길이가 범위를 벗어나면 입력 오류 예외를 던지고
-     * 아무것도 바꾸지 않는다.
+     * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 규칙을 어기면 입력 오류 예외를 던지고 아무것도 바꾸지 않는다.
      */
     public void changeNickname(String nickname, Instant now) {
-        validateNickname(nickname);
+        requireValidNickname(nickname);
         requireNow(now);
         this.nickname = nickname;
         this.updatedAt = now;
@@ -133,12 +137,49 @@ public class Member {
         this.updatedAt = now;
     }
 
-    // 닉네임은 회원이 직접 입력하는 값이라, 가입과 닉네임 변경 모두 규칙을 어기면 같은 입력 오류 예외를 던진다.
-    private static void validateNickname(String nickname) {
-        if (nickname == null
-                || nickname.isBlank()
-                || nickname.length() < NICKNAME_MIN_LENGTH
-                || nickname.length() > NICKNAME_MAX_LENGTH) {
+    /**
+     * 호출하면 닉네임이 규칙을 지키는지 알려 준다. 길이는 실제 글자(코드포인트) 수로 센다. 이모지처럼 UTF-16 문자 두 개로
+     * 이뤄진 글자도 DB 컬럼 길이 기준과 맞추려고 한 글자로 센다.
+     *
+     * <p>화면에서 같아 보이는 닉네임을 만들 수 있는 글자는 받지 않는다. DB 유니크 제약은 NBSP와 한글 채움 문자를 다른 글자로 보고,
+     * 폭 없는 공백은 아예 무시한다. 그래서 그대로 두면 {@code hiker}에 NBSP를 붙인 닉네임이 {@code hiker}를 사칭하며 통과한다.
+     * 이를 막으려고 일반 공백(U+0020)은 닉네임 가운데에 한 칸만 허용하고, 그 밖의 공백류·제어·서식 문자와 한글 채움 문자는 거부한다.
+     * ZWJ(U+200D)도 서식 문자라서 ZWJ로 이은 이모지는 쓸 수 없다.
+     */
+    public static boolean isValidNickname(String nickname) {
+        if (nickname == null) {
+            return false;
+        }
+        int length = nickname.codePointCount(0, nickname.length());
+        if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) {
+            return false;
+        }
+        boolean misplacedSpace = nickname.startsWith(" ") || nickname.endsWith(" ") || nickname.contains("  ");
+        return !misplacedSpace && nickname.codePoints().noneMatch(Member::isHiddenOrSpaceLike);
+    }
+
+    // 닉네임 가운데의 일반 공백은 위치와 개수를 따로 검사하므로 여기서는 보이지 않는 글자가 아닌 것으로 본다.
+    private static boolean isHiddenOrSpaceLike(int codePoint) {
+        if (codePoint == ' ') {
+            return false;
+        }
+        return switch (Character.getType(codePoint)) {
+            case Character.CONTROL,
+                    Character.FORMAT,
+                    Character.SPACE_SEPARATOR,
+                    Character.LINE_SEPARATOR,
+                    Character.PARAGRAPH_SEPARATOR -> true;
+            default -> BLANK_LETTERS.contains(codePoint);
+        };
+    }
+
+    /**
+     * 호출하면 닉네임이 규칙을 어길 때 입력 오류 예외를 던진다. 서비스는 중복 조회보다 먼저 이 메서드를 불러야 한다.
+     * 중복 조회는 DB 정렬 규칙으로 비교하는데, 이 규칙은 폭 없는 공백을 무시한다. 그래서 검증하지 않으면 폭 없는 공백이 붙은 닉네임이
+     * 입력 오류가 아니라 닉네임 중복으로 보인다.
+     */
+    public static void requireValidNickname(String nickname) {
+        if (!isValidNickname(nickname)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT, NICKNAME_RULE_MESSAGE);
         }
     }

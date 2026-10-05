@@ -61,6 +61,7 @@ public class MyInfoService {
         if (nickname.equals(member.getNickname())) {
             return;
         }
+        Member.requireValidNickname(nickname);
         // DB가 닉네임을 대소문자 구분 없이 비교하므로, 자기 닉네임의 대소문자만 바꾸는 요청도 중복으로 잡지 않게 본인 행을 뺀다.
         if (memberRepository.existsByNicknameAndIdNot(nickname, member.getId())) {
             throw new MemberException(MemberErrorCode.MEMBER_NICKNAME_DUPLICATED);

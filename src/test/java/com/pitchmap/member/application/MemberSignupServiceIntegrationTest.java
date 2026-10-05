@@ -3,6 +3,8 @@ package com.pitchmap.member.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pitchmap.common.error.BusinessException;
+import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
@@ -17,6 +19,8 @@ import com.pitchmap.member.infra.DisposableEmailDomainJpaRepository;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -89,6 +93,40 @@ class MemberSignupServiceIntegrationTest {
                 .isInstanceOfSatisfying(
                         MemberException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_EMAIL_DUPLICATED));
+        assertThat(memberJpaRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[F-01][EV-06] 악센트만 다른 이메일은 다른 이메일이라 둘 다 가입된다")
+    void emailsDifferingOnlyByAccentAreDistinct() {
+        // given
+        memberSignupService.signUp(new SignupCommand("tomás@example.com", VALID_PASSWORD, nickname(), REQUEST_IP));
+
+        // when
+        SignupResult second = memberSignupService.signUp(
+                new SignupCommand("tomas@example.com", VALID_PASSWORD, nickname(), REQUEST_IP));
+
+        // then
+        assertThat(memberJpaRepository.findById(second.memberId()).orElseThrow().getEmail())
+                .isEqualTo("tomas@example.com");
+        assertThat(memberJpaRepository.count()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" ", "\u00A0", "\u3164", "\u200B"})
+    @DisplayName("[F-01] 있는 닉네임 뒤에 공백이나 보이지 않는 문자를 붙여 같아 보이게 해도 INVALID_INPUT이고 회원이 만들어지지 않는다")
+    void lookAlikeNicknameIsRejected(String invisibleSuffix) {
+        // given
+        String nickname = nickname();
+        memberSignupService.signUp(new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname, REQUEST_IP));
+        SignupCommand lookAlike =
+                new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname + invisibleSuffix, REQUEST_IP);
+
+        // when & then
+        assertThatThrownBy(() -> memberSignupService.signUp(lookAlike))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));
         assertThat(memberJpaRepository.count()).isEqualTo(1);
     }
 
