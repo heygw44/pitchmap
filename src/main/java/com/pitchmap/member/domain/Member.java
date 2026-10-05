@@ -31,6 +31,9 @@ public class Member {
     @Column(name = "password_hash")
     private String passwordHash;
 
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
+
     private String nickname;
 
     @Enumerated(EnumType.STRING)
@@ -87,7 +90,7 @@ public class Member {
         return new Member(email, passwordHash, nickname, now);
     }
 
-    /** 호출하면 비밀번호 해시와 수정 시각만 바꾼다. 회원 상태와 다른 값은 그대로 둔다. */
+    /** 호출하면 비밀번호 해시, 비밀번호를 바꾼 시각, 수정 시각만 바꾼다. 회원 상태와 다른 값은 그대로 둔다. */
     public void changePassword(String passwordHash, Instant now) {
         if (passwordHash == null || passwordHash.isBlank()) {
             throw new IllegalArgumentException("비밀번호 해시가 비어 있습니다.");
@@ -96,6 +99,7 @@ public class Member {
             throw new IllegalArgumentException("비밀번호를 바꾼 시각이 null입니다.");
         }
         this.passwordHash = passwordHash;
+        this.passwordChangedAt = now;
         this.updatedAt = now;
     }
 }
