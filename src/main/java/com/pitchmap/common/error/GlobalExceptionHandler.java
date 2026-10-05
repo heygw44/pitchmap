@@ -62,7 +62,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         List<ErrorResponse.FieldError> fieldErrors = new ArrayList<>();
         for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            fieldErrors.add(new ErrorResponse.FieldError(fieldError.getField(), fieldError.getDefaultMessage()));
+            // 형 변환에 실패하면 Spring 기본 메시지가 java.lang.Integer 같은 자바 타입 이름이 든 영어 문장이라서, 개발자가 정한 문구로 바꿔 내보낸다.
+            String message = fieldError.isBindingFailure() ? "값의 형식이 올바르지 않습니다." : fieldError.getDefaultMessage();
+            fieldErrors.add(new ErrorResponse.FieldError(fieldError.getField(), message));
         }
         for (ObjectError globalError : ex.getBindingResult().getGlobalErrors()) {
             fieldErrors.add(new ErrorResponse.FieldError(globalError.getObjectName(), globalError.getDefaultMessage()));
