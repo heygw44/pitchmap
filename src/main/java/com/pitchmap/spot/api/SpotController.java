@@ -1,6 +1,7 @@
 package com.pitchmap.spot.api;
 
 import com.pitchmap.spot.application.SpotMapQueryService;
+import com.pitchmap.spot.application.SpotNearbyQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -14,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 class SpotController {
 
     private final SpotMapQueryService spotMapQueryService;
+    private final SpotNearbyQueryService spotNearbyQueryService;
 
-    SpotController(SpotMapQueryService spotMapQueryService) {
+    SpotController(SpotMapQueryService spotMapQueryService, SpotNearbyQueryService spotNearbyQueryService) {
         this.spotMapQueryService = spotMapQueryService;
+        this.spotNearbyQueryService = spotNearbyQueryService;
     }
 
     @Operation(
@@ -38,5 +41,24 @@ class SpotController {
     @GetMapping
     SpotAreaResponse findInArea(@Valid @ParameterObject @ModelAttribute SpotAreaRequest request) {
         return SpotAreaResponse.from(spotMapQueryService.findInArea(request.toQuery()));
+    }
+
+    @Operation(
+            summary = "반경 검색",
+            description = "중심 좌표(lat, lng)에서 반경 radiusKm 안에 있는 장소를 가까운 순서로 돌려준다. "
+                    + "로그인하지 않아도 조회할 수 있다. "
+                    + "distanceKm는 중심에서 장소까지의 거리(km)이고, 서버가 소수 둘째 자리까지 반올림해서 준다. "
+                    + "위도는 -90~90, 경도는 -180~180이고, 반경은 0보다 크고 50 이하여야 한다. "
+                    + "반경이 50을 넘으면 400 SPOT_RADIUS_TOO_LARGE로 응답한다. "
+                    + "types, hasWater, hasToilet, excludeWarning은 지도 영역 조회와 같다. 예를 들어 hasWater가 true이면 "
+                    + "서버는 물이 있는 박지만 남기고, 야영장과 자연휴양림은 이 값과 상관없이 포함한다. "
+                    + "closedNow는 서버가 오늘 한국 날짜로 계산한 휴장 여부다. 원천의 휴장 정보가 정확하지 않아서 "
+                    + "서버는 휴장 중인 장소도 숨기지 않고 표시만 한다. 박지의 closedNow는 항상 false다. "
+                    + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. "
+                    + "응답에는 전체 개수가 없고, 다음 페이지가 있는지만 hasNext로 알려 준다. "
+                    + "그 밖에 파라미터가 빠졌거나 범위를 벗어났거나 모르는 유형이면 400 INVALID_INPUT으로 응답한다.")
+    @GetMapping("/nearby")
+    SpotNearbyPageResponse findNearby(@Valid @ParameterObject @ModelAttribute SpotNearbyRequest request) {
+        return SpotNearbyPageResponse.from(spotNearbyQueryService.findNearby(request.toQuery()));
     }
 }
