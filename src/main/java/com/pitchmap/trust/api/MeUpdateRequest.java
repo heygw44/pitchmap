@@ -13,7 +13,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * <p>JSON에 빠진 필드를 Jackson이 Java {@code null}로 넘기는 경우가 있다. 그래서 생성자가 {@code null}을 "요청에 없음"으로 바꾼다.
  */
 public record MeUpdateRequest(
-        @Schema(implementation = String.class, description = "2~20자이고 공백만으로 쓸 수 없다. null로 보내면 400이다.")
+        @Schema(
+                implementation = String.class,
+                minLength = MyInfoUpdateCommand.NICKNAME_MIN_LENGTH,
+                maxLength = MyInfoUpdateCommand.NICKNAME_MAX_LENGTH,
+                description = "공백만으로 쓸 수 없다. null로 보내면 400이다.")
         PatchField<String> nickname,
 
         @Schema(
