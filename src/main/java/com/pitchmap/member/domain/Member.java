@@ -80,6 +80,10 @@ public class Member {
         this.updatedAt = now;
     }
 
+    /**
+     * 미인증 일반 회원을 만든다. 닉네임이 공백이거나 길이가 범위를 벗어나면 닉네임을 바꿀 때와 같은 입력 오류 예외를 던진다.
+     * 이메일, 비밀번호 해시, 시각이 비어 있으면 호출하는 쪽의 버그라서 {@link IllegalArgumentException}을 던진다.
+     */
     public static Member register(Email email, String passwordHash, String nickname, Instant now) {
         if (email == null || passwordHash == null || now == null) {
             throw new IllegalArgumentException("회원 생성에 필요한 값이 null입니다.");
@@ -87,9 +91,7 @@ public class Member {
         if (passwordHash.isBlank()) {
             throw new IllegalArgumentException("비밀번호 해시가 비어 있습니다.");
         }
-        if (!isValidNickname(nickname)) {
-            throw new IllegalArgumentException(NICKNAME_RULE_MESSAGE);
-        }
+        validateNickname(nickname);
         return new Member(email, passwordHash, nickname, now);
     }
 
@@ -111,9 +113,7 @@ public class Member {
      * 아무것도 바꾸지 않는다.
      */
     public void changeNickname(String nickname, Instant now) {
-        if (!isValidNickname(nickname)) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT, NICKNAME_RULE_MESSAGE);
-        }
+        validateNickname(nickname);
         requireNow(now);
         this.nickname = nickname;
         this.updatedAt = now;
@@ -133,13 +133,14 @@ public class Member {
         this.updatedAt = now;
     }
 
-    // 가입과 닉네임 변경이 같은 규칙을 쓰도록 판정을 한 곳에 둔다.
-    // 다만 가입 요청은 API 계층이 먼저 검증하므로, 가입에서 이 판정에 걸리면 호출하는 쪽의 버그라서 다른 예외를 던진다.
-    private static boolean isValidNickname(String nickname) {
-        return nickname != null
-                && !nickname.isBlank()
-                && nickname.length() >= NICKNAME_MIN_LENGTH
-                && nickname.length() <= NICKNAME_MAX_LENGTH;
+    // 닉네임은 회원이 직접 입력하는 값이라, 가입과 닉네임 변경 모두 규칙을 어기면 같은 입력 오류 예외를 던진다.
+    private static void validateNickname(String nickname) {
+        if (nickname == null
+                || nickname.isBlank()
+                || nickname.length() < NICKNAME_MIN_LENGTH
+                || nickname.length() > NICKNAME_MAX_LENGTH) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT, NICKNAME_RULE_MESSAGE);
+        }
     }
 
     private static void requireNow(Instant now) {

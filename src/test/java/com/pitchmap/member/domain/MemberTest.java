@@ -8,6 +8,7 @@ import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.testsupport.MutableClock;
 import java.time.Duration;
 import java.time.Instant;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,20 +58,19 @@ class MemberTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 21})
-    @DisplayName("[F-01] 닉네임이 범위를 벗어나면 거부한다")
+    @DisplayName("[F-01] 닉네임이 범위를 벗어나면 INVALID_INPUT으로 거부한다")
     void register_rejectsNicknameOutOfRange(int length) {
         String nickname = "n".repeat(length);
 
-        assertThatThrownBy(() -> Member.register(EMAIL, HASH, nickname, NOW))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
     }
 
     @ParameterizedTest
+    @NullSource
     @ValueSource(strings = {"", "  ", "   \t"})
-    @DisplayName("[F-01] 닉네임이 공백이면 거부한다")
+    @DisplayName("[F-01] 닉네임이 null이거나 공백이면 INVALID_INPUT으로 거부한다")
     void register_rejectsBlankNickname(String nickname) {
-        assertThatThrownBy(() -> Member.register(EMAIL, HASH, nickname, NOW))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
     }
 
     @ParameterizedTest
@@ -82,12 +82,11 @@ class MemberTest {
     }
 
     @Test
-    @DisplayName("[F-01] null 인자는 거부한다")
+    @DisplayName("[F-01] 이메일, 비밀번호 해시, 시각이 null이면 거부한다")
     void register_rejectsNulls() {
         assertThatThrownBy(() -> Member.register(null, HASH, "nick", NOW)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Member.register(EMAIL, null, "nick", NOW))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Member.register(EMAIL, HASH, null, NOW)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Member.register(EMAIL, HASH, "nick", null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -118,10 +117,7 @@ class MemberTest {
         Member member = Member.register(EMAIL, HASH, "nick", NOW);
 
         // when & then
-        assertThatThrownBy(() -> member.changeNickname(nickname, LATER))
-                .isInstanceOfSatisfying(
-                        BusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));
+        assertInvalidInput(() -> member.changeNickname(nickname, LATER));
         assertThat(member.getNickname()).isEqualTo("nick");
         assertThat(member.getUpdatedAt()).isEqualTo(NOW);
     }
@@ -198,5 +194,12 @@ class MemberTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> member.changeSelfGender(SelfGender.MALE, null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static void assertInvalidInput(ThrowingCallable call) {
+        assertThatThrownBy(call)
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));
     }
 }
