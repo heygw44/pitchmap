@@ -1,7 +1,5 @@
 package com.pitchmap.spot.application;
 
-import com.pitchmap.spot.domain.SpotClosure;
-import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.spot.infra.SpotAreaCondition;
 import com.pitchmap.spot.infra.SpotAreaMapper;
 import com.pitchmap.spot.infra.SpotClusterGrid;
@@ -84,21 +82,8 @@ public class SpotMapQueryService {
                 row.spotId(), row.type(), row.name(), row.lat(), row.lng(), row.parkWarning(), isClosedOn(row, today));
     }
 
-    // 박지는 사용자가 제보한 장소라 운영 상태나 휴장 기간이 없다. 그래서 서버는 박지를 항상 휴장이 아닌 것으로 본다.
     private static boolean isClosedOn(SpotMarkerRow row, LocalDate today) {
-        if (row.type() == SpotType.BAKJI) {
-            return false;
-        }
-        SpotClosure closure =
-                new SpotClosure(toOperatingStatus(row.operatingStatus()), row.closedFrom(), row.closedUntil());
-        return closure.isClosedOn(today);
-    }
-
-    private static PublicSpotOperatingStatus toOperatingStatus(String operatingStatus) {
-        if (operatingStatus == null) {
-            return null;
-        }
-        return PublicSpotOperatingStatus.valueOf(operatingStatus);
+        return SpotClosedNow.isClosedOn(row.type(), row.operatingStatus(), row.closedFrom(), row.closedUntil(), today);
     }
 
     private static SpotCluster toCluster(SpotClusterRow row) {
