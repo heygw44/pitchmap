@@ -24,4 +24,5 @@ public record PublicSpotRow(
         String operatingStatus,
         LocalDate closedFrom,
         LocalDate closedUntil,
+        LocalDate sourceDate,
         boolean sourceRemoved) {}

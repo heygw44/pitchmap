@@ -16,6 +16,7 @@
                d.operating_status AS operating_status,
                d.closed_from AS closed_from,
                d.closed_until AS closed_until,
+               d.source_date AS source_date,
                d.source_removed_at IS NOT NULL AS source_removed
         FROM public_spot_detail d
         JOIN spot s ON s.id = d.spot_id
@@ -47,7 +48,7 @@
     <insert id="insertDetails">
         INSERT INTO public_spot_detail
             (spot_id, source, external_id, category, facilities, phone, homepage,
-             operating_status, closed_from, closed_until, synced_at, created_at, updated_at)
+             operating_status, closed_from, closed_until, source_date, synced_at, created_at, updated_at)
         VALUES
         <foreach collection="spots" item="spot" separator=",">
             (#{spot.spotId},
@@ -60,6 +61,7 @@
              #{spot.columns.operatingStatus},
              #{spot.columns.closedFrom},
              #{spot.columns.closedUntil},
+             #{spot.columns.sourceDate},
              #{now},
              #{now},
              #{now})
@@ -100,7 +102,8 @@
                    #{spot.columns.homepage} AS homepage,
                    #{spot.columns.operatingStatus} AS operating_status,
                    #{spot.columns.closedFrom} AS closed_from,
-                   #{spot.columns.closedUntil} AS closed_until
+                   #{spot.columns.closedUntil} AS closed_until,
+                   #{spot.columns.sourceDate} AS source_date
         </foreach>
         ) AS changed ON changed.spot_id = d.spot_id
         SET d.category = changed.category,
@@ -110,6 +113,7 @@
             d.operating_status = changed.operating_status,
             d.closed_from = CAST(changed.closed_from AS DATE),
             d.closed_until = CAST(changed.closed_until AS DATE),
+            d.source_date = CAST(changed.source_date AS DATE),
             d.synced_at = #{now},
             d.updated_at = #{now}
     </update>

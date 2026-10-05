@@ -62,7 +62,8 @@ final class GoCampingItemConverter {
                 blankToNull(item.homepage()),
                 operatingStatus(externalId, item.manageSttus()),
                 closedDate(externalId, "hvofBgnde", item.hvofBgnde()),
-                closedDate(externalId, "hvofEnddle", item.hvofEnddle())));
+                closedDate(externalId, "hvofEnddle", item.hvofEnddle()),
+                null));
     }
 
     /** 호출하면 원천에서 삭제된 항목인지 알려 준다. 동기화 목록의 syncStatus가 정확히 D일 때만 삭제로 본다. 다른 값이나 빈 값은 모두 살아 있는 항목이다. */
