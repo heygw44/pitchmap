@@ -30,6 +30,7 @@ public class MemberSignupService {
     public SignupResult signUp(SignupCommand command) {
         Password password = Password.of(command.password());
         Email email = Email.of(command.email());
+        Member.requireValidNickname(command.nickname());
         rejectDisposableDomain(email);
         rejectDuplicates(email, command.nickname());
 

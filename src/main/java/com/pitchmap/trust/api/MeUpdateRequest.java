@@ -17,7 +17,7 @@ public record MeUpdateRequest(
                 implementation = String.class,
                 minLength = MyInfoUpdateCommand.NICKNAME_MIN_LENGTH,
                 maxLength = MyInfoUpdateCommand.NICKNAME_MAX_LENGTH,
-                description = "앞뒤에 공백이 없어야 한다. null로 보내면 400이다.")
+                description = "앞뒤 공백, 연속 공백, 보이지 않는 문자는 쓸 수 없다. null로 보내면 400이다.")
         PatchField<String> nickname,
 
         @Schema(

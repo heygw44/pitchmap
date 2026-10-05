@@ -136,18 +136,35 @@ class MemberControllerTest {
         assertInvalidInput(result, "nickname");
     }
 
-    @Test
-    @DisplayName("[F-01] 닉네임이 공백뿐이면 400을 응답한다")
-    void blankNicknameReturnsFieldError() {
-        MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, "   ");
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    @DisplayName("[F-01] 닉네임이 비었거나 공백뿐이면 nickname 필드 오류를 하나만 응답한다")
+    void blankNicknameReportsSingleFieldError(String nickname) {
+        MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, nickname);
 
         assertInvalidInput(result, "nickname");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='nickname')]")
+                .asList()
+                .hasSize(1);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {" hiker", "hiker ", "hi ker ", "\\thiker"})
-    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있으면 nickname 필드 오류로 400을 응답한다")
-    void nicknameWithSurroundingWhitespaceReturnsFieldError(String nickname) {
+    @ValueSource(
+            strings = {
+                " hiker",
+                "hiker ",
+                "hi ker ",
+                "\\thiker",
+                "hi  ker",
+                "hi\u00A0ker",
+                "hiker\u3164",
+                "hi\u200Bker",
+                "👨\u200D👩"
+            })
+    @DisplayName("[F-01] 닉네임에 앞뒤·연속 공백이나 보이지 않는 문자가 있으면 nickname 필드 오류로 400을 응답한다")
+    void nicknameWithMisplacedSpacesOrHiddenCharactersReturnsFieldError(String nickname) {
         MvcTestResult result = post("hiker@example.com", VALID_PASSWORD, nickname);
 
         assertInvalidInput(result, "nickname");
@@ -187,6 +204,20 @@ class MemberControllerTest {
         MvcTestResult result = post(email, VALID_PASSWORD, "hiker");
 
         assertInvalidInput(result, "email");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-an-email", "hiker@", "hiker@localhost", "hiker@[127.0.0.1]"})
+    @DisplayName("[F-01] 이메일이 틀려도 email 필드 오류는 하나만 응답한다")
+    void invalidEmailReportsSingleFieldError(String email) {
+        MvcTestResult result = post(email, VALID_PASSWORD, "hiker");
+
+        assertInvalidInput(result, "email");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='email')]")
+                .asList()
+                .hasSize(1);
     }
 
     @Test

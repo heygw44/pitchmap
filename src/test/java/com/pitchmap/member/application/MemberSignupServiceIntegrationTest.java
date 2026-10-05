@@ -19,6 +19,8 @@ import com.pitchmap.member.infra.DisposableEmailDomainJpaRepository;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -110,16 +112,18 @@ class MemberSignupServiceIntegrationTest {
         assertThat(memberJpaRepository.count()).isEqualTo(2);
     }
 
-    @Test
-    @DisplayName("[F-01] 앞뒤 공백만 다른 닉네임은 서비스에서도 INVALID_INPUT이고 회원이 만들어지지 않는다")
-    void nicknameWithSurroundingWhitespaceIsRejected() {
+    @ParameterizedTest
+    @ValueSource(strings = {" ", "\u00A0", "\u3164", "\u200B"})
+    @DisplayName("[F-01] 있는 닉네임 뒤에 공백이나 보이지 않는 문자를 붙여 같아 보이게 해도 INVALID_INPUT이고 회원이 만들어지지 않는다")
+    void lookAlikeNicknameIsRejected(String invisibleSuffix) {
         // given
         String nickname = nickname();
         memberSignupService.signUp(new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname, REQUEST_IP));
-        SignupCommand padded = new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname + " ", REQUEST_IP);
+        SignupCommand lookAlike =
+                new SignupCommand(TestSequence.email(), VALID_PASSWORD, nickname + invisibleSuffix, REQUEST_IP);
 
         // when & then
-        assertThatThrownBy(() -> memberSignupService.signUp(padded))
+        assertThatThrownBy(() -> memberSignupService.signUp(lookAlike))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));

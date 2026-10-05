@@ -74,16 +74,54 @@ class MemberTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {" nick", "nick ", " nick ", "\tnick", "nick\n", "ni ck "})
-    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있으면 INVALID_INPUT으로 거부한다")
-    void register_rejectsSurroundingWhitespace(String nickname) {
+    @ValueSource(strings = {" nick", "nick ", " nick ", "\tnick", "nick\n", "ni ck ", "ni  ck"})
+    @DisplayName("[F-01] 닉네임 앞뒤에 공백이 있거나 공백이 연속하면 INVALID_INPUT으로 거부한다")
+    void register_rejectsMisplacedSpaces(String nickname) {
         assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
     }
 
-    @Test
-    @DisplayName("[F-01] 닉네임 가운데 공백은 허용한다")
-    void register_acceptsInnerWhitespace() {
-        assertThat(Member.register(EMAIL, HASH, "백패커 민수", NOW).getNickname()).isEqualTo("백패커 민수");
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                // 공백류: NBSP, 숫자 크기 공백, 좁은 NBSP, 전각 공백, 줄 구분자, 문단 구분자
+                "nick\u00A0",
+                "ni\u00A0ck",
+                "ni\u2007ck",
+                "ni\u202Fck",
+                "ni\u3000ck",
+                "ni\u2028ck",
+                "ni\u2029ck",
+                // 서식 문자: 폭 없는 공백, ZWNJ, ZWJ, 단어 결합자, BOM, 소프트 하이픈, 오른쪽에서 왼쪽 덮어쓰기
+                "ni\u200Bck",
+                "\u200B\u200B",
+                "ni\u200Cck",
+                "ni\u200Dck",
+                "ni\u2060ck",
+                "\uFEFFnick",
+                "ni\u00ADck",
+                "\u202Enick",
+                // 제어 문자
+                "ni\u0000ck",
+                "ni\u0085ck",
+                // 한글 채움 문자
+                "nick\u3164",
+                "\u3164\u3164",
+                "ni\u115Fck",
+                "ni\u1160ck",
+                "ni\uFFA0ck",
+                // ZWJ로 이은 이모지
+                "👨\u200D👩\u200D👧"
+            })
+    @DisplayName("[F-01] 닉네임에 공백류·제어·서식 문자나 한글 채움 문자가 있으면 INVALID_INPUT으로 거부한다")
+    void register_rejectsHiddenCharacters(String nickname) {
+        assertInvalidInput(() -> Member.register(EMAIL, HASH, nickname, NOW));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"백패커 민수", "hi ker", "하이커❤\uFE0F", "굿👍\uD83C\uDFFB"})
+    @DisplayName("[F-01] 닉네임 가운데의 일반 공백 한 칸과 이모지의 변이 선택자·피부색 수정자는 허용한다")
+    void register_acceptsInnerSpaceAndEmojiModifiers(String nickname) {
+        assertThat(Member.register(EMAIL, HASH, nickname, NOW).getNickname()).isEqualTo(nickname);
     }
 
     @Test
@@ -97,9 +135,9 @@ class MemberTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {" nick", "nick "})
-    @DisplayName("닉네임을 앞뒤 공백이 있는 값으로 바꾸려 하면 INVALID_INPUT이고 닉네임과 수정 시각은 그대로다")
-    void changeNickname_rejectsSurroundingWhitespace(String nickname) {
+    @ValueSource(strings = {" nick", "nick ", "ni  ck", "nick\u00A0", "nick\u3164", "ni\u200Bck"})
+    @DisplayName("닉네임을 앞뒤·연속 공백이나 보이지 않는 문자가 든 값으로 바꾸려 하면 INVALID_INPUT이고 닉네임과 수정 시각은 그대로다")
+    void changeNickname_rejectsMisplacedSpacesAndHiddenCharacters(String nickname) {
         Member member = Member.register(EMAIL, HASH, "nick", NOW);
 
         assertInvalidInput(() -> member.changeNickname(nickname, LATER));

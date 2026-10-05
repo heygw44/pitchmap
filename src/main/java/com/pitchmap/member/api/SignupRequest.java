@@ -9,7 +9,8 @@ import jakarta.validation.constraints.Size;
 
 public record SignupRequest(
         @NotBlank(message = "이메일은 필수입니다.")
-        @Email(message = "이메일 형식이 올바르지 않습니다.", regexp = com.pitchmap.member.domain.Email.DOMAIN_PATTERN)
+        @Email(message = "이메일 형식이 올바르지 않습니다.")
+        @MailableEmail
         @Size(max = Member.EMAIL_MAX_LENGTH, message = "이메일은 " + Member.EMAIL_MAX_LENGTH + "자 이하여야 합니다.")
         String email,
 

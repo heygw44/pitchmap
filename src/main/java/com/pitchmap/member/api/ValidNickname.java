@@ -12,7 +12,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 닉네임 규칙({@link Member#isValidNickname})을 지키는지 검사한다. null은 통과시키므로 필수 여부는 {@code @NotBlank}가 가린다.
+ * 닉네임 규칙({@link Member#isValidNickname})을 지키는지 검사한다. null과 빈 값(공백뿐인 값 포함)은 통과시키고 필수 여부는
+ * {@code @NotBlank}가 가린다. 같은 필드에 오류가 두 개 나오지 않게 하려는 것이다.
  * {@code @Size}를 쓰지 않는 이유: 그것은 UTF-16 문자 수로 세서, 이모지처럼 문자 두 개로 이뤄진 글자의 길이를 도메인 규칙과 다르게 센다.
  */
 @Documented
@@ -31,7 +32,7 @@ import java.lang.annotation.Target;
 
         @Override
         public boolean isValid(String nickname, ConstraintValidatorContext context) {
-            return nickname == null || Member.isValidNickname(nickname);
+            return nickname == null || nickname.isBlank() || Member.isValidNickname(nickname);
         }
     }
 }

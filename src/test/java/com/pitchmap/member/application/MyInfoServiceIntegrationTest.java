@@ -224,6 +224,25 @@ class MyInfoServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("다른 회원이 쓰는 닉네임에 폭 없는 공백이나 NBSP를 붙이면 중복이 아니라 INVALID_INPUT이고 닉네임이 바뀌지 않는다")
+    void lookAlikeOfAnotherMembersNicknameIsInvalidInput() {
+        // given
+        memberJpaRepository.saveAndFlush(aMember().nickname("taken").build());
+        Member saved = memberJpaRepository.saveAndFlush(aMember().build());
+
+        // when & then
+        assertErrorCode(
+                () -> myInfoService.update(
+                        saved.getId(), command(PatchField.of("taken\u200B"), PatchField.absent(), PatchField.absent())),
+                CommonErrorCode.INVALID_INPUT);
+        assertErrorCode(
+                () -> myInfoService.update(
+                        saved.getId(), command(PatchField.of("taken\u00A0"), PatchField.absent(), PatchField.absent())),
+                CommonErrorCode.INVALID_INPUT);
+        assertThat(reload(saved).getNickname()).isEqualTo(saved.getNickname());
+    }
+
+    @Test
     @DisplayName("지금 쓰는 자기 닉네임을 보내면 바뀌는 것 없이 성공한다")
     void ownCurrentNicknameIsNoOp() {
         // given
