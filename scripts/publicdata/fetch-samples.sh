@@ -88,6 +88,52 @@ fetch "$FIXTURES/publicdata/gocamping/location-based-list.json" json \
   "$BASE/B551011/GoCamping/locationBasedList" "${GOCAMPING[@]}" -d numOfRows=3 -d pageNo=1 \
   -d mapX="$LNG" -d mapY="$LAT" -d radius=20000
 
+# 동기화 목록은 최근에 수정한 순서로 온다. 그래서 한 페이지(1,000건)를 받은 다음 추가(A)·수정(U)·삭제(D)를 한 건씩 골라 3건으로 줄인다.
+# 수정과 삭제는 휴장 기간이 있는 항목을 고른다. 이 조건에 맞는 항목이 그 페이지에 없으면 저장하지 않고 실패로 센다.
+fetch_sync_list_sample() {
+  local out="$FIXTURES/publicdata/gocamping/based-sync-list.json" tmp
+  tmp=$(mktemp)
+  if ! curl -sSG --connect-timeout 5 --max-time 60 "$BASE/B551011/GoCamping/basedSyncList" --data-urlencode "serviceKey=$KEY" \
+    "${GOCAMPING[@]}" -d numOfRows=1000 -d pageNo=1 -o "$tmp"; then
+    echo "실패(연결): ${out#"$ROOT"/}" >&2
+    failed=1; rm -f "$tmp"; return
+  fi
+  mkdir -p "$(dirname "$out")"
+  python3 - "$tmp" "$out" <<'PY' || { echo "실패(오류 응답이거나 고를 항목이 없음): ${out#"$ROOT"/}" >&2; failed=1; rm -f "$tmp"; return; }
+import json, sys
+
+source, target = sys.argv[1], sys.argv[2]
+data = json.load(open(source, encoding="utf-8"))
+if data["response"]["header"]["resultCode"] != "0000":
+    sys.exit(1)
+body = data["response"]["body"]
+items = body["items"]["item"]
+
+
+def first(status, needs_closed_period):
+    for item in items:
+        if item["syncStatus"] != status:
+            continue
+        if needs_closed_period and not (item["hvofBgnde"] and item["hvofEnddle"]):
+            continue
+        return item
+    return None
+
+
+picked = [first("A", False), first("U", True), first("D", True)]
+if None in picked:
+    sys.exit(1)
+body["items"]["item"] = picked
+body["numOfRows"] = len(picked)
+json.dump(data, open(target, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+PY
+  rm -f "$tmp"
+  saved+=("$out")
+  echo "저장: ${out#"$ROOT"/}"
+}
+
+fetch_sync_list_sample
+
 fetch "$FIXTURES/weather/kma/vilage-fcst.json" json \
   "$BASE/1360000/VilageFcstInfoService_2.0/getVilageFcst" -d dataType=JSON -d numOfRows=1000 -d pageNo=1 \
   -d base_date="$VILAGE_DATE" -d base_time="$VILAGE_TIME" -d nx="$NX" -d ny="$NY"
@@ -125,6 +171,7 @@ cat > "$FIXTURES/publicdata-samples.txt" <<EOF
 위치: 위도 $LAT, 경도 $LNG, 기상청 격자 ($NX, $NY)
 단기예보 발표: $VILAGE_DATE $VILAGE_TIME / 중기예보 발표: $MID_TMFC
 고캠핑: 3건만 받음 (numOfRows=3), 위치 기반은 반경 20km
+고캠핑 동기화 목록: 한 페이지(1,000건)에서 추가·수정·삭제를 한 건씩 골라 3건으로 줄임
 EOF
 
 if [ "$failed" -ne 0 ]; then

@@ -2,6 +2,9 @@ package com.pitchmap.publicdata.application;
 
 import com.pitchmap.publicdata.infra.GoCampingItem;
 import com.pitchmap.spot.application.PublicSpotCommand;
+import com.pitchmap.spot.application.PublicSpotOperatingStatus;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,9 +24,19 @@ final class GoCampingItemConverter {
     // 원천 항목 이름을 그대로 facilities JSON의 키로 쓴다. 순서를 고정해 두면 같은 데이터는 늘 같은 JSON이 된다.
     private static final Map<String, Function<GoCampingItem, String>> FACILITY_FIELDS = facilityFields();
 
+    private static final String REMOVED_SYNC_STATUS = "D";
+
+    private static final Map<String, PublicSpotOperatingStatus> OPERATING_STATUSES = Map.of(
+            "운영", PublicSpotOperatingStatus.OPERATING,
+            "휴장", PublicSpotOperatingStatus.TEMPORARILY_CLOSED,
+            "폐업", PublicSpotOperatingStatus.PERMANENTLY_CLOSED);
+
     private GoCampingItemConverter() {}
 
-    /** 호출하면 항목을 명령으로 바꾼다. ID·이름이 비었거나 좌표를 숫자로 읽을 수 없으면 WARN 로그를 남기고 빈 값을 돌려준다. */
+    /**
+     * 호출하면 항목을 명령으로 바꾼다. ID·이름이 비었거나 좌표를 숫자로 읽을 수 없으면 WARN 로그를 남기고 빈 값을 돌려준다.
+     * 운영 상태와 휴장 기간은 읽을 수 없으면 null로 두고 항목은 그대로 적재한다.
+     */
     static Optional<PublicSpotCommand> convert(GoCampingItem item) {
         String externalId = blankToNull(item.contentId());
         String name = blankToNull(item.facltNm());
@@ -46,7 +59,41 @@ final class GoCampingItemConverter {
                 blankToNull(item.induty()),
                 facilities(item),
                 blankToNull(item.tel()),
-                blankToNull(item.homepage())));
+                blankToNull(item.homepage()),
+                operatingStatus(externalId, item.manageSttus()),
+                closedDate(externalId, "hvofBgnde", item.hvofBgnde()),
+                closedDate(externalId, "hvofEnddle", item.hvofEnddle())));
+    }
+
+    /** 호출하면 원천에서 삭제된 항목인지 알려 준다. 동기화 목록의 syncStatus가 정확히 D일 때만 삭제로 본다. 다른 값이나 빈 값은 모두 살아 있는 항목이다. */
+    static boolean isRemoved(GoCampingItem item) {
+        return REMOVED_SYNC_STATUS.equals(blankToNull(item.syncStatus()));
+    }
+
+    // 운영 상태는 원천의 값을 그대로 저장만 한다. 모르는 값은 상태를 알 수 없는 것으로 두고 원천에 새 값이 생겼음을 알리려고 WARN을 남긴다.
+    private static PublicSpotOperatingStatus operatingStatus(String externalId, String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        PublicSpotOperatingStatus status = OPERATING_STATUSES.get(trimmed);
+        if (status == null) {
+            log.warn("gocamping item has unknown operating status contentId={} manageSttus={}", externalId, trimmed);
+        }
+        return status;
+    }
+
+    private static LocalDate closedDate(String externalId, String field, String value) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(trimmed);
+        } catch (DateTimeParseException e) {
+            log.warn("gocamping item has unparseable closed date contentId={} field={}", externalId, field);
+            return null;
+        }
     }
 
     private static Double parseCoordinate(String value) {

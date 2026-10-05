@@ -9,6 +9,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.awaitility.Awaitility.await;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -35,7 +36,7 @@ import org.springframework.core.io.ClassPathResource;
 @IntegrationTest
 class GoCampingClientIntegrationTest {
 
-    private static final String BASED_LIST_PATH = "/B551011/GoCamping/basedList";
+    private static final String BASED_SYNC_LIST_PATH = "/B551011/GoCamping/basedSyncList";
     private static final String SERVICE_KEY = "test+key/value==";
     private static final String ENCODED_SERVICE_KEY = "test%2Bkey%2Fvalue%3D%3D";
     private static final String REQUEST_TIMER = "pitchmap.external.api.requests";
@@ -51,44 +52,48 @@ class GoCampingClientIntegrationTest {
     private MeterRegistry meterRegistry;
 
     @Test
-    @DisplayName("[F-06] 고캠핑 목록 응답의 전체 개수와 캠핑장 항목을 원천 값 그대로 읽는다")
-    void readsTotalCountAndItemsFromBasedListResponse() {
+    @DisplayName("[F-06] 고캠핑 동기화 목록 응답의 전체 개수와 캠핑장 항목, 동기화 상태, 운영 상태, 휴장 기간을 원천 값 그대로 읽는다")
+    void readsTotalCountAndItemsFromBasedSyncListResponse() {
         // given
-        stubBasedList(okJson(readFixture("based-list.json")));
+        stubBasedSyncList(okJson(readFixture("based-sync-list.json")));
 
         // when
         GoCampingPage page = client.fetchPage(1, 3);
 
         // then
-        assertThat(page.totalCount()).isEqualTo(3115);
+        assertThat(page.totalCount()).isEqualTo(5353);
         assertThat(page.pageNo()).isEqualTo(1);
         assertThat(page.numOfRows()).isEqualTo(3);
         assertThat(page.items()).hasSize(3);
         GoCampingItem first = page.items().getFirst();
-        assertThat(first.contentId()).isEqualTo("146");
-        assertThat(first.facltNm()).isEqualTo("강변사리 캠핑장");
-        assertThat(first.addr1()).isEqualTo("전북특별자치도 임실군 덕치면 강동로 865-20");
+        assertThat(first.contentId()).isEqualTo("102367");
+        assertThat(first.facltNm()).isEqualTo("내산별빛캠핑장");
+        assertThat(first.addr1()).isEqualTo("경기도 연천군 신서면 동내로 1402");
         assertThat(first.addr2()).isEmpty();
         // 원천에서 mapX는 경도, mapY는 위도다.
-        assertThat(first.mapX()).isEqualTo("127.190085215523");
-        assertThat(first.mapY()).isEqualTo("35.4952105728394");
+        assertThat(first.mapX()).isEqualTo("127.146834160271");
+        assertThat(first.mapY()).isEqualTo("38.1569737100084");
         assertThat(first.induty()).isEqualTo("일반야영장");
-        assertThat(first.toiletCo()).isEqualTo("1");
-        assertThat(first.brazierCl()).isEqualTo("개별");
-        assertThat(first.animalCmgCl()).isEqualTo("불가능");
+        assertThat(first.toiletCo()).isEqualTo("0");
+        assertThat(page.items())
+                .extracting(GoCampingItem::contentId, GoCampingItem::syncStatus, GoCampingItem::manageSttus)
+                .containsExactly(tuple("102367", "A", "운영"), tuple("1467", "U", "운영"), tuple("3466", "D", "휴장"));
+        assertThat(page.items())
+                .extracting(GoCampingItem::hvofBgnde, GoCampingItem::hvofEnddle)
+                .containsExactly(tuple("", ""), tuple("2026-11-16", "2027-03-15"), tuple("2023-07-20", "2026-12-31"));
     }
 
     @Test
     @DisplayName("[F-06] 클라이언트는 인증키의 +, /, = 를 퍼센트 인코딩하고 페이지 번호와 크기를 쿼리로 보낸다")
     void sendsPercentEncodedServiceKeyWithPagingParameters() {
         // given
-        stubBasedList(okJson(readFixture("based-list.json")));
+        stubBasedSyncList(okJson(readFixture("based-sync-list.json")));
 
         // when
         client.fetchPage(2, 3);
 
         // then
-        wireMock.verify(getRequestedFor(urlPathEqualTo(BASED_LIST_PATH))
+        wireMock.verify(getRequestedFor(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                 .withQueryParam("pageNo", equalTo("2"))
                 .withQueryParam("numOfRows", equalTo("3"))
                 .withQueryParam("_type", equalTo("json"))
@@ -103,7 +108,7 @@ class GoCampingClientIntegrationTest {
     @DisplayName("[F-06] 원천이 결과 없는 페이지의 items를 빈 문자열로 주면 빈 목록을 돌려준다")
     void returnsEmptyItemsWhenItemsIsEmptyString() {
         // given
-        stubBasedList(okJson("""
+        stubBasedSyncList(okJson("""
                 {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"},
                   "body": {"items": "", "numOfRows": 2, "pageNo": 1559, "totalCount": 3115}}}
                 """));
@@ -121,7 +126,7 @@ class GoCampingClientIntegrationTest {
     @DisplayName("[F-06] 원천이 결과 한 건을 배열이 아닌 객체로 주어도 항목 하나로 읽는다")
     void readsSingleItemObjectAsOneItem() {
         // given
-        stubBasedList(okJson("""
+        stubBasedSyncList(okJson("""
                 {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"},
                   "body": {"items": {"item": {"contentId": "146", "facltNm": "강변사리 캠핑장",
                     "mapX": "127.190085215523", "mapY": "35.4952105728394"}},
@@ -144,7 +149,7 @@ class GoCampingClientIntegrationTest {
     @DisplayName("[F-06][NFR-06] 원천이 성공이 아닌 resultCode를 주면 다시 보내지 않고 오류 코드를 담은 예외를 던진다")
     void throwsWithoutRetryWhenResultCodeIsNotSuccess() {
         // given
-        stubBasedList(okJson("""
+        stubBasedSyncList(okJson("""
                 {"response": {"header": {"resultCode": "10", "resultMsg": "INVALID_REQUEST_PARAMETER_ERROR"}}}
                 """));
 
@@ -155,14 +160,14 @@ class GoCampingClientIntegrationTest {
         assertThat(thrown)
                 .hasMessageContaining("resultCode=10")
                 .hasMessageContaining("INVALID_REQUEST_PARAMETER_ERROR");
-        assertThat(basedListRequestCount()).isEqualTo(1);
+        assertThat(basedSyncListRequestCount()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("[F-06][NFR-06] 인증 오류 XML을 받으면 다시 보내지 않고 인증 오류 내용을 담은 예외를 던진다")
     void throwsWithoutRetryWhenAuthErrorXmlIsReturned() {
         // given
-        stubBasedList(aResponse()
+        stubBasedSyncList(aResponse()
                 .withStatus(200)
                 .withHeader("Content-Type", "text/xml;charset=UTF-8")
                 .withBody(readFixture("auth-error.xml")));
@@ -173,22 +178,22 @@ class GoCampingClientIntegrationTest {
         // then
         assertThat(thrown).hasMessageContaining("SERVICE_KEY_IS_NOT_REGISTERED_ERROR");
         assertNoServiceKey(thrown);
-        assertThat(basedListRequestCount()).isEqualTo(1);
+        assertThat(basedSyncListRequestCount()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("[F-06][NFR-06] 첫 요청이 500이면 한 번 다시 보내고, 두 요청을 모두 지표에 남긴다")
     void retriesOnceAfterServerErrorAndRecordsBothAttempts() {
         // given
-        wireMock.stubFor(get(urlPathEqualTo(BASED_LIST_PATH))
+        wireMock.stubFor(get(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                 .inScenario("server error once")
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(serverError())
                 .willSetStateTo(RECOVERED));
-        wireMock.stubFor(get(urlPathEqualTo(BASED_LIST_PATH))
+        wireMock.stubFor(get(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                 .inScenario("server error once")
                 .whenScenarioStateIs(RECOVERED)
-                .willReturn(okJson(readFixture("based-list.json"))));
+                .willReturn(okJson(readFixture("based-sync-list.json"))));
         long successBefore = requestCount("success");
         long failureBefore = requestCount("failure");
 
@@ -196,8 +201,8 @@ class GoCampingClientIntegrationTest {
         GoCampingPage page = client.fetchPage(1, 3);
 
         // then
-        assertThat(page.totalCount()).isEqualTo(3115);
-        assertThat(basedListRequestCount()).isEqualTo(2);
+        assertThat(page.totalCount()).isEqualTo(5353);
+        assertThat(basedSyncListRequestCount()).isEqualTo(2);
         assertThat(requestCount("success") - successBefore).isEqualTo(1);
         assertThat(requestCount("failure") - failureBefore).isEqualTo(1);
     }
@@ -206,7 +211,7 @@ class GoCampingClientIntegrationTest {
     @DisplayName("[F-06][NFR-06] 500이 두 번 이어지면 두 번째 요청 뒤에 인증키 없는 예외를 던진다")
     void throwsAfterSecondServerError() {
         // given
-        stubBasedList(serverError());
+        stubBasedSyncList(serverError());
         long successBefore = requestCount("success");
         long failureBefore = requestCount("failure");
 
@@ -216,7 +221,7 @@ class GoCampingClientIntegrationTest {
         // then
         assertThat(thrown).hasMessageContaining("HTTP 500");
         assertNoServiceKey(thrown);
-        assertThat(basedListRequestCount()).isEqualTo(2);
+        assertThat(basedSyncListRequestCount()).isEqualTo(2);
         assertThat(requestCount("success") - successBefore).isZero();
         assertThat(requestCount("failure") - failureBefore).isEqualTo(2);
     }
@@ -225,7 +230,7 @@ class GoCampingClientIntegrationTest {
     @DisplayName("[F-06][NFR-06] 응답이 응답 대기 시간보다 늦으면 한 번 다시 보낸 뒤 인증키 없는 예외를 던진다")
     void throwsAfterSecondReadTimeout() {
         // given: 테스트 프로필의 응답 대기 시간은 1초다.
-        stubBasedList(okJson(readFixture("based-list.json")).withFixedDelay(2_000));
+        stubBasedSyncList(okJson(readFixture("based-sync-list.json")).withFixedDelay(2_000));
         long failureBefore = requestCount("failure");
 
         // when
@@ -237,20 +242,20 @@ class GoCampingClientIntegrationTest {
         assertThat(requestCount("failure") - failureBefore).isEqualTo(2);
         // WireMock이 지연 응답을 다 보낸 뒤에야 요청을 기록할 수 있다. 그러면 기록 시점이 클라이언트 예외보다 늦으므로, 테스트는 기록이 두 건이 될 때까지 기다린다.
         await().atMost(Duration.ofSeconds(5))
-                .untilAsserted(() -> assertThat(basedListRequestCount()).isEqualTo(2));
+                .untilAsserted(() -> assertThat(basedSyncListRequestCount()).isEqualTo(2));
     }
 
-    private void stubBasedList(ResponseDefinitionBuilder response) {
-        wireMock.stubFor(get(urlPathEqualTo(BASED_LIST_PATH)).willReturn(response));
+    private void stubBasedSyncList(ResponseDefinitionBuilder response) {
+        wireMock.stubFor(get(urlPathEqualTo(BASED_SYNC_LIST_PATH)).willReturn(response));
     }
 
-    private int basedListRequestCount() {
-        return wireMock.findAll(getRequestedFor(urlPathEqualTo(BASED_LIST_PATH)))
+    private int basedSyncListRequestCount() {
+        return wireMock.findAll(getRequestedFor(urlPathEqualTo(BASED_SYNC_LIST_PATH)))
                 .size();
     }
 
     private LoggedRequest onlyRequest() {
-        var requests = wireMock.findAll(getRequestedFor(urlPathEqualTo(BASED_LIST_PATH)));
+        var requests = wireMock.findAll(getRequestedFor(urlPathEqualTo(BASED_SYNC_LIST_PATH)));
         assertThat(requests).hasSize(1);
         return requests.getFirst();
     }
@@ -258,7 +263,7 @@ class GoCampingClientIntegrationTest {
     private long requestCount(String outcome) {
         Timer timer = meterRegistry
                 .find(REQUEST_TIMER)
-                .tags("api", "gocamping", "operation", "basedList", "outcome", outcome)
+                .tags("api", "gocamping", "operation", "basedSyncList", "outcome", outcome)
                 .timer();
         return timer == null ? 0 : timer.count();
     }

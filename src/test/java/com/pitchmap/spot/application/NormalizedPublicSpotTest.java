@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pitchmap.spot.infra.PublicSpotRow;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +21,18 @@ class NormalizedPublicSpotTest {
     void stripsTextAndTurnsBlankIntoNull() {
         // given
         PublicSpotCommand command = new PublicSpotCommand(
-                " 100 ", "  솔숲 야영장 ", SEOUL_LATITUDE, SEOUL_LONGITUDE, "   ", " 일반야영장 ", null, "", " \t");
+                " 100 ",
+                "  솔숲 야영장 ",
+                SEOUL_LATITUDE,
+                SEOUL_LONGITUDE,
+                "   ",
+                " 일반야영장 ",
+                null,
+                "",
+                " \t",
+                null,
+                null,
+                null);
 
         // when
         NormalizedPublicSpot spot = NormalizedPublicSpot.from(command);
@@ -47,6 +59,9 @@ class NormalizedPublicSpotTest {
                 "다".repeat(NormalizedPublicSpot.MAX_CATEGORY_LENGTH + 1),
                 null,
                 "1".repeat(NormalizedPublicSpot.MAX_PHONE_LENGTH + 1),
+                null,
+                null,
+                null,
                 null);
 
         // when
@@ -65,8 +80,8 @@ class NormalizedPublicSpotTest {
         // given: 이모지 하나는 Java char 두 개지만 MySQL은 한 글자로 센다.
         String camping = Character.toString(CAMPING_EMOJI_CODE_POINT);
         String name = "가".repeat(NormalizedPublicSpot.MAX_NAME_LENGTH - 1) + camping + camping;
-        PublicSpotCommand command =
-                new PublicSpotCommand("100", name, SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null);
+        PublicSpotCommand command = new PublicSpotCommand(
+                "100", name, SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null, null, null, null);
 
         // when
         NormalizedPublicSpot spot = NormalizedPublicSpot.from(command);
@@ -82,7 +97,7 @@ class NormalizedPublicSpotTest {
         // given
         String homepage = "https://example.com/" + "a".repeat(NormalizedPublicSpot.MAX_HOMEPAGE_LENGTH);
         PublicSpotCommand command = new PublicSpotCommand(
-                "100", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, homepage);
+                "100", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, homepage, null, null, null);
 
         // when
         NormalizedPublicSpot spot = NormalizedPublicSpot.from(command);
@@ -100,9 +115,20 @@ class NormalizedPublicSpotTest {
         facilities.put("toiletCo", "");
         facilities.put("animalCmgCl", "   ");
         PublicSpotCommand withFacilities = new PublicSpotCommand(
-                "100", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, facilities, null, null);
+                "100", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, facilities, null, null, null, null, null);
         PublicSpotCommand withBlankFacilities = new PublicSpotCommand(
-                "101", "갈대 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, Map.of("toiletCo", ""), null, null);
+                "101",
+                "갈대 야영장",
+                SEOUL_LATITUDE,
+                SEOUL_LONGITUDE,
+                null,
+                null,
+                Map.of("toiletCo", ""),
+                null,
+                null,
+                null,
+                null,
+                null);
 
         // when
         NormalizedPublicSpot spot = NormalizedPublicSpot.from(withFacilities);
@@ -117,10 +143,10 @@ class NormalizedPublicSpotTest {
     @DisplayName("[F-06] 외부 ID나 이름이 비어 있으면 저장할 수 없는 값으로 거부한다")
     void rejectsBlankExternalIdOrName() {
         // given
-        PublicSpotCommand blankExternalId =
-                new PublicSpotCommand(" ", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null);
-        PublicSpotCommand blankName =
-                new PublicSpotCommand("100", "", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null);
+        PublicSpotCommand blankExternalId = new PublicSpotCommand(
+                " ", "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null, null, null, null);
+        PublicSpotCommand blankName = new PublicSpotCommand(
+                "100", "", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> NormalizedPublicSpot.from(blankExternalId))
@@ -134,7 +160,7 @@ class NormalizedPublicSpotTest {
         // given
         String externalId = "1".repeat(NormalizedPublicSpot.MAX_EXTERNAL_ID_LENGTH + 1);
         PublicSpotCommand command = new PublicSpotCommand(
-                externalId, "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null);
+                externalId, "솔숲 야영장", SEOUL_LATITUDE, SEOUL_LONGITUDE, null, null, null, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> NormalizedPublicSpot.from(command)).isInstanceOf(IllegalArgumentException.class);
@@ -144,7 +170,8 @@ class NormalizedPublicSpotTest {
     @DisplayName("[F-06] 기상청 격자 밖 좌표는 저장할 수 없는 값으로 거부한다")
     void rejectsCoordinateOutsideWeatherGrid() {
         // given
-        PublicSpotCommand command = new PublicSpotCommand("100", "적도 야영장", 0, 0, null, null, null, null, null);
+        PublicSpotCommand command =
+                new PublicSpotCommand("100", "적도 야영장", 0, 0, null, null, null, null, null, null, null, null);
 
         // when & then
         assertThatThrownBy(() -> NormalizedPublicSpot.from(command)).isInstanceOf(IllegalArgumentException.class);
@@ -154,8 +181,8 @@ class NormalizedPublicSpotTest {
     @DisplayName("[F-06] MySQL이 경도를 읽을 때 생기는 부동소수 오차 안의 좌표는 바뀌지 않은 좌표로 본다")
     void treatsCoordinateWithinFloatingPointErrorAsUnchanged() {
         // given: 실제 MySQL에서 127.7298을 저장하고 ST_Longitude로 읽으면 127.72979999999998이 나왔다.
-        NormalizedPublicSpot spot = NormalizedPublicSpot.from(
-                new PublicSpotCommand("100", "솔숲 야영장", 37.8813, 127.7298, null, null, null, null, null));
+        NormalizedPublicSpot spot = NormalizedPublicSpot.from(new PublicSpotCommand(
+                "100", "솔숲 야영장", 37.8813, 127.7298, null, null, null, null, null, null, null, null));
         PublicSpotRow stored = storedRow(37.8813, 127.72979999999998);
 
         // when
@@ -169,8 +196,8 @@ class NormalizedPublicSpotTest {
     @DisplayName("[F-06] 위도나 경도가 허용 오차보다 많이 다르면 바뀐 좌표로 본다")
     void treatsCoordinateBeyondToleranceAsChanged() {
         // given: 1e-6도는 허용 오차 1e-7도의 열 배이고 약 10cm다.
-        NormalizedPublicSpot spot = NormalizedPublicSpot.from(
-                new PublicSpotCommand("100", "솔숲 야영장", 37.8813, 127.7298, null, null, null, null, null));
+        NormalizedPublicSpot spot = NormalizedPublicSpot.from(new PublicSpotCommand(
+                "100", "솔숲 야영장", 37.8813, 127.7298, null, null, null, null, null, null, null, null));
         PublicSpotRow movedLatitude = storedRow(37.8813 + 1e-6, 127.7298);
         PublicSpotRow movedLongitude = storedRow(37.8813, 127.7298 + 1e-6);
 
@@ -183,7 +210,110 @@ class NormalizedPublicSpotTest {
         assertThat(longitudeDiffers).isTrue();
     }
 
+    @Test
+    @DisplayName("[F-06] 운영 상태와 휴장 기간을 명령에서 그대로 가져오고, 휴장 시작일이 종료일보다 늦어도 거부하지 않는다")
+    void keepsOperatingStatusAndClosedDatesAsGiven() {
+        // given
+        PublicSpotCommand command = campsiteCommand(
+                PublicSpotOperatingStatus.TEMPORARILY_CLOSED,
+                LocalDate.parse("2027-03-15"),
+                LocalDate.parse("2026-11-16"));
+
+        // when
+        NormalizedPublicSpot spot = NormalizedPublicSpot.from(command);
+
+        // then
+        assertThat(spot.operatingStatus()).isEqualTo(PublicSpotOperatingStatus.TEMPORARILY_CLOSED);
+        assertThat(spot.closedFrom()).isEqualTo(LocalDate.parse("2027-03-15"));
+        assertThat(spot.closedUntil()).isEqualTo(LocalDate.parse("2026-11-16"));
+        assertThat(spot.toColumns(null).operatingStatus()).isEqualTo("TEMPORARILY_CLOSED");
+    }
+
+    @Test
+    @DisplayName("[F-06] 운영 상태와 휴장 기간이 저장된 값과 같으면 상세가 바뀌지 않은 것으로 본다")
+    void sameOperatingStatusAndClosedDatesAreNotDifferent() {
+        // given
+        NormalizedPublicSpot spot = NormalizedPublicSpot.from(campsiteCommand(
+                PublicSpotOperatingStatus.TEMPORARILY_CLOSED,
+                LocalDate.parse("2026-11-16"),
+                LocalDate.parse("2027-03-15")));
+        PublicSpotRow stored =
+                detailRow("TEMPORARILY_CLOSED", LocalDate.parse("2026-11-16"), LocalDate.parse("2027-03-15"));
+        NormalizedPublicSpot withoutStatus = NormalizedPublicSpot.from(campsiteCommand(null, null, null));
+
+        // when
+        boolean differs = spot.differsInDetailColumns(stored, null);
+        boolean bothNullDiffers = withoutStatus.differsInDetailColumns(detailRow(null, null, null), null);
+
+        // then
+        assertThat(differs).isFalse();
+        assertThat(bothNullDiffers).isFalse();
+    }
+
+    @Test
+    @DisplayName("[F-06] 운영 상태나 휴장 기간이 저장된 값과 다르면, 한쪽이 null인 경우를 포함해 상세가 바뀐 것으로 본다")
+    void differentOperatingStatusOrClosedDatesAreDifferent() {
+        // given
+        LocalDate from = LocalDate.parse("2026-11-16");
+        LocalDate until = LocalDate.parse("2027-03-15");
+        NormalizedPublicSpot spot =
+                NormalizedPublicSpot.from(campsiteCommand(PublicSpotOperatingStatus.TEMPORARILY_CLOSED, from, until));
+        NormalizedPublicSpot withoutStatus = NormalizedPublicSpot.from(campsiteCommand(null, null, null));
+
+        // when & then
+        assertThat(spot.differsInDetailColumns(detailRow("OPERATING", from, until), null))
+                .isTrue();
+        assertThat(spot.differsInDetailColumns(detailRow(null, from, until), null))
+                .isTrue();
+        assertThat(spot.differsInDetailColumns(detailRow("TEMPORARILY_CLOSED", from.plusDays(1), until), null))
+                .isTrue();
+        assertThat(spot.differsInDetailColumns(detailRow("TEMPORARILY_CLOSED", from, null), null))
+                .isTrue();
+        assertThat(spot.differsInDetailColumns(detailRow("TEMPORARILY_CLOSED", from, until.plusDays(1)), null))
+                .isTrue();
+        assertThat(withoutStatus.differsInDetailColumns(detailRow("OPERATING", null, null), null))
+                .isTrue();
+        assertThat(withoutStatus.differsInDetailColumns(detailRow(null, from, null), null))
+                .isTrue();
+    }
+
+    private static PublicSpotCommand campsiteCommand(
+            PublicSpotOperatingStatus operatingStatus, LocalDate closedFrom, LocalDate closedUntil) {
+        return new PublicSpotCommand(
+                "100",
+                "솔숲 야영장",
+                SEOUL_LATITUDE,
+                SEOUL_LONGITUDE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                operatingStatus,
+                closedFrom,
+                closedUntil);
+    }
+
+    private static PublicSpotRow detailRow(String operatingStatus, LocalDate closedFrom, LocalDate closedUntil) {
+        return new PublicSpotRow(
+                1L,
+                "100",
+                "솔숲 야영장",
+                null,
+                SEOUL_LATITUDE,
+                SEOUL_LONGITUDE,
+                null,
+                null,
+                null,
+                null,
+                operatingStatus,
+                closedFrom,
+                closedUntil,
+                false);
+    }
+
     private static PublicSpotRow storedRow(double latitude, double longitude) {
-        return new PublicSpotRow(1L, "100", "솔숲 야영장", null, latitude, longitude, null, null, null, null);
+        return new PublicSpotRow(
+                1L, "100", "솔숲 야영장", null, latitude, longitude, null, null, null, null, null, null, null, false);
     }
 }

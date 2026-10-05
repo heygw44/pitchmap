@@ -88,7 +88,8 @@
             "tourEraCl": "",
             "firstImageUrl": "https://gocamping.or.kr/upload/camp/146/thumb/thumb_720_2206guyVnvUuoeq2x85fTTX2.jpg",
             "createdtime": "2018-09-21",
-            "modifiedtime": "2026-10-02"
+            "modifiedtime": "2026-10-02",
+            "syncStatus": "A"
           },
           {
             "contentId": "2329",
@@ -171,13 +172,14 @@
             "tourEraCl": "",
             "firstImageUrl": "https://gocamping.or.kr/upload/camp/2329/thumb/thumb_720_1559wVtGSH2Dv574wnDY7udg.jpg",
             "createdtime": "2018-09-21",
-            "modifiedtime": "2026-10-02"
+            "modifiedtime": "2026-10-02",
+            "syncStatus": "A"
           }
         ]
       },
       "numOfRows": 2,
       "pageNo": 1,
-      "totalCount": 5
+      "totalCount": 7
     }
   }
 }

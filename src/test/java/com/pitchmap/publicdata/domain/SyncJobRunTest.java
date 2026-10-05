@@ -25,24 +25,26 @@ class SyncJobRunTest {
         assertThat(run.getJobType()).isEqualTo(SyncJobType.GOCAMPING);
         assertThat(run.getProgressCursor()).isEqualTo("1");
         assertThat(run.getProcessedCount()).isZero();
+        assertThat(run.getSkippedCount()).isZero();
         assertThat(run.getStartedAt()).isEqualTo(NOW);
         assertThat(run.getUpdatedAt()).isEqualTo(NOW);
         assertThat(run.getFinishedAt()).isNull();
     }
 
     @Test
-    @DisplayName("[F-06] 진행을 기록하면 위치를 바꾸고 처리 건수를 더하고 수정 시각을 바꾼다")
-    void recordProgressMovesCursorAndAddsProcessedCount() {
+    @DisplayName("[F-06] 진행을 기록하면 위치를 바꾸고 처리 건수와 건너뛴 건수를 더하고 수정 시각을 바꾼다")
+    void recordProgressMovesCursorAndAddsCounts() {
         // given
         SyncJobRun run = SyncJobRun.start(SyncJobType.GOCAMPING, null, NOW);
 
         // when
-        run.recordProgress("1", 100, NOW.plusSeconds(10));
-        run.recordProgress("2", 15, NOW.plusSeconds(20));
+        run.recordProgress("1", 100, 3, NOW.plusSeconds(10));
+        run.recordProgress("2", 15, 0, NOW.plusSeconds(20));
 
         // then
         assertThat(run.getProgressCursor()).isEqualTo("2");
         assertThat(run.getProcessedCount()).isEqualTo(115);
+        assertThat(run.getSkippedCount()).isEqualTo(3);
         assertThat(run.getUpdatedAt()).isEqualTo(NOW.plusSeconds(20));
     }
 
@@ -65,7 +67,7 @@ class SyncJobRunTest {
     void failKeepsCursorAndStoresMessage() {
         // given
         SyncJobRun run = SyncJobRun.start(SyncJobType.GOCAMPING, null, NOW);
-        run.recordProgress("3", 300, NOW.plusSeconds(10));
+        run.recordProgress("3", 300, 0, NOW.plusSeconds(10));
 
         // when
         run.fail("GoCampingApiException: 서버 오류", NOW.plusSeconds(20));
@@ -137,7 +139,7 @@ class SyncJobRunTest {
         failed.fail("오류", NOW);
 
         // when, then
-        assertThatThrownBy(() -> completed.recordProgress("1", 1, NOW)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> completed.recordProgress("1", 1, 0, NOW)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> completed.complete(NOW)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> completed.fail("오류", NOW)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> failed.complete(NOW)).isInstanceOf(IllegalStateException.class);
@@ -152,6 +154,21 @@ class SyncJobRunTest {
         SyncJobRun run = SyncJobRun.start(SyncJobType.GOCAMPING, null, NOW);
 
         // when, then
-        assertThatThrownBy(() -> run.recordProgress("1", -1, NOW)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> run.recordProgress("1", -1, 0, NOW)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("[F-06] 건너뛴 건수 증가분이 음수이면 진행 기록을 거부하고 기록을 바꾸지 않는다")
+    void recordProgressRejectsNegativeSkippedDelta() {
+        // given
+        SyncJobRun run = SyncJobRun.start(SyncJobType.GOCAMPING, null, NOW);
+        run.recordProgress("1", 10, 2, NOW.plusSeconds(10));
+
+        // when, then
+        assertThatThrownBy(() -> run.recordProgress("2", 10, -1, NOW.plusSeconds(20)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(run.getProgressCursor()).isEqualTo("1");
+        assertThat(run.getProcessedCount()).isEqualTo(10);
+        assertThat(run.getSkippedCount()).isEqualTo(2);
     }
 }

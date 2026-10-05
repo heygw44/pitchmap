@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.entry;
 
 import com.pitchmap.publicdata.infra.GoCampingItem;
 import com.pitchmap.spot.application.PublicSpotCommand;
+import com.pitchmap.spot.application.PublicSpotOperatingStatus;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -67,7 +69,11 @@ class GoCampingItemConverterTest {
                 "",
                 "",
                 null,
-                "불가능");
+                "불가능",
+                "A",
+                "운영",
+                "",
+                "");
 
         // when
         PublicSpotCommand command = GoCampingItemConverter.convert(item).orElseThrow();
@@ -97,7 +103,85 @@ class GoCampingItemConverterTest {
                 .isEmpty();
     }
 
+    @Test
+    @DisplayName("[F-06] 운영 상태는 운영, 휴장, 폐업을 각각 OPERATING, TEMPORARILY_CLOSED, PERMANENTLY_CLOSED로 읽는다")
+    void mapsOperatingStatus() {
+        // when, then
+        assertThat(convertWith(" 운영 ", "", "").operatingStatus()).isEqualTo(PublicSpotOperatingStatus.OPERATING);
+        assertThat(convertWith("휴장", "", "").operatingStatus()).isEqualTo(PublicSpotOperatingStatus.TEMPORARILY_CLOSED);
+        assertThat(convertWith("폐업", "", "").operatingStatus()).isEqualTo(PublicSpotOperatingStatus.PERMANENTLY_CLOSED);
+    }
+
+    @Test
+    @DisplayName("[F-06] 운영 상태가 비었거나 모르는 값이면 null로 두고 항목은 그대로 적재한다")
+    void leavesOperatingStatusNullWhenBlankOrUnknown() {
+        // when, then
+        assertThat(convertWith("", "", "").operatingStatus()).isNull();
+        assertThat(convertWith(null, "", "").operatingStatus()).isNull();
+        assertThat(convertWith("  ", "", "").operatingStatus()).isNull();
+        assertThat(convertWith("공사중", "", "").operatingStatus()).isNull();
+    }
+
+    @Test
+    @DisplayName("[F-06] 휴장 시작일과 종료일은 yyyy-MM-dd로 읽고, 앞뒤 공백은 지운다")
+    void parsesClosedDates() {
+        // when
+        PublicSpotCommand command = convertWith("휴장", " 2026-11-16 ", "2027-03-15");
+
+        // then
+        assertThat(command.closedFrom()).isEqualTo(LocalDate.of(2026, 11, 16));
+        assertThat(command.closedUntil()).isEqualTo(LocalDate.of(2027, 3, 15));
+    }
+
+    @Test
+    @DisplayName("[F-06] 휴장 기간이 비었거나 날짜로 읽을 수 없으면 null로 두고 항목은 그대로 적재한다")
+    void leavesClosedDatesNullWhenBlankOrUnparseable() {
+        // when
+        PublicSpotCommand blank = convertWith("운영", "", null);
+        PublicSpotCommand garbage = convertWith("휴장", "2026/11/16", "내년 봄");
+
+        // then
+        assertThat(blank.closedFrom()).isNull();
+        assertThat(blank.closedUntil()).isNull();
+        assertThat(garbage.closedFrom()).isNull();
+        assertThat(garbage.closedUntil()).isNull();
+    }
+
+    @Test
+    @DisplayName("[F-06] 동기화 상태가 D인 항목만 삭제된 항목으로 본다")
+    void treatsOnlySyncStatusDAsRemoved() {
+        // when, then
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus("D"))).isTrue();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus(" D "))).isTrue();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus("A"))).isFalse();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus("U"))).isFalse();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus(""))).isFalse();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus(null))).isFalse();
+        assertThat(GoCampingItemConverter.isRemoved(withSyncStatus("d"))).isFalse();
+    }
+
+    private static PublicSpotCommand convertWith(String manageSttus, String hvofBgnde, String hvofEnddle) {
+        return GoCampingItemConverter.convert(gangbyeonSari(
+                        "", "127.190085215523", "35.4952105728394", "U", manageSttus, hvofBgnde, hvofEnddle))
+                .orElseThrow();
+    }
+
+    private static GoCampingItem withSyncStatus(String syncStatus) {
+        return gangbyeonSari("", "127.190085215523", "35.4952105728394", syncStatus, "운영", "", "");
+    }
+
     private static GoCampingItem gangbyeonSari(String addr2, String mapX, String mapY) {
+        return gangbyeonSari(addr2, mapX, mapY, "A", "운영", "", "");
+    }
+
+    private static GoCampingItem gangbyeonSari(
+            String addr2,
+            String mapX,
+            String mapY,
+            String syncStatus,
+            String manageSttus,
+            String hvofBgnde,
+            String hvofEnddle) {
         return new GoCampingItem(
                 "146",
                 "강변사리 캠핑장",
@@ -116,6 +200,10 @@ class GoCampingItemConverterTest {
                 "",
                 "계곡 물놀이,청소년체험시설",
                 "",
-                "불가능");
+                "불가능",
+                syncStatus,
+                manageSttus,
+                hvofBgnde,
+                hvofEnddle);
     }
 }

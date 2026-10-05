@@ -54,8 +54,8 @@ public class SyncJobRunService {
     }
 
     @Transactional
-    public void recordProgress(long runId, String cursor, int processedDelta) {
-        getRun(runId).recordProgress(cursor, processedDelta, clock.instant());
+    public void recordProgress(long runId, String cursor, int processedDelta, int skippedDelta) {
+        getRun(runId).recordProgress(cursor, processedDelta, skippedDelta, clock.instant());
     }
 
     @Transactional

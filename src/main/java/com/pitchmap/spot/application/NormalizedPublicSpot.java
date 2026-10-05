@@ -4,6 +4,7 @@ import com.pitchmap.spot.domain.GeoPoint;
 import com.pitchmap.spot.domain.WeatherGrid;
 import com.pitchmap.spot.infra.PublicSpotColumns;
 import com.pitchmap.spot.infra.PublicSpotRow;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -15,6 +16,8 @@ import java.util.TreeMap;
  *
  * <p>원천 데이터에는 앞뒤 공백, 빈 문자열, 열 크기보다 긴 값이 섞여 온다. 그래서 {@link #from}을 호출하면 문자열의 앞뒤 공백을 지우고, 빈 문자열은
  * null로 바꾸고, 열 크기를 넘는 값은 열 크기에 맞춰 자른다. 다만 홈페이지 주소는 자르면 열리지 않는 주소가 되므로 자르지 않고 버린다.
+ *
+ * <p>운영 상태와 휴장 기간은 원천이 준 대로 둔다. 휴장 시작일이 종료일보다 늦어도 거부하지 않는다.
  */
 record NormalizedPublicSpot(
         String externalId,
@@ -25,7 +28,10 @@ record NormalizedPublicSpot(
         String category,
         SortedMap<String, String> facilities,
         String phone,
-        String homepage) {
+        String homepage,
+        PublicSpotOperatingStatus operatingStatus,
+        LocalDate closedFrom,
+        LocalDate closedUntil) {
 
     // 열 크기는 spot, public_spot_detail 테이블 정의와 같다. MySQL VARCHAR는 바이트가 아니라 문자 수로 길이를 센다.
     static final int MAX_EXTERNAL_ID_LENGTH = 50;
@@ -60,7 +66,10 @@ record NormalizedPublicSpot(
                 truncate(blankToNull(command.category()), MAX_CATEGORY_LENGTH),
                 normalizeFacilities(command.facilities()),
                 truncate(blankToNull(command.phone()), MAX_PHONE_LENGTH),
-                dropIfTooLong(blankToNull(command.homepage()), MAX_HOMEPAGE_LENGTH));
+                dropIfTooLong(blankToNull(command.homepage()), MAX_HOMEPAGE_LENGTH),
+                command.operatingStatus(),
+                command.closedFrom(),
+                command.closedUntil());
     }
 
     /** 호출하면 spot 테이블에 저장한 이름, 주소, 좌표 중 하나라도 이 값과 다른지 돌려준다. */
@@ -71,12 +80,18 @@ record NormalizedPublicSpot(
                 || !isSameDegree(location.longitude(), stored.longitude());
     }
 
-    /** 호출하면 public_spot_detail에 저장한 분류, 시설, 전화번호, 홈페이지 중 하나라도 이 값과 다른지 돌려준다. */
+    /**
+     * 호출하면 public_spot_detail에 저장한 분류, 시설, 전화번호, 홈페이지, 운영 상태, 휴장 기간 중 하나라도 이 값과 다른지 돌려준다. 값이 없는
+     * 쪽(null)과 있는 쪽은 다른 값으로 본다.
+     */
     boolean differsInDetailColumns(PublicSpotRow stored, Map<String, String> storedFacilities) {
         return !Objects.equals(category, stored.category())
                 || !Objects.equals(facilities, storedFacilities)
                 || !Objects.equals(phone, stored.phone())
-                || !Objects.equals(homepage, stored.homepage());
+                || !Objects.equals(homepage, stored.homepage())
+                || !Objects.equals(operatingStatusName(), stored.operatingStatus())
+                || !Objects.equals(closedFrom, stored.closedFrom())
+                || !Objects.equals(closedUntil, stored.closedUntil());
     }
 
     PublicSpotColumns toColumns(String facilitiesJson) {
@@ -91,7 +106,17 @@ record NormalizedPublicSpot(
                 category,
                 facilitiesJson,
                 phone,
-                homepage);
+                homepage,
+                operatingStatusName(),
+                closedFrom,
+                closedUntil);
+    }
+
+    private String operatingStatusName() {
+        if (operatingStatus == null) {
+            return null;
+        }
+        return operatingStatus.name();
     }
 
     private static String requireText(String value, String message) {

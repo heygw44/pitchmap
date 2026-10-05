@@ -29,15 +29,25 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
-// 테스트 프로필의 페이지 크기는 2다. 픽스처는 전체 5건이라 서비스는 1~3페이지를 차례로 받는다.
-// 1페이지: 146, 2329 / 2페이지: 2931, 7001 / 3페이지: 7002
+// 테스트 프로필의 페이지 크기는 2다. 픽스처는 동기화 목록 7건이라 서비스는 1~4페이지를 차례로 받는다.
+// 1페이지: 146(A), 2329(A) / 2페이지: 2931(U), 7001(A) / 3페이지: 7002(U), 1467(U, 휴장 기간이 있다) / 4페이지: 3466(D)
+// 3466은 원천에서 삭제된 항목이라 처음부터 DB에 없다. 1467과 3466은 고캠핑 basedSyncList 실제 응답
+// (fixtures/publicdata/gocamping/based-sync-list.json)의 항목이고, 나머지는 basedList 실제 응답에서 가져와 syncStatus를 붙였다.
 @IntegrationTest
 class GoCampingSyncServiceIntegrationTest {
 
-    private static final String BASED_LIST_PATH = "/B551011/GoCamping/basedList";
+    private static final String BASED_SYNC_LIST_PATH = "/B551011/GoCamping/basedSyncList";
     private static final String TEST_SERVICE_KEY = "test+key/value==";
-    private static final int TOTAL_COUNT = 5;
+    private static final int PAGE_COUNT = 4;
+    // 응답에 담긴 항목은 모두 7건이고, 그중 삭제 항목 하나를 뺀 6건이 장소로 적재된다.
+    private static final int RECEIVED_COUNT = 7;
+    private static final int LIVE_COUNT = 6;
+
+    private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
     @Autowired
     private GoCampingSyncService goCampingSyncService;
@@ -67,27 +77,62 @@ class GoCampingSyncServiceIntegrationTest {
 
         // then
         assertThat(result).isPresent();
-        assertThat(result.get().pages()).isEqualTo(3);
-        assertThat(result.get().processedCount()).isEqualTo(TOTAL_COUNT);
-        assertThat(result.get().inserted()).isEqualTo(TOTAL_COUNT);
-        assertThat(countRows("spot")).isEqualTo(TOTAL_COUNT);
-        assertThat(countRows("public_spot_detail")).isEqualTo(TOTAL_COUNT);
+        assertThat(result.get().pages()).isEqualTo(PAGE_COUNT);
+        assertThat(result.get().processedCount()).isEqualTo(RECEIVED_COUNT);
+        assertThat(result.get().inserted()).isEqualTo(LIVE_COUNT);
+        assertThat(countRows("spot")).isEqualTo(LIVE_COUNT);
+        assertThat(countRows("public_spot_detail")).isEqualTo(LIVE_COUNT);
         assertThat(jdbcTemplate.queryForList(
                         "SELECT external_id FROM public_spot_detail WHERE source = 'GOCAMPING' ORDER BY external_id",
                         String.class))
-                .containsExactly("146", "2329", "2931", "7001", "7002");
+                .containsExactly("146", "1467", "2329", "2931", "7001", "7002");
         assertThat(jdbcTemplate.queryForList("SELECT DISTINCT type FROM spot", String.class))
                 .containsExactly("CAMPSITE");
         assertThat(runs()).singleElement().satisfies(run -> {
             assertThat(run.status()).isEqualTo("COMPLETED");
-            assertThat(run.progressCursor()).isEqualTo("3");
-            assertThat(run.processedCount()).isEqualTo(TOTAL_COUNT);
+            assertThat(run.progressCursor()).isEqualTo(String.valueOf(PAGE_COUNT));
+            assertThat(run.processedCount()).isEqualTo(RECEIVED_COUNT);
             assertThat(run.finished()).isTrue();
         });
-        for (int pageNo = 1; pageNo <= 3; pageNo++) {
+        for (int pageNo = 1; pageNo <= PAGE_COUNT; pageNo++) {
             assertThat(requestCount(pageNo)).isEqualTo(1);
         }
-        assertThat(requestCount(4)).isZero();
+        assertThat(requestCount(PAGE_COUNT + 1)).isZero();
+    }
+
+    @Test
+    @DisplayName("[F-06] 운영 상태와 휴장 기간은 상세에 저장하고, 삭제 항목은 DB에 없으면 적재하지 않으며 받은 항목 수에는 센다")
+    void syncStoresOperatingStatusAndClosedPeriodAndIgnoresRemovedItemNotInDb() {
+        // given
+        stubAllPages();
+
+        // when
+        GoCampingSyncResult result = goCampingSyncService.sync().orElseThrow();
+
+        // then
+        Map<String, Object> closedPeriod =
+                jdbcTemplate.queryForMap("SELECT operating_status, CAST(closed_from AS CHAR) AS closed_from,"
+                        + " CAST(closed_until AS CHAR) AS closed_until FROM public_spot_detail"
+                        + " WHERE external_id = '1467'");
+        assertThat(closedPeriod.get("operating_status")).isEqualTo("OPERATING");
+        assertThat(closedPeriod.get("closed_from")).isEqualTo("2026-11-16");
+        assertThat(closedPeriod.get("closed_until")).isEqualTo("2027-03-15");
+        Map<String, Object> noPeriod =
+                jdbcTemplate.queryForMap("SELECT operating_status, closed_from, closed_until FROM public_spot_detail"
+                        + " WHERE external_id = '146'");
+        assertThat(noPeriod.get("operating_status")).isEqualTo("OPERATING");
+        assertThat(noPeriod.get("closed_from")).isNull();
+        assertThat(noPeriod.get("closed_until")).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM public_spot_detail WHERE external_id = '3466'", Integer.class))
+                .isZero();
+        assertThat(countRows("public_spot_detail WHERE source_removed_at IS NOT NULL"))
+                .isZero();
+        assertThat(result.removed()).isZero();
+        assertThat(result.skipped()).isZero();
+        assertThat(result.processedCount()).isEqualTo(RECEIVED_COUNT);
+        assertThat(runs().getFirst().processedCount()).isEqualTo(RECEIVED_COUNT);
+        assertThat(runs().getFirst().skippedCount()).isZero();
     }
 
     @Test
@@ -108,12 +153,38 @@ class GoCampingSyncServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("[F-06] 좌표가 비어 있는 항목은 건너뛰고, 건너뛴 건수를 결과와 실행 기록에 남기며 받은 항목 수에는 센다")
+    void syncSkipsItemWithoutCoordinateAndRecordsSkippedCount() {
+        // given: 2페이지의 7001은 좌표가 비어 있다.
+        stubAllPages(Map.of("7001", Map.of("mapX", "", "mapY", "")));
+
+        // when
+        GoCampingSyncResult result = goCampingSyncService.sync().orElseThrow();
+
+        // then
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.inserted()).isEqualTo(LIVE_COUNT - 1);
+        assertThat(result.removed()).isZero();
+        assertThat(result.processedCount()).isEqualTo(RECEIVED_COUNT);
+        assertThat(countRows("spot")).isEqualTo(LIVE_COUNT - 1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM public_spot_detail WHERE external_id = '7001'", Integer.class))
+                .isZero();
+        assertThat(runs()).singleElement().satisfies(run -> {
+            assertThat(run.status()).isEqualTo("COMPLETED");
+            assertThat(run.skippedCount()).isEqualTo(1);
+            assertThat(run.processedCount()).isEqualTo(RECEIVED_COUNT);
+        });
+    }
+
+    @Test
     @DisplayName("[F-06][NFR-06] 중간 페이지에서 실패하면 실행 기록을 실패로 남기고, 다음 실행은 받은 페이지를 다시 부르지 않고 이어서 받는다")
     void syncResumesFromNextPageAfterFailure() {
         // given: 2페이지는 재시도까지 모두 서버 오류로 응답한다.
         stubPage(1);
         stubPage(3);
-        wireMock.stubFor(get(urlPathEqualTo(BASED_LIST_PATH))
+        stubPage(4);
+        wireMock.stubFor(get(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                 .withQueryParam("pageNo", equalTo("2"))
                 .willReturn(aResponse().withStatus(500)));
 
@@ -142,14 +213,15 @@ class GoCampingSyncServiceIntegrationTest {
         assertThat(runs).hasSize(2);
         assertThat(runs.get(0).status()).isEqualTo("FAILED");
         assertThat(runs.get(1).status()).isEqualTo("COMPLETED");
-        assertThat(runs.get(1).progressCursor()).isEqualTo("3");
-        assertThat(runs.get(1).processedCount()).isEqualTo(3);
+        assertThat(runs.get(1).progressCursor()).isEqualTo(String.valueOf(PAGE_COUNT));
+        assertThat(runs.get(1).processedCount()).isEqualTo(5);
         assertThat(requestCount(1)).isEqualTo(1);
         // 첫 실행이 서버 오류로 두 번(처음 호출과 재시도 한 번), 재실행이 한 번 불렀다.
         assertThat(requestCount(2)).isEqualTo(3);
         assertThat(requestCount(3)).isEqualTo(1);
-        assertThat(countRows("spot")).isEqualTo(TOTAL_COUNT);
-        assertThat(countRows("public_spot_detail")).isEqualTo(TOTAL_COUNT);
+        assertThat(requestCount(4)).isEqualTo(1);
+        assertThat(countRows("spot")).isEqualTo(LIVE_COUNT);
+        assertThat(countRows("public_spot_detail")).isEqualTo(LIVE_COUNT);
     }
 
     @Test
@@ -169,10 +241,97 @@ class GoCampingSyncServiceIntegrationTest {
         assertThat(second).isPresent();
         assertThat(second.get().inserted()).isZero();
         assertThat(second.get().updated()).isZero();
-        assertThat(second.get().unchanged()).isEqualTo(TOTAL_COUNT);
+        assertThat(second.get().unchanged()).isEqualTo(LIVE_COUNT);
+        assertThat(second.get().removed()).isZero();
+        assertThat(second.get().skipped()).isZero();
         assertThat(spotRows()).isEqualTo(spotsAfterFirst);
         assertThat(detailRows()).isEqualTo(detailsAfterFirst);
         assertThat(runs()).hasSize(2).allSatisfy(run -> assertThat(run.status()).isEqualTo("COMPLETED"));
+    }
+
+    @Test
+    @DisplayName("[F-06] 원천에서 삭제된 항목은 장소를 숨기고, 같은 삭제 항목이 다시 와도 그대로 두며, 살아 있는 항목으로 돌아오면 다시 공개한다")
+    void syncHidesRemovedSpotAndRestoresItWhenItComesBack() {
+        // given: 처음에는 모든 항목이 정상으로 적재된다.
+        stubAllPages();
+        goCampingSyncService.sync();
+        assertThat(spotStatus("2931")).isEqualTo("ACTIVE");
+        assertThat(sourceRemovedAt("2931")).isNull();
+
+        // when: 2931이 삭제 항목으로 바뀌어 온다.
+        stubAllPages(Map.of("2931", Map.of("syncStatus", "D")));
+        clock.advance(Duration.ofDays(1));
+        GoCampingSyncResult hidden = goCampingSyncService.sync().orElseThrow();
+
+        // then
+        assertThat(hidden.removed()).isEqualTo(1);
+        assertThat(hidden.skipped()).isZero();
+        assertThat(hidden.inserted()).isZero();
+        assertThat(hidden.updated()).isZero();
+        assertThat(hidden.unchanged()).isEqualTo(LIVE_COUNT - 1);
+        assertThat(hidden.processedCount()).isEqualTo(RECEIVED_COUNT);
+        assertThat(spotStatus("2931")).isEqualTo("HIDDEN");
+        String removedAt = sourceRemovedAt("2931");
+        assertThat(removedAt).isNotNull();
+        assertThat(countRows("spot WHERE status = 'HIDDEN'")).isEqualTo(1);
+        assertThat(runs().getLast().skippedCount()).isZero();
+
+        // when: 같은 응답으로 다시 실행한다.
+        clock.advance(Duration.ofDays(1));
+        GoCampingSyncResult again = goCampingSyncService.sync().orElseThrow();
+
+        // then: 이미 숨긴 장소는 다시 숨기지 않고, 숨긴 시각도 그대로다.
+        assertThat(again.removed()).isZero();
+        assertThat(again.inserted()).isZero();
+        assertThat(again.updated()).isZero();
+        assertThat(again.unchanged()).isEqualTo(LIVE_COUNT - 1);
+        assertThat(spotStatus("2931")).isEqualTo("HIDDEN");
+        assertThat(sourceRemovedAt("2931")).isEqualTo(removedAt);
+
+        // when: 2931이 U로 돌아온다.
+        stubAllPages(Map.of("2931", Map.of("syncStatus", "U")));
+        clock.advance(Duration.ofDays(1));
+        GoCampingSyncResult restored = goCampingSyncService.sync().orElseThrow();
+
+        // then
+        assertThat(restored.removed()).isZero();
+        assertThat(restored.updated()).isEqualTo(1);
+        assertThat(restored.inserted()).isZero();
+        assertThat(restored.unchanged()).isEqualTo(LIVE_COUNT - 1);
+        assertThat(spotStatus("2931")).isEqualTo("ACTIVE");
+        assertThat(sourceRemovedAt("2931")).isNull();
+        assertThat(countRows("spot WHERE status = 'HIDDEN'")).isZero();
+    }
+
+    @Test
+    @DisplayName("[F-06] 관리자가 숨긴 장소가 삭제 항목으로 와도 건드리거나 표시하지 않고, 살아 있는 항목으로 돌아와도 숨긴 채로 둔다")
+    void syncLeavesAdminHiddenSpotUntouchedWhenItArrivesAsRemoved() {
+        // given: 처음에 적재한 뒤 관리자가 2931을 숨긴다.
+        stubAllPages();
+        goCampingSyncService.sync();
+        jdbcTemplate.update("UPDATE spot SET status = 'HIDDEN' WHERE id = (SELECT spot_id FROM public_spot_detail"
+                + " WHERE external_id = '2931')");
+        List<Map<String, Object>> spotsBefore = spotRows();
+
+        // when: 2931이 삭제 항목으로 온다.
+        stubAllPages(Map.of("2931", Map.of("syncStatus", "D")));
+        clock.advance(Duration.ofDays(1));
+        GoCampingSyncResult removedRun = goCampingSyncService.sync().orElseThrow();
+
+        // then
+        assertThat(removedRun.removed()).isZero();
+        assertThat(spotStatus("2931")).isEqualTo("HIDDEN");
+        assertThat(sourceRemovedAt("2931")).isNull();
+        assertThat(spotRows()).isEqualTo(spotsBefore);
+
+        // when: 2931이 살아 있는 항목으로 돌아온다.
+        stubAllPages();
+        clock.advance(Duration.ofDays(1));
+        goCampingSyncService.sync();
+
+        // then: 관리자가 숨긴 장소라서 다시 공개하지 않는다.
+        assertThat(spotStatus("2931")).isEqualTo("HIDDEN");
+        assertThat(sourceRemovedAt("2931")).isNull();
     }
 
     @Test
@@ -194,10 +353,10 @@ class GoCampingSyncServiceIntegrationTest {
         assertThat(runs.get(0).errorMessage()).isNotBlank();
         assertThat(runs.get(0).finished()).isTrue();
         assertThat(runs.get(1).status()).isEqualTo("COMPLETED");
-        assertThat(runs.get(1).progressCursor()).isEqualTo("3");
+        assertThat(runs.get(1).progressCursor()).isEqualTo(String.valueOf(PAGE_COUNT));
         assertThat(requestCount(1)).isZero();
         assertThat(requestCount(2)).isEqualTo(1);
-        assertThat(countRows("spot")).isEqualTo(3);
+        assertThat(countRows("spot")).isEqualTo(4);
     }
 
     @Test
@@ -219,38 +378,74 @@ class GoCampingSyncServiceIntegrationTest {
     }
 
     private void stubAllPages() {
-        for (int pageNo = 1; pageNo <= 3; pageNo++) {
-            stubPage(pageNo);
+        stubAllPages(Map.of());
+    }
+
+    private void stubAllPages(Map<String, Map<String, String>> itemOverrides) {
+        for (int pageNo = 1; pageNo <= PAGE_COUNT; pageNo++) {
+            stubPage(pageNo, itemOverrides);
         }
     }
 
     private void stubPage(int pageNo) {
-        wireMock.stubFor(get(urlPathEqualTo(BASED_LIST_PATH))
+        stubPage(pageNo, Map.of());
+    }
+
+    private void stubPage(int pageNo, Map<String, Map<String, String>> itemOverrides) {
+        wireMock.stubFor(get(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                 .withQueryParam("pageNo", equalTo(String.valueOf(pageNo)))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json;charset=UTF-8")
-                        .withBody(readFixture(pageNo))));
+                        .withBody(readFixture(pageNo, itemOverrides))));
     }
 
-    private static String readFixture(int pageNo) {
-        String path = "fixtures/publicdata/gocamping/sync/based-list-page" + pageNo + ".json";
+    // 항목 ID를 키로, 바꿀 원천 필드 이름과 값을 넘기면 픽스처의 그 항목 필드만 바꿔서 응답으로 쓴다.
+    private static String readFixture(int pageNo, Map<String, Map<String, String>> itemOverrides) {
+        String path = "fixtures/publicdata/gocamping/sync/based-sync-list-page" + pageNo + ".json";
         try {
-            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
+            String json = new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
+            if (itemOverrides.isEmpty()) {
+                return json;
+            }
+            JsonNode root = JSON_MAPPER.readTree(json);
+            for (JsonNode item :
+                    root.path("response").path("body").path("items").path("item")) {
+                Map<String, String> fields =
+                        itemOverrides.get(item.path("contentId").asString());
+                if (fields != null) {
+                    fields.forEach((name, value) -> ((ObjectNode) item).put(name, value));
+                }
+            }
+            return JSON_MAPPER.writeValueAsString(root);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     private int requestCount(int pageNo) {
-        return wireMock.countRequestsMatching(getRequestedFor(urlPathEqualTo(BASED_LIST_PATH))
+        return wireMock.countRequestsMatching(getRequestedFor(urlPathEqualTo(BASED_SYNC_LIST_PATH))
                         .withQueryParam("pageNo", equalTo(String.valueOf(pageNo)))
                         .build())
                 .getCount();
     }
 
-    private int countRows(String table) {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+    private int countRows(String tableAndCondition) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableAndCondition, Integer.class);
+    }
+
+    private String spotStatus(String externalId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT s.status FROM spot s JOIN public_spot_detail d ON d.spot_id = s.id WHERE d.external_id = ?",
+                String.class,
+                externalId);
+    }
+
+    private String sourceRemovedAt(String externalId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT CAST(source_removed_at AS CHAR) FROM public_spot_detail WHERE external_id = ?",
+                String.class,
+                externalId);
     }
 
     private List<Map<String, Object>> spotRows() {
@@ -260,8 +455,9 @@ class GoCampingSyncServiceIntegrationTest {
 
     private List<Map<String, Object>> detailRows() {
         return jdbcTemplate.queryForList("SELECT spot_id, source, external_id, category, CAST(facilities AS CHAR)"
-                + " AS facilities, phone, homepage, synced_at, created_at, updated_at FROM public_spot_detail"
-                + " ORDER BY spot_id");
+                + " AS facilities, phone, homepage, operating_status, CAST(closed_from AS CHAR) AS closed_from,"
+                + " CAST(closed_until AS CHAR) AS closed_until, source_removed_at, synced_at, created_at, updated_at"
+                + " FROM public_spot_detail ORDER BY spot_id");
     }
 
     private long insertRunningRun(Instant updatedAt) {
@@ -276,17 +472,24 @@ class GoCampingSyncServiceIntegrationTest {
 
     private List<RunRow> runs() {
         return jdbcTemplate.query(
-                "SELECT id, status, progress_cursor, processed_count, error_message, finished_at FROM sync_job_run"
-                        + " WHERE job_type = 'GOCAMPING' ORDER BY id",
+                "SELECT id, status, progress_cursor, processed_count, skipped_count, error_message, finished_at"
+                        + " FROM sync_job_run WHERE job_type = 'GOCAMPING' ORDER BY id",
                 (rs, rowNum) -> new RunRow(
                         rs.getLong("id"),
                         rs.getString("status"),
                         rs.getString("progress_cursor"),
                         rs.getInt("processed_count"),
+                        rs.getInt("skipped_count"),
                         rs.getString("error_message"),
                         rs.getObject("finished_at") != null));
     }
 
     private record RunRow(
-            long id, String status, String progressCursor, int processedCount, String errorMessage, boolean finished) {}
+            long id,
+            String status,
+            String progressCursor,
+            int processedCount,
+            int skippedCount,
+            String errorMessage,
+            boolean finished) {}
 }

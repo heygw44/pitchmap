@@ -29,6 +29,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>공공데이터포털은 하루 호출 수를 1,000번으로 제한하고, 재시도한 요청도 이 한도에서 뺀다. 그래서 클라이언트는 다시 보내면 성공할 수 있는
  * 실패(I/O 오류, 타임아웃, HTTP 5xx)일 때만 한 번 더 보낸다. 반면 인증 오류나 원천 오류 코드는 다시 보내도 같은 결과라서 바로 실패로 끝낸다.
  *
+ * <p>전체 동기화 한 번은 페이지 크기 100 기준으로 약 54번을 호출한다(항목 5,353건).
+ *
  * <p>인증키는 쿼리 값으로 보내므로 요청 주소에 키가 들어 있다. 그래서 클라이언트는 요청 주소를 로그나 예외 메시지에 남기지 않는다.
  */
 @Slf4j
@@ -36,8 +38,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class GoCampingClient {
 
     private static final String API = "gocamping";
-    private static final String BASED_LIST = "basedList";
-    private static final String BASED_LIST_URI = "/basedList?serviceKey={serviceKey}&MobileOS={mobileOs}"
+    private static final String BASED_SYNC_LIST = "basedSyncList";
+    private static final String BASED_SYNC_LIST_URI = "/basedSyncList?serviceKey={serviceKey}&MobileOS={mobileOs}"
             + "&MobileApp={mobileApp}&_type={type}&pageNo={pageNo}&numOfRows={numOfRows}";
     private static final String MOBILE_OS = "ETC";
     private static final String MOBILE_APP = "pitchmap";
@@ -60,7 +62,7 @@ public class GoCampingClient {
     }
 
     /**
-     * 캠핑장 기본 목록 한 페이지를 받는다.
+     * 캠핑장 동기화 목록 한 페이지를 받는다.
      *
      * @param pageNo 1부터 세는 페이지 번호
      * @param numOfRows 페이지 크기
@@ -68,24 +70,24 @@ public class GoCampingClient {
      */
     public GoCampingPage fetchPage(int pageNo, int numOfRows) {
         try {
-            return fetchBasedListOnce(pageNo, numOfRows);
+            return fetchBasedSyncListOnce(pageNo, numOfRows);
         } catch (GoCampingApiException e) {
             if (!e.isRetryable()) {
                 throw e;
             }
             log.warn("고캠핑 API 호출이 실패해서 한 번 다시 보낸다. reason={}", e.getMessage());
-            return fetchBasedListOnce(pageNo, numOfRows);
+            return fetchBasedSyncListOnce(pageNo, numOfRows);
         }
     }
 
-    private GoCampingPage fetchBasedListOnce(int pageNo, int numOfRows) {
-        return metrics.record(API, BASED_LIST, () -> {
-            RawResponse response = sendBasedList(pageNo, numOfRows);
+    private GoCampingPage fetchBasedSyncListOnce(int pageNo, int numOfRows) {
+        return metrics.record(API, BASED_SYNC_LIST, () -> {
+            RawResponse response = sendBasedSyncList(pageNo, numOfRows);
             return toPage(response, pageNo, numOfRows);
         });
     }
 
-    private RawResponse sendBasedList(int pageNo, int numOfRows) {
+    private RawResponse sendBasedSyncList(int pageNo, int numOfRows) {
         Map<String, Object> uriVariables = Map.of(
                 "serviceKey", serviceKey,
                 "mobileOs", MOBILE_OS,
@@ -94,7 +96,10 @@ public class GoCampingClient {
                 "pageNo", pageNo,
                 "numOfRows", numOfRows);
         try {
-            return restClient.get().uri(BASED_LIST_URI, uriVariables).exchange((request, response) -> read(response));
+            return restClient
+                    .get()
+                    .uri(BASED_SYNC_LIST_URI, uriVariables)
+                    .exchange((request, response) -> read(response));
         } catch (ResourceAccessException e) {
             // Spring은 이 예외 메시지에서 쿼리를 뺀 주소만 남긴다. 그래서 원인으로 이어도 메시지에 키가 들어가지 않는다.
             throw GoCampingApiException.retryable(
@@ -201,7 +206,11 @@ public class GoCampingClient {
                 textOf(node, "sbrsEtc"),
                 textOf(node, "posblFcltyCl"),
                 textOf(node, "posblFcltyEtc"),
-                textOf(node, "animalCmgCl"));
+                textOf(node, "animalCmgCl"),
+                textOf(node, "syncStatus"),
+                textOf(node, "manageSttus"),
+                textOf(node, "hvofBgnde"),
+                textOf(node, "hvofEnddle"));
     }
 
     private static String textOf(JsonNode node, String field) {
@@ -231,7 +240,7 @@ public class GoCampingClient {
     }
 
     private static String describe(int pageNo, String reason) {
-        return "고캠핑 " + BASED_LIST + " 호출 실패 pageNo=" + pageNo + ": " + reason;
+        return "고캠핑 " + BASED_SYNC_LIST + " 호출 실패 pageNo=" + pageNo + ": " + reason;
     }
 
     private static RestClient createRestClient(GoCampingProperties properties) {

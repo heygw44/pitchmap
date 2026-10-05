@@ -12,7 +12,11 @@
                d.category AS category,
                d.facilities AS facilities,
                d.phone AS phone,
-               d.homepage AS homepage
+               d.homepage AS homepage,
+               d.operating_status AS operating_status,
+               d.closed_from AS closed_from,
+               d.closed_until AS closed_until,
+               d.source_removed_at IS NOT NULL AS source_removed
         FROM public_spot_detail d
         JOIN spot s ON s.id = d.spot_id
         WHERE d.source = #{source}
@@ -42,7 +46,8 @@
 
     <insert id="insertDetails">
         INSERT INTO public_spot_detail
-            (spot_id, source, external_id, category, facilities, phone, homepage, synced_at, created_at, updated_at)
+            (spot_id, source, external_id, category, facilities, phone, homepage,
+             operating_status, closed_from, closed_until, synced_at, created_at, updated_at)
         VALUES
         <foreach collection="spots" item="spot" separator=",">
             (#{spot.spotId},
@@ -52,6 +57,9 @@
              CAST(#{spot.columns.facilities} AS JSON),
              #{spot.columns.phone},
              #{spot.columns.homepage},
+             #{spot.columns.operatingStatus},
+             #{spot.columns.closedFrom},
+             #{spot.columns.closedUntil},
              #{now},
              #{now},
              #{now})
@@ -89,15 +97,96 @@
                    #{spot.columns.category} AS category,
                    #{spot.columns.facilities} AS facilities,
                    #{spot.columns.phone} AS phone,
-                   #{spot.columns.homepage} AS homepage
+                   #{spot.columns.homepage} AS homepage,
+                   #{spot.columns.operatingStatus} AS operating_status,
+                   #{spot.columns.closedFrom} AS closed_from,
+                   #{spot.columns.closedUntil} AS closed_until
         </foreach>
         ) AS changed ON changed.spot_id = d.spot_id
         SET d.category = changed.category,
             d.facilities = CAST(changed.facilities AS JSON),
             d.phone = changed.phone,
             d.homepage = changed.homepage,
+            d.operating_status = changed.operating_status,
+            d.closed_from = CAST(changed.closed_from AS DATE),
+            d.closed_until = CAST(changed.closed_until AS DATE),
             d.synced_at = #{now},
             d.updated_at = #{now}
+    </update>
+
+    <!-- 원천 삭제로 숨겼던 장소를 되돌린다. 조건에 source_removed_at을 쓰므로, 같은 트랜잭션에서 clearSourceRemoved보다 먼저 실행해야 한다.
+         SET은 spot의 열만 바꾼다. 그래서 두 테이블을 조인해도 영향받은 행 수는 spot에서 바뀐 행 수와 같다. -->
+    <update id="restoreSpots">
+        UPDATE spot s
+        JOIN public_spot_detail d ON d.spot_id = s.id
+        SET s.status = 'ACTIVE',
+            s.updated_at = #{now}
+        WHERE s.status = 'HIDDEN'
+          AND d.source_removed_at IS NOT NULL
+          AND s.id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <update id="clearSourceRemoved">
+        UPDATE public_spot_detail
+        SET source_removed_at = NULL,
+            updated_at = #{now}
+        WHERE source_removed_at IS NOT NULL
+          AND spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <select id="selectRemovalCandidateIds" resultType="long">
+        SELECT d.spot_id
+        FROM public_spot_detail d
+        JOIN spot s ON s.id = d.spot_id
+        WHERE d.source = #{source}
+          AND s.status = 'ACTIVE'
+          AND d.source_removed_at IS NULL
+          AND d.external_id IN
+        <foreach collection="externalIds" item="externalId" open="(" separator="," close=")">
+            #{externalId}
+        </foreach>
+    </select>
+
+    <!-- 기본 키로만 읽으므로, 존재하지 않는 키 사이의 틈에는 잠금이 걸리지 않는다. -->
+    <select id="lockRemovalCandidates" resultType="long">
+        SELECT d.spot_id
+        FROM public_spot_detail d
+        JOIN spot s ON s.id = d.spot_id
+        WHERE s.status = 'ACTIVE'
+          AND d.source_removed_at IS NULL
+          AND d.spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+        ORDER BY d.spot_id
+        FOR UPDATE
+    </select>
+
+    <update id="hideSpots">
+        UPDATE spot
+        SET status = 'HIDDEN',
+            updated_at = #{now}
+        WHERE status = 'ACTIVE'
+          AND id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+    <update id="markSourceRemoved">
+        UPDATE public_spot_detail
+        SET source_removed_at = #{now},
+            updated_at = #{now}
+        WHERE spot_id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
     </update>
 
 </mapper>

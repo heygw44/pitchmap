@@ -45,6 +45,9 @@ public class SyncJobRun {
     @Column(name = "processed_count")
     private int processedCount;
 
+    @Column(name = "skipped_count")
+    private int skippedCount;
+
     @Column(name = "started_at")
     private Instant startedAt;
 
@@ -65,6 +68,7 @@ public class SyncJobRun {
         this.status = SyncJobStatus.RUNNING;
         this.progressCursor = startCursor;
         this.processedCount = 0;
+        this.skippedCount = 0;
         this.startedAt = now;
         this.createdAt = now;
         this.updatedAt = now;
@@ -81,15 +85,22 @@ public class SyncJobRun {
         return new SyncJobRun(jobType, startCursor, now);
     }
 
-    /** 호출하면 진행 위치를 바꾸고 처리 건수에 {@code processedDelta}를 더한다. 수정 시각도 바꾸므로 오래된 실행인지 판단할 때 이 시각을 쓴다. */
-    public void recordProgress(String cursor, int processedDelta, Instant now) {
+    /**
+     * 호출하면 진행 위치를 바꾸고 처리 건수에 {@code processedDelta}를, 건너뛴 건수에 {@code skippedDelta}를 더한다.
+     * 수정 시각도 바꾸므로 오래된 실행인지 판단할 때 이 시각을 쓴다.
+     */
+    public void recordProgress(String cursor, int processedDelta, int skippedDelta, Instant now) {
         requireRunning();
         requireNow(now);
         if (processedDelta < 0) {
             throw new IllegalArgumentException("처리 건수 증가분은 0 이상이어야 합니다.");
         }
+        if (skippedDelta < 0) {
+            throw new IllegalArgumentException("건너뛴 건수 증가분은 0 이상이어야 합니다.");
+        }
         this.progressCursor = cursor;
         this.processedCount += processedDelta;
+        this.skippedCount += skippedDelta;
         this.updatedAt = now;
     }
 

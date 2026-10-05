@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// 기본값은 하루 한 번, 새벽 3시(한국 시간)다. 고캠핑 API는 하루 호출 한도가 1,000건이고, 페이지 크기 100이면 전체 목록을 받는 데
-// 약 32건을 쓴다. 그래서 하루 한 번이면 한도 안에서 충분히 최신 상태를 유지하고, 실패해도 다음 날 다시 받을 여유가 남는다.
+// 기본값은 하루 한 번, 새벽 3시(한국 시간)다. 고캠핑 API는 하루 호출 한도가 1,000건이고, 페이지 크기 100이면 동기화 목록 전체
+// (약 5,400건)를 받는 데 약 54건을 쓴다. 그래서 하루 한 번이면 한도 안에서 충분히 최신 상태를 유지하고, 실패해도 다음 날 다시 받을 여유가 남는다.
 // 또 사용자가 가장 적은 새벽에 돌려서, 동기화가 지도 조회와 같은 시간에 DB를 쓰는 일을 줄인다.
 // cron을 UTC가 아닌 한국 시간으로 해석해야 하므로 zone을 명시한다.
 @Slf4j
