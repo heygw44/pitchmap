@@ -22,7 +22,10 @@ public class WireMockTestConfig {
 
     @Bean
     DynamicPropertyRegistrar wireMockPropertyRegistrar(WireMockServer wireMockServer) {
-        return registry -> registry.add(
-                "pitchmap.publicdata.gocamping.base-url", () -> wireMockServer.baseUrl() + "/B551011/GoCamping");
+        return registry -> {
+            registry.add(
+                    "pitchmap.publicdata.gocamping.base-url", () -> wireMockServer.baseUrl() + "/B551011/GoCamping");
+            registry.add("pitchmap.weather.kma.base-url", () -> wireMockServer.baseUrl() + "/1360000");
+        };
     }
 }

@@ -1,5 +1,6 @@
 package com.pitchmap.common.external;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.function.Supplier;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class ExternalApiMetrics {
 
     private static final String TIMER_NAME = "pitchmap.external.api.requests";
+    private static final String FALLBACK_COUNTER_NAME = "pitchmap.external.api.fallbacks";
     private static final String SUCCESS = "success";
     private static final String FAILURE = "failure";
 
@@ -41,6 +43,20 @@ public class ExternalApiMetrics {
         } finally {
             sample.stop(timer(api, operation, outcome));
         }
+    }
+
+    /**
+     * 외부 API가 실패해서 서버가 그 값 없이 응답했다는 사실을 센다. 요청마다 하나씩 기록하는 {@link #record}와 달리, 호출한 쪽이 실패를 받아 넘어간
+     * 때 한 번 부른다. 재시도 횟수와 상관없이 응답 하나에 한 번이다.
+     *
+     * @param api 외부 API 이름. 예: {@code kma}
+     */
+    public void recordFallback(String api) {
+        Counter.builder(FALLBACK_COUNTER_NAME)
+                .description("외부 API 실패로 해당 값 없이 응답한 수")
+                .tag("api", api)
+                .register(meterRegistry)
+                .increment();
     }
 
     private Timer timer(String api, String operation, String outcome) {
