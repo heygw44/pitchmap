@@ -57,6 +57,15 @@ mybatis:
     # 그래서 그 사이 JPA가 flush한 변경이 보이지 않는다.
     local-cache-scope: statement
 
+server:
+  # 운영에서는 Caddy가 요청을 받아 앱으로 넘기므로, 앱이 보는 접속 주소는 Caddy의 내부 주소 하나뿐이다.
+  # 그러면 로그인 기록과 IP당 요청 한도(인증 메일 재발송, 비밀번호 재설정 요청)가 모든 사용자를 한 IP로 센다.
+  # 그래서 Tomcat이 X-Forwarded-For와 X-Forwarded-Proto를 읽어 실제 접속 IP와 HTTPS 여부로 바꾸게 한다.
+  # Tomcat은 내부 주소(10.x, 172.16~31.x, 192.168.x, 127.x 등)에서 온 요청의 헤더만 믿는다. 밖에서 직접 들어온 요청이
+  # 헤더를 꾸며 보내도 무시하고, Caddy는 클라이언트가 보낸 X-Forwarded-For를 버리고 새로 채운다.
+  # 로컬 Vite 개발 서버의 프록시는 이 헤더를 붙이지 않으므로 로컬 동작은 그대로다.
+  forward-headers-strategy: native
+
 management:
   endpoints:
     web:

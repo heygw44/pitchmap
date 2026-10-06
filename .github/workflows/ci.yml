@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [develop, main]
+  # 배포 워크플로(deploy.yml)가 이미지를 만들기 전에 같은 check를 호출한다.
+  workflow_call:
 
 permissions:
   contents: read

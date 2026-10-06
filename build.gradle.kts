@@ -71,6 +71,11 @@ val integrationTest by tasks.registering(Test::class) {
     shouldRunAfter(tasks.test)
 }
 
+// 운영 이미지(Dockerfile)는 build/libs에 있는 jar 하나를 가져간다. 그래서 실행할 수 없는 plain jar는 만들지 않는다.
+tasks.jar {
+    enabled = false
+}
+
 jacoco {
     // JaCoCo는 Java 25 클래스 파일을 0.8.14부터 정식 지원한다.
     toolVersion = "0.8.15"

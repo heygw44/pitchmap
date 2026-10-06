@@ -1,0 +1,22 @@
+# 이미지 빌드 컨텍스트에서 뺄 파일이다. 저장소 루트를 컨텍스트로 쓰므로 비밀값 파일과 큰 폴더를 반드시 뺀다.
+# 앱 이미지는 build/libs의 jar만, caddy 이미지는 web/ 소스와 deploy/caddy만 쓴다.
+**/.env
+**/.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+.git
+.github
+.gradle
+.idea
+.claude
+docs
+data
+mysql-data
+**/node_modules
+web/dist
+build/*
+!build/libs
