@@ -26,6 +26,7 @@ public class WireMockTestConfig {
             registry.add(
                     "pitchmap.publicdata.gocamping.base-url", () -> wireMockServer.baseUrl() + "/B551011/GoCamping");
             registry.add("pitchmap.weather.kma.base-url", () -> wireMockServer.baseUrl() + "/1360000");
+            registry.add("pitchmap.weather.kasi.base-url", () -> wireMockServer.baseUrl() + "/B090041/openapi/service");
         };
     }
 }
