@@ -28,6 +28,8 @@ import com.pitchmap.spot.application.SpotNearbyQuery;
 import com.pitchmap.spot.application.SpotNearbyQueryService;
 import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
+import com.pitchmap.spot.application.SpotRating;
+import com.pitchmap.spot.application.SpotRecentReview;
 import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.weather.application.SunTimes;
@@ -68,6 +70,7 @@ class SpotControllerTest {
             LocalDate.of(2026, 1, 1),
             "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
             "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요.");
+    private static final SpotRating NO_RATING = new SpotRating(null, 0);
     private static final SpotParkWarning NOT_WARNED = new SpotParkWarning(false, null, null, null, null, null);
 
     @Autowired
@@ -468,7 +471,18 @@ class SpotControllerTest {
         SpotBakjiDetail bakji = new SpotBakjiDetail("능선 끝 평지", false, true, "WEAK", 12L, 31L, "새벽능선");
         when(spotDetailQueryService.findDetail(101L))
                 .thenReturn(new SpotDetail(
-                        101L, SpotType.BAKJI, "능선 끝 평지", 37.71, 128.75, "강원 평창군", WARNED, bakji, null, null));
+                        101L,
+                        SpotType.BAKJI,
+                        "능선 끝 평지",
+                        37.71,
+                        128.75,
+                        "강원 평창군",
+                        WARNED,
+                        bakji,
+                        null,
+                        NO_RATING,
+                        List.of(),
+                        null));
 
         // when
         MvcTestResult result = mvc.get().uri(PATH + "/101").exchange();
@@ -496,6 +510,52 @@ class SpotControllerTest {
     }
 
     @Test
+    @DisplayName("[F-10] 후기가 있는 장소의 상세는 평균 평점, 후기 수, 최근 후기를 후기 목록 항목과 같은 모양으로 응답한다")
+    void detailShowsRatingAndRecentReviews() {
+        // given
+        SpotRecentReview review = new SpotRecentReview(
+                9L, 31L, "새벽능선", LocalDate.of(2026, 10, 4), 5, "별이 좋았다", Instant.parse("2026-10-05T03:00:00Z"));
+        when(spotDetailQueryService.findDetail(106L))
+                .thenReturn(new SpotDetail(
+                        106L,
+                        SpotType.CAMPSITE,
+                        "숲속 야영장",
+                        37.52,
+                        127.81,
+                        null,
+                        NOT_WARNED,
+                        null,
+                        null,
+                        new SpotRating(4.3, 3),
+                        List.of(review),
+                        null));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/106").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.rating").isEqualTo(Map.of("average", 4.3, "count", 3));
+        assertThat(result).bodyJson().extractingPath("$.recentReviews").asList().hasSize(1);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.recentReviews[0]")
+                .isEqualTo(Map.of(
+                        "reviewId",
+                        9,
+                        "author",
+                        Map.of("memberId", 31, "nickname", "새벽능선"),
+                        "visitedDate",
+                        "2026-10-04",
+                        "rating",
+                        5,
+                        "content",
+                        "별이 좋았다",
+                        "createdAt",
+                        "2026-10-05T03:00:00Z"));
+    }
+
+    @Test
     @DisplayName("[F-05] 야영장 상세를 조회하면 원천 정보와 시설, 휴장 여부를 받고, bakji는 null이다")
     void readsCampsiteDetail() {
         // given
@@ -513,7 +573,18 @@ class SpotControllerTest {
                 true);
         when(spotDetailQueryService.findDetail(102L))
                 .thenReturn(new SpotDetail(
-                        102L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, NOT_WARNED, null, publicDetail, null));
+                        102L,
+                        SpotType.CAMPSITE,
+                        "숲속 야영장",
+                        37.52,
+                        127.81,
+                        null,
+                        NOT_WARNED,
+                        null,
+                        publicDetail,
+                        NO_RATING,
+                        List.of(),
+                        null));
 
         // when
         MvcTestResult result = mvc.get().uri(PATH + "/102").exchange();
@@ -565,6 +636,8 @@ class SpotControllerTest {
                         WARNED,
                         bakji,
                         null,
+                        NO_RATING,
+                        List.of(),
                         new SpotWeather(forecast, sun)));
 
         // when
@@ -620,6 +693,8 @@ class SpotControllerTest {
                         NOT_WARNED,
                         null,
                         null,
+                        NO_RATING,
+                        List.of(),
                         new SpotWeather(forecast, null)));
 
         // when
@@ -643,7 +718,18 @@ class SpotControllerTest {
         // given
         when(spotDetailQueryService.findDetail(105L))
                 .thenReturn(new SpotDetail(
-                        105L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, NOT_WARNED, null, null, null));
+                        105L,
+                        SpotType.CAMPSITE,
+                        "숲속 야영장",
+                        37.52,
+                        127.81,
+                        null,
+                        NOT_WARNED,
+                        null,
+                        null,
+                        NO_RATING,
+                        List.of(),
+                        null));
 
         // when
         MvcTestResult result = mvc.get().uri(PATH + "/105").exchange();

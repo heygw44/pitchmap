@@ -5,6 +5,8 @@ import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.spot.infra.SpotDetailMapper;
 import com.pitchmap.spot.infra.SpotDetailRow;
+import com.pitchmap.spot.infra.SpotRatingRow;
+import com.pitchmap.spot.infra.SpotRecentReviewRow;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -24,6 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 @RequiredArgsConstructor
 class SpotDetailReader {
+
+    private static final int RECENT_REVIEW_COUNT = 3;
 
     private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
 
@@ -58,8 +62,27 @@ class SpotDetailReader {
                 toParkWarning(row),
                 toBakjiDetail(row),
                 toPublicDetail(row, today),
+                toRating(spotDetailMapper.selectRating(spotId)),
+                spotDetailMapper.selectRecentReviews(spotId, RECENT_REVIEW_COUNT).stream()
+                        .map(SpotDetailReader::toRecentReview)
+                        .toList(),
                 null);
         return new Read(detail, row.weatherNx(), row.weatherNy());
+    }
+
+    private static SpotRating toRating(SpotRatingRow row) {
+        return new SpotRating(row.average(), row.count());
+    }
+
+    private static SpotRecentReview toRecentReview(SpotRecentReviewRow row) {
+        return new SpotRecentReview(
+                row.reviewId(),
+                row.authorId(),
+                row.authorNickname(),
+                row.visitedDate(),
+                row.rating(),
+                row.content(),
+                row.createdAt());
     }
 
     // 경고인데 경계 행이 없으면 경계 이름·출처·기준일만 null로 두고, 안내 문구는 채운다.
