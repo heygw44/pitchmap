@@ -1,5 +1,6 @@
 package com.pitchmap.spot.application;
 
+import com.pitchmap.spot.domain.ClusterGridShape;
 import com.pitchmap.spot.infra.SpotAreaCondition;
 import com.pitchmap.spot.infra.SpotAreaMapper;
 import com.pitchmap.spot.infra.SpotClusterGrid;
@@ -17,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 지도 화면 영역 안의 ACTIVE 장소를 찾는다.
  *
  * <p>한 응답에는 마커와 묶음을 합쳐 {@value #MAX_ITEMS}개까지만 담는다. 그래서 서버는 영역 안 장소가 {@value #MAX_ITEMS}개 이하이면 모두 마커로
- * 주고, 넘으면 마커를 비우고 영역을 가로세로 {@value #GRID_SIZE}칸씩 나눈 칸별 묶음으로 준다. 칸은 많아야 {@value #GRID_SIZE}×
- * {@value #GRID_SIZE}개라서 묶음도 상한을 넘지 않는다.
+ * 주고, 넘으면 마커를 비우고 영역을 칸으로 나눈 칸별 묶음으로 준다. 열 수와 행 수는 화면 크기(px)로 정하고({@link ClusterGridShape}), 전체 칸은
+ * 많아야 {@value ClusterGridShape#MAX_CELLS}개라서 묶음도 상한을 넘지 않는다.
  *
  * <p>공공데이터 장소의 휴장 여부는 조회한 날의 한국 날짜로 계산한다. 서버는 휴장 중인 장소도 숨기지 않고 표시만 한다.
  */
@@ -27,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpotMapQueryService {
 
     static final int MAX_ITEMS = 500;
-    static final int GRID_SIZE = 20;
 
     private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
 
@@ -56,13 +56,18 @@ public class SpotMapQueryService {
     }
 
     private List<SpotCluster> findClusters(SpotAreaQuery query, SpotAreaCondition condition) {
-        SpotClusterGrid grid = new SpotClusterGrid(
-                (query.neLat() - query.swLat()) / GRID_SIZE,
-                (query.neLng() - query.swLng()) / GRID_SIZE,
-                GRID_SIZE - 1);
-        return spotAreaMapper.selectClusters(condition, grid).stream()
+        return spotAreaMapper.selectClusters(condition, toGrid(query)).stream()
                 .map(SpotMapQueryService::toCluster)
                 .toList();
+    }
+
+    private static SpotClusterGrid toGrid(SpotAreaQuery query) {
+        ClusterGridShape shape = ClusterGridShape.forScreen(query.screenWidth(), query.screenHeight());
+        return new SpotClusterGrid(
+                (query.neLat() - query.swLat()) / shape.rows(),
+                (query.neLng() - query.swLng()) / shape.columns(),
+                shape.rows() - 1,
+                shape.columns() - 1);
     }
 
     private static SpotAreaCondition toCondition(SpotAreaQuery query) {
