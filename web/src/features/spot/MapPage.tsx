@@ -11,9 +11,10 @@ import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { createMapView } from '../../map/KakaoMap';
 import { MapLoadError } from '../../map/kakaoLoader';
 import type { MapLoadErrorReason } from '../../map/kakaoLoader';
-import type { MapView } from '../../map/types';
+import type { LatLng, MapView } from '../../map/types';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
+import { BakjiReportPanel } from './BakjiReportPanel';
 import { SpotDetailPanel } from './SpotDetailPanel';
 import { SpotListRow } from './SpotListRow';
 import { useSpotsInView } from './useSpotsInView';
@@ -35,22 +36,38 @@ const CLUSTER_ZOOM_STEP = 2;
 const CHIP_CLASS =
   'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3';
 
-export function MapPage({ spotId }: { spotId?: number }) {
+type MapPageProps = {
+  spotId?: number;
+  // report는 지도를 눌러 박지 위치를 찍는 제보 화면이다.
+  mode?: 'browse' | 'report';
+};
+
+export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
+  const reporting = mode === 'report';
   const hostRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapView | null>(null);
   const [mapFailure, setMapFailure] = useState<MapFailure | null>(null);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [terrainOn, setTerrainOn] = useState(false);
-  const [snap, setSnap] = useState<SheetSnap>(spotId === undefined ? 'peek' : 'half');
+  const [snap, setSnap] = useState<SheetSnap>(spotId === undefined && !reporting ? 'peek' : 'half');
   const [snapSpotId, setSnapSpotId] = useState(spotId);
+  const [snapReporting, setSnapReporting] = useState(reporting);
+  const [draft, setDraft] = useState<LatLng | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const area = useSpotsInView(map);
 
-  // 장소를 고르면 상세가 보이도록 시트를 절반으로 열고, 목록으로 돌아오면 접는다.
+  // 제보 화면을 벗어나면 이전 제보의 완료 상태를 버린다. 그래야 다시 들어왔을 때 지도를 눌러 위치를 찍을 수 있다.
+  if (!reporting && submitted) setSubmitted(false);
+
+  // 장소를 고르거나 제보 화면에 들어오면 내용이 보이도록 시트를 절반으로 열고, 목록으로 돌아오면 접는다.
   // 렌더 중에 이전 값과 비교해서 바꾸므로, 화면이 한 번 그려진 뒤 다시 그리는 일이 없다.
-  if (snapSpotId !== spotId) {
+  if (snapSpotId !== spotId || snapReporting !== reporting) {
     setSnapSpotId(spotId);
-    if ((snapSpotId === undefined) !== (spotId === undefined)) {
-      setSnap(spotId === undefined ? 'peek' : 'half');
+    setSnapReporting(reporting);
+    const wasOpen = snapSpotId !== undefined || snapReporting;
+    const isOpen = spotId !== undefined || reporting;
+    if (wasOpen !== isOpen) {
+      setSnap(isOpen ? 'half' : 'peek');
     }
   }
 
@@ -99,7 +116,10 @@ export function MapPage({ spotId }: { spotId?: number }) {
 
   useEffect(() => {
     if (!map) return;
-    const offMarker = map.onMarkerClick((id) => navigate(`/spots/${id}`));
+    // 제보 중에는 핀을 눌러도 화면을 옮기지 않는다. 위치를 찍다가 실수로 상세로 나가지 않게 하기 위해서다.
+    const offMarker = map.onMarkerClick((id) => {
+      if (!reporting) navigate(`/spots/${id}`);
+    });
     const offCluster = map.onClusterClick((cluster) => {
       map.setCenter(cluster.position, Math.max(1, map.getLevel() - CLUSTER_ZOOM_STEP));
     });
@@ -107,7 +127,22 @@ export function MapPage({ spotId }: { spotId?: number }) {
       offMarker();
       offCluster();
     };
-  }, [map]);
+  }, [map, reporting]);
+
+  // 제보 화면에서만 지도를 눌러 박지 위치를 찍는다. 화면을 벗어나면 임시 핀을 지우고 찍은 위치도 버린다.
+  useEffect(() => {
+    if (!map || !reporting || submitted) return;
+    const offClick = map.onMapClick(setDraft);
+    return () => {
+      offClick();
+      map.showDraft(null);
+      setDraft(null);
+    };
+  }, [map, reporting, submitted]);
+
+  useEffect(() => {
+    map?.showDraft(draft);
+  }, [map, draft]);
 
   useEffect(() => {
     map?.setSelected(spotId ?? null);
@@ -119,8 +154,8 @@ export function MapPage({ spotId }: { spotId?: number }) {
 
   // 상세 화면에서는 장소 이름을 불러온 뒤 상세 패널이 제목을 바꾼다.
   useEffect(() => {
-    if (spotId === undefined) document.title = '피치맵';
-  }, [spotId]);
+    if (spotId === undefined) document.title = reporting ? '박지 제보 · 피치맵' : '피치맵';
+  }, [spotId, reporting]);
 
   function retryMap() {
     setMapFailure(null);
@@ -132,10 +167,21 @@ export function MapPage({ spotId }: { spotId?: number }) {
       <Sheet
         snap={snap}
         onSnapChange={setSnap}
-        label={spotId === undefined ? '장소 목록' : '장소 상세'}
-        header={spotId === undefined ? <ListHeader area={area} /> : undefined}
+        label={reporting ? '박지 제보' : spotId === undefined ? '장소 목록' : '장소 상세'}
+        header={spotId === undefined && !reporting ? <ListHeader area={area} /> : undefined}
       >
-        {spotId === undefined ? (
+        {reporting ? (
+          <BakjiReportPanel
+            draft={draft}
+            onCancel={() => navigate('/')}
+            onSubmitted={() => {
+              // 새 박지가 지도에 보이도록 마커를 다시 불러오고, 등록이 끝났으니 임시 핀은 치운다.
+              setSubmitted(true);
+              setDraft(null);
+              area.retry();
+            }}
+          />
+        ) : spotId === undefined ? (
           <SpotList area={area} waitingForMap={map === null && mapFailure === null} />
         ) : (
           <SpotDetailPanel key={spotId} spotId={spotId} onBack={() => navigate('/')} />
@@ -177,7 +223,8 @@ export function MapPage({ spotId }: { spotId?: number }) {
             <AccountChip />
           </div>
           {map && (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {!reporting && <ReportButton />}
               <button
                 type="button"
                 aria-pressed={terrainOn}
@@ -271,6 +318,23 @@ function SpotList({ area, waitingForMap }: { area: SpotsInView; waitingForMap: b
         </ul>
       )}
     </div>
+  );
+}
+
+// 비회원은 로그인한 뒤 제보 화면으로 돌아오게 보낸다. 이메일 인증 여부는 제보 화면이 안내한다.
+function ReportButton() {
+  const session = useSession();
+  const anonymous = session.status === 'anonymous' || (session.status === 'authenticated' && session.me === null);
+  const target = anonymous ? withNext('/login', '/bakjis/new') : '/bakjis/new';
+
+  return (
+    <Link
+      to={target}
+      className="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep"
+    >
+      <Icon name="backpack" size={20} />
+      박지 제보
+    </Link>
   );
 }
 

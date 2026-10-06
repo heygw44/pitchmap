@@ -161,13 +161,15 @@ export interface PublicDetail {
   closedNow: boolean;
 }
 
-// 지금 서버는 warned만 준다. 공원 이름, 경계 데이터 출처·기준일, 안내 문구는 경고 상세 기능이 붙으면 함께 온다.
+// 경고가 아니면(warned가 false) 서버는 warned만 준다. 경고일 때만 나머지 필드가 함께 온다.
 export interface ParkWarning {
   warned: boolean;
   areaName?: string;
   source?: string;
   sourceDate?: string;
   notice?: string;
+  // 흔적을 남기지 않는 방법 같은, 서버가 정한 안내 문장이다.
+  guide?: string;
 }
 
 export interface SpotRating {
@@ -181,11 +183,23 @@ export interface ExpectedPeople {
   count: number;
 }
 
+// 기상청이 값을 주지 않은 항목은 null이다.
 export interface ShortTermForecast {
   at: string;
-  temperature: number;
-  precipitationProbability: number;
-  windSpeed: number;
+  temperature: number | null;
+  precipitationProbability: number | null;
+  windSpeed: number | null;
+}
+
+// 날짜는 한국 날짜(YYYY-MM-DD)이고, 나머지 값은 기상청이 주지 않았으면 null이다.
+export interface MidTermForecast {
+  date: string;
+  minTemperature: number | null;
+  maxTemperature: number | null;
+  amSky: string | null;
+  pmSky: string | null;
+  amPrecipitationProbability: number | null;
+  pmPrecipitationProbability: number | null;
 }
 
 export interface SunInfo {
@@ -199,9 +213,9 @@ export interface SunInfo {
 export interface Weather {
   source: string;
   shortTerm: ShortTermForecast[];
-  // 중기 예보 항목의 모양은 날씨 연동 기능에서 정한다.
-  midTerm: unknown[];
-  sun: SunInfo;
+  midTerm: MidTermForecast[];
+  // 천문연 조회만 실패하면 날씨는 주고 sun만 null이다.
+  sun: SunInfo | null;
 }
 
 export interface SpotDetail {
@@ -222,4 +236,44 @@ export interface SpotDetail {
   recruitingBasecamps: unknown[];
   // 날씨 연동 전이거나 외부 API가 실패하면 null이다.
   weather: Weather | null;
+}
+
+// 박지 제보와 확인·신고
+
+export type GroundType = 'SOIL' | 'GRASS' | 'GRAVEL' | 'SAND' | 'ROCK' | 'DECK';
+
+// 모르는 선택 항목(description, signalLevel, groundType)은 필드를 빼고 보낸다.
+export interface BakjiCreateRequest {
+  name: string;
+  lat: number;
+  lng: number;
+  description?: string;
+  hasWater: boolean;
+  hasToilet: boolean;
+  signalLevel?: SignalLevel;
+  groundType?: GroundType;
+}
+
+export interface DuplicateCandidate {
+  spotId: number;
+  name: string;
+  distanceM: number;
+}
+
+export interface BakjiSubmissionResponse {
+  spotId: number;
+  parkWarning: { warned: boolean; areaName?: string };
+  guide: string;
+  duplicateCandidates: DuplicateCandidate[];
+}
+
+export interface BakjiConfirmationResponse {
+  confirmationCount: number;
+}
+
+export type BakjiReportReason = 'ILLEGAL_AREA' | 'CLOSED' | 'FALSE_INFO';
+
+export interface BakjiProblemReportRequest {
+  reason: BakjiReportReason;
+  content?: string;
 }
