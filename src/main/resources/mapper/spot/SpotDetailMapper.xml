@@ -46,4 +46,28 @@
           AND s.status = 'ACTIVE'
     </select>
 
+    <!-- 후기가 없으면 집계 함수가 행 하나를 돌려주고 COUNT는 0, AVG는 NULL이다. 평균은 소수 첫째 자리에서 반올림한다. -->
+    <select id="selectRating" resultType="com.pitchmap.spot.infra.SpotRatingRow">
+        SELECT COUNT(*) AS count,
+               ROUND(AVG(r.rating), 1) AS average
+        FROM spot_review r
+        WHERE r.spot_id = #{spotId}
+    </select>
+
+    <!-- 작성 시각이 같은 후기가 있어도 어느 것이 최근인지 정해지도록 id를 보조 정렬 키로 쓴다. 작성자 닉네임은 조회할 때의 회원 값이다. -->
+    <select id="selectRecentReviews" resultType="com.pitchmap.spot.infra.SpotRecentReviewRow">
+        SELECT r.id AS review_id,
+               r.member_id AS author_id,
+               m.nickname AS author_nickname,
+               r.visited_date AS visited_date,
+               r.rating AS rating,
+               r.content AS content,
+               r.created_at AS created_at
+        FROM spot_review r
+        JOIN member m ON m.id = r.member_id
+        WHERE r.spot_id = #{spotId}
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

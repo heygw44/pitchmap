@@ -110,6 +110,8 @@ class SpotDetailQueryServiceIntegrationTest {
         assertThat(detail.bakji().description()).isNull();
         assertThat(detail.bakji().signalLevel()).isNull();
         assertThat(detail.bakji().hasToilet()).isTrue();
+        assertThat(detail.rating()).isEqualTo(new SpotRating(null, 0));
+        assertThat(detail.recentReviews()).isEmpty();
     }
 
     @Test

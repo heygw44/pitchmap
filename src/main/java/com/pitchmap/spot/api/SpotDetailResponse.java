@@ -9,6 +9,8 @@ import com.pitchmap.spot.application.SpotDetail;
 import com.pitchmap.spot.application.SpotFacilities;
 import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
+import com.pitchmap.spot.application.SpotRating;
+import com.pitchmap.spot.application.SpotRecentReview;
 import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.weather.application.SunTimes;
@@ -18,7 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-// 평점, 최근 후기, 예상 인원, 모집 중인 베이스캠프는 아직 채우지 않는다.
+// 예상 인원과 모집 중인 베이스캠프는 아직 채우지 않는다.
 // 클라이언트가 응답 모양에 맞춰 화면을 만들 수 있도록 서버는 빈 값(null, 0, 빈 배열)을 넣어 준다.
 // parkWarning은 경고가 아니면 warned만 내보낸다. weather는 기상청 호출이 실패하면 null이고, 천문연만 실패하면 weather 안의 sun이 null이다.
 public record SpotDetailResponse(
@@ -32,7 +34,7 @@ public record SpotDetailResponse(
         PublicDetail publicDetail,
         ParkWarning parkWarning,
         Rating rating,
-        List<Object> recentReviews,
+        List<RecentReview> recentReviews,
         List<Object> expectedPeople,
         List<Object> recruitingBasecamps,
         Weather weather) {
@@ -48,8 +50,8 @@ public record SpotDetailResponse(
                 detail.bakji() == null ? null : Bakji.from(detail.bakji()),
                 detail.publicDetail() == null ? null : PublicDetail.from(detail.publicDetail()),
                 ParkWarning.from(detail.parkWarning()),
-                new Rating(null, 0),
-                List.of(),
+                Rating.from(detail.rating()),
+                detail.recentReviews().stream().map(RecentReview::from).toList(),
                 List.of(),
                 List.of(),
                 detail.weather() == null ? null : Weather.from(detail.weather()));
@@ -198,5 +200,28 @@ public record SpotDetailResponse(
         }
     }
 
-    public record Rating(Double average, long count) {}
+    // 평균은 후기가 없으면 null이다. 후기 수는 항상 준다.
+    public record Rating(Double average, long count) {
+
+        static Rating from(SpotRating rating) {
+            return new Rating(rating.average(), rating.count());
+        }
+    }
+
+    public record Author(long memberId, String nickname) {}
+
+    // 후기 목록의 항목과 같은 모양이다. 작성자는 회원 ID와 닉네임만 내보낸다.
+    public record RecentReview(
+            long reviewId, Author author, LocalDate visitedDate, int rating, String content, Instant createdAt) {
+
+        static RecentReview from(SpotRecentReview review) {
+            return new RecentReview(
+                    review.reviewId(),
+                    new Author(review.authorId(), review.authorNickname()),
+                    review.visitedDate(),
+                    review.rating(),
+                    review.content(),
+                    review.createdAt());
+        }
+    }
 }
