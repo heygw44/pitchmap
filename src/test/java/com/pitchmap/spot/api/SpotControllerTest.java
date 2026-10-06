@@ -109,7 +109,7 @@ class SpotControllerTest {
     }
 
     @Test
-    @DisplayName("[F-03] 장소가 500개를 넘어 묶음으로 조회되면 빈 마커 배열과 묶음마다 좌표와 장소 수를 응답한다")
+    @DisplayName("[F-03] 장소가 500개를 넘어 묶음으로 조회되면 빈 마커 배열과 묶음마다 평균 좌표와 장소 수를 응답한다")
     void areaQueryReturnsClusters() {
         // given
         SpotCluster north = new SpotCluster(37.91, 127.33, 42L);
@@ -149,16 +149,7 @@ class SpotControllerTest {
         assertThat(result).hasStatus(HttpStatus.OK);
         assertThat(capturedQuery())
                 .isEqualTo(new SpotAreaQuery(
-                        37.0,
-                        127.0,
-                        38.0,
-                        128.0,
-                        360,
-                        740,
-                        Set.of(SpotType.CAMPSITE, SpotType.BAKJI),
-                        true,
-                        false,
-                        true));
+                        37.0, 127.0, 38.0, 128.0, Set.of(SpotType.CAMPSITE, SpotType.BAKJI), true, false, true));
     }
 
     @Test
@@ -190,7 +181,7 @@ class SpotControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
         assertThat(capturedQuery())
-                .isEqualTo(new SpotAreaQuery(37.0, 127.0, 38.0, 128.0, 360, 740, Set.of(), false, false, false));
+                .isEqualTo(new SpotAreaQuery(37.0, 127.0, 38.0, 128.0, Set.of(), false, false, false));
     }
 
     @Test
@@ -211,28 +202,8 @@ class SpotControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"1, 1", "10000, 10000"})
-    @DisplayName("[F-03] 화면 크기 1px과 10000px은 받고, 조회 조건에 그대로 넣어 서비스에 넘긴다")
-    void screenSizeBoundaryValuesAreAccepted(int width, int height) {
-        // given
-        whenServiceReturnsEmpty();
-        Map<String, String> params = validParams();
-        params.put("width", String.valueOf(width));
-        params.put("height", String.valueOf(height));
-
-        // when
-        MvcTestResult result = get(params);
-
-        // then
-        assertThat(result).hasStatus(HttpStatus.OK);
-        SpotAreaQuery query = capturedQuery();
-        assertThat(query.screenWidth()).isEqualTo(width);
-        assertThat(query.screenHeight()).isEqualTo(height);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"swLat", "swLng", "neLat", "neLng", "zoom", "width", "height"})
-    @DisplayName("[F-03] 영역 좌표·확대 수준·화면 크기가 빠지면 그 필드 오류로 400 INVALID_INPUT을 응답하고 조회하지 않는다")
+    @ValueSource(strings = {"swLat", "swLng", "neLat", "neLng", "zoom"})
+    @DisplayName("[F-03] 영역 좌표나 확대 수준이 빠지면 그 필드 오류로 400 INVALID_INPUT을 응답하고 조회하지 않는다")
     void missingRequiredParameterReturnsFieldError(String name) {
         // given
         Map<String, String> params = validParams();
@@ -255,15 +226,9 @@ class SpotControllerTest {
         "zoom, 0",
         "zoom, 15",
         "zoom, 1.5",
-        "swLat, abc",
-        "width, 0",
-        "width, 10001",
-        "width, 1.5",
-        "height, 0",
-        "height, 10001",
-        "height, abc"
+        "swLat, abc"
     })
-    @DisplayName("[F-03] 위도·경도·확대 수준·화면 크기가 범위를 벗어나거나 숫자가 아니면 그 필드 오류로 400 INVALID_INPUT을 응답한다")
+    @DisplayName("[F-03] 위도·경도·확대 수준이 범위를 벗어나거나 숫자가 아니면 그 필드 오류로 400 INVALID_INPUT을 응답한다")
     void outOfRangeParameterReturnsFieldError(String name, String value) {
         // given
         Map<String, String> params = validParams();
@@ -758,8 +723,6 @@ class SpotControllerTest {
         params.put("neLat", neLat);
         params.put("neLng", neLng);
         params.put("zoom", zoom);
-        params.put("width", "360");
-        params.put("height", "740");
         return params;
     }
 

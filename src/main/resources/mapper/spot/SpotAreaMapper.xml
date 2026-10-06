@@ -60,19 +60,18 @@
         LIMIT #{limit}
     </select>
 
-    <!-- 행 번호는 남서 꼭짓점에서 북쪽으로, 열 번호는 동쪽으로 떨어진 거리를 칸 크기로 나눈 몫이다. 행 수와 열 수는 화면 크기에 따라 서로 다르다.
-         북쪽이나 동쪽 경계선 위의 장소는 몫이 행 수나 열 수와 같아지므로, LEAST로 마지막 행이나 마지막 열에 넣는다.
-         영역 조건이 남서 경계보다 작은 좌표를 이미 걸렀으므로 몫은 0보다 작아지지 않는다.
-         묶음 좌표는 칸 안 장소들의 평균이 아니라 칸 중심(남서 꼭짓점 + (번호 + 0.5) × 칸 크기)이다. 평균은 이웃한 두 칸의 장소가 경계 근처에
-         몰리면 두 묶음 표시를 가깝게 만들지만, 칸 중심은 이웃한 묶음 사이의 간격을 칸 크기로 보장한다. -->
+    <!-- 칸 번호는 남서 꼭짓점에서 떨어진 거리를 칸 폭으로 나눈 몫이다. 북쪽이나 동쪽 경계선 위의 장소는 몫이 칸 수와 같아지므로,
+         LEAST로 마지막 칸에 넣는다. 영역 조건이 남서 경계보다 작은 좌표를 이미 걸렀으므로 몫은 0보다 작아지지 않는다. -->
     <select id="selectClusters" resultType="com.pitchmap.spot.infra.SpotClusterRow">
-        SELECT #{area.swLat} + (c.cell_row + 0.5) * #{grid.cellLat} AS lat,
-               #{area.swLng} + (c.cell_column + 0.5) * #{grid.cellLng} AS lng,
+        SELECT AVG(c.lat) AS lat,
+               AVG(c.lng) AS lng,
                COUNT(*) AS spot_count
         FROM (
-            SELECT LEAST(FLOOR((ST_Latitude(s.location) - #{area.swLat}) / #{grid.cellLat}), #{grid.lastRowIndex})
+            SELECT ST_Latitude(s.location) AS lat,
+                   ST_Longitude(s.location) AS lng,
+                   LEAST(FLOOR((ST_Latitude(s.location) - #{area.swLat}) / #{grid.cellLat}), #{grid.lastCellIndex})
                        AS cell_row,
-                   LEAST(FLOOR((ST_Longitude(s.location) - #{area.swLng}) / #{grid.cellLng}), #{grid.lastColumnIndex})
+                   LEAST(FLOOR((ST_Longitude(s.location) - #{area.swLng}) / #{grid.cellLng}), #{grid.lastCellIndex})
                        AS cell_column
             FROM spot s
             LEFT JOIN bakji_detail b ON b.spot_id = s.id

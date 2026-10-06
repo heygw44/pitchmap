@@ -54,8 +54,6 @@ class SpotApiIntegrationTest {
                 .param("neLat", "38")
                 .param("neLng", "128")
                 .param("zoom", "7")
-                .param("width", "360")
-                .param("height", "740")
                 .exchange();
 
         // then
@@ -90,8 +88,6 @@ class SpotApiIntegrationTest {
                 .param("neLat", "37")
                 .param("neLng", "128")
                 .param("zoom", "7")
-                .param("width", "360")
-                .param("height", "740")
                 .exchange();
 
         // then
