@@ -46,6 +46,17 @@ class IdentityVerificationTest {
     }
 
     @Test
+    @DisplayName("[NFR-11] 연령대는 올해에서 출생연도를 뺀 나이로 계산하고, 미성년이나 출생연도가 없으면 비어 있다")
+    void ageGroupFollowsAge() {
+        assertThat(verificationBornIn(2007).ageGroupIn(THIS_YEAR)).contains(AgeGroup.TWENTIES);
+        assertThat(verificationBornIn(1996).ageGroupIn(THIS_YEAR)).contains(AgeGroup.THIRTIES);
+        assertThat(verificationBornIn(2008).ageGroupIn(THIS_YEAR)).isEmpty();
+        IdentityVerification withdrawn = verificationBornIn(1990);
+        ReflectionTestUtils.setField(withdrawn, "birthYear", null);
+        assertThat(withdrawn.ageGroupIn(THIS_YEAR)).isEmpty();
+    }
+
+    @Test
     @DisplayName("[ID-01] 본인확인 기록에는 출생연도·성별·CI 해시·제공자·시각만 담긴다")
     void keepsOnlyMinimalFields() {
         IdentityVerification verification = verificationBornIn(1995);

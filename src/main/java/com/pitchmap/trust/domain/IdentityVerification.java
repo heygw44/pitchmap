@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.Year;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -97,5 +98,13 @@ public class IdentityVerification {
     /** currentYear가 속한 해에 성인이면 true다. 출생연도가 없으면(탈퇴 뒤) 성인으로 보지 않는다. */
     public boolean isAdult(Year currentYear) {
         return birthYear != null && birthYear + ADULT_AGE <= currentYear.getValue();
+    }
+
+    /** currentYear 기준 연 나이(올해 − 출생연도)로 계산한 연령대다. 출생연도가 없거나 성인이 아니면 빈 값이다. */
+    public Optional<AgeGroup> ageGroupIn(Year currentYear) {
+        if (birthYear == null) {
+            return Optional.empty();
+        }
+        return AgeGroup.fromAge(currentYear.getValue() - birthYear);
     }
 }

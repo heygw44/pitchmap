@@ -12,6 +12,7 @@ import com.pitchmap.trust.domain.IdentityVerification;
 import com.pitchmap.trust.domain.IdentityVerificationRepository;
 import com.pitchmap.trust.domain.VerifiedIdentity;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,29 @@ class TrustSummaryServiceTest {
         // 2007년생은 2026년에 성인이므로 경계는 2025년에서 2026년으로 넘어갈 때다.
         assertThat(serviceAt("2025-12-31T14:59:59Z").summarize(MEMBER_ID)).isEqualTo(new TrustSummary(true, 0));
         assertThat(serviceAt("2025-12-31T15:00:00Z").summarize(MEMBER_ID)).isEqualTo(new TrustSummary(true, 1));
+    }
+
+    @Test
+    @DisplayName("[TR-01] 상세는 성인이면 본인확인 연령대·성별을, 미성년이면 성별만 내고 다시 동행 비율은 null이다")
+    void detailExposesVerifiedValues() {
+        when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(recordBornIn(2007)));
+        TrustSummaryService service = serviceAt("2026-10-05T03:00:00Z");
+        TrustDetail adult = service.detail(MEMBER_ID);
+        assertThat(adult).isEqualTo(new TrustDetail(true, true, 1, 0, null, true, List.of(), "TWENTIES", "MALE"));
+
+        when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(recordBornIn(2008)));
+        TrustDetail minor = service.detail(MEMBER_ID);
+        assertThat(minor).isEqualTo(new TrustDetail(true, false, 0, 0, null, true, List.of(), null, "MALE"));
+    }
+
+    @Test
+    @DisplayName("[TR-01] 본인확인 기록이 없으면 상세는 단계 0이고 본인확인 값이 없다")
+    void detailWithoutRecord() {
+        when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+
+        TrustDetail detail = serviceAt("2026-10-05T03:00:00Z").detail(MEMBER_ID);
+
+        assertThat(detail).isEqualTo(new TrustDetail(false, false, 0, 0, null, true, List.of(), null, null));
     }
 
     private TrustSummaryService serviceAt(String instant) {
