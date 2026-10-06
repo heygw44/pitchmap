@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pitchmap.common.error.BusinessException;
-import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.publicdata.domain.PublicDataErrorCode;
 import com.pitchmap.publicdata.domain.SyncJobType;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,14 +94,85 @@ class SyncJobLauncherIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-06] 박지 재판정은 아직 실행할 수 없어 INVALID_INPUT을 던지고 실행 기록을 만들지 않는다")
-    void bakjiRejudgeIsRejected() {
-        // when, then
-        assertThatThrownBy(() -> syncJobLauncher.launch(SyncJobType.BAKJI_REJUDGE))
-                .isInstanceOfSatisfying(
-                        BusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT));
-        assertThat(countRows("sync_job_run")).isZero();
+    @DisplayName("[F-06] 박지 재판정을 시작하면 작업이 끝난 뒤 실행 기록이 COMPLETED가 되고, 경계 안 박지에 공원 경고가 붙는다")
+    void launchedBakjiRejudgeCompletes() throws InterruptedException {
+        // given
+        insertProtectedArea("북한산", "MULTIPOLYGON(((126.9 37.6, 127.0 37.6, 127.0 37.7, 126.9 37.7, 126.9 37.6)))");
+        long areaId = protectedAreaIdOf("북한산");
+        long spotId = insertBakji("경계 안 박지", 37.65, 126.95);
+
+        // when
+        long runId = syncJobLauncher.launch(SyncJobType.BAKJI_REJUDGE);
+
+        // then
+        assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");
+        assertThat(jdbcTemplate.queryForObject("SELECT job_type FROM sync_job_run WHERE id = ?", String.class, runId))
+                .isEqualTo("BAKJI_REJUDGE");
+        assertParkWarning(spotId, areaId);
+    }
+
+    @Test
+    @DisplayName("[F-06] 공원 경계 적재가 성공하면 이어서 박지 재판정 실행 기록이 생겨 COMPLETED가 되고, 새 경계 안 박지에 공원 경고가 붙는다")
+    void parkBoundaryLoadChainsBakjiRejudge() throws InterruptedException {
+        // given: 설정한 픽스처의 북한산 경계는 경도 126.9~127.0, 위도 37.6~37.7이다.
+        long spotId = insertBakji("북한산 안 박지", 37.65, 126.95);
+
+        // when
+        long runId = syncJobLauncher.launch(SyncJobType.PARK_BOUNDARY);
+
+        // then: 재판정은 적재 기록이 COMPLETED가 된 뒤에 시작하므로, 재판정 기록이 생길 때까지 따로 기다린다.
+        assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");
+        long rejudgeRunId = awaitRunOf(SyncJobType.BAKJI_REJUDGE);
+        assertThat(awaitFinished(rejudgeRunId)).isEqualTo("COMPLETED");
+        assertParkWarning(spotId, protectedAreaIdOf("북한산"));
+    }
+
+    private long awaitRunOf(SyncJobType jobType) throws InterruptedException {
+        long deadline = System.nanoTime() + AWAIT_TIMEOUT.toNanos();
+        while (System.nanoTime() < deadline) {
+            Long runId =
+                    jdbcTemplate
+                            .queryForList("SELECT id FROM sync_job_run WHERE job_type = ?", Long.class, jobType.name())
+                            .stream()
+                            .findFirst()
+                            .orElse(null);
+            if (runId != null) {
+                return runId;
+            }
+            Thread.sleep(POLL_INTERVAL);
+        }
+        throw new AssertionError(jobType + " 실행 기록이 " + AWAIT_TIMEOUT + " 안에 생기지 않았다.");
+    }
+
+    private void assertParkWarning(long spotId, long protectedAreaId) {
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap("SELECT park_warning, protected_area_id FROM spot WHERE id = ?", spotId);
+        assertThat(row.get("park_warning")).isEqualTo(true);
+        assertThat(((Number) row.get("protected_area_id")).longValue()).isEqualTo(protectedAreaId);
+    }
+
+    private void insertProtectedArea(String name, String multiPolygonWkt) {
+        jdbcTemplate.update(
+                "INSERT INTO protected_area (name, area_type, source, source_date, boundary, created_at, updated_at)"
+                        + " VALUES (?, 'NATIONAL_PARK', 'KDPA', '2025-12-31',"
+                        + " ST_GeomFromText(?, 4326, 'axis-order=long-lat'), NOW(6), NOW(6))",
+                name,
+                multiPolygonWkt);
+    }
+
+    private long protectedAreaIdOf(String name) {
+        return jdbcTemplate.queryForObject("SELECT id FROM protected_area WHERE name = ?", Long.class, name);
+    }
+
+    // POINT는 (경도, 위도) 순서로 받는다.
+    private long insertBakji(String name, double latitude, double longitude) {
+        jdbcTemplate.update(
+                "INSERT INTO spot (type, name, location, weather_nx, weather_ny, status, created_at, updated_at)"
+                        + " VALUES ('BAKJI', ?, ST_SRID(POINT(?, ?), 4326), 60, 127, 'ACTIVE', NOW(6), NOW(6))",
+                name,
+                longitude,
+                latitude);
+        return jdbcTemplate.queryForObject("SELECT id FROM spot WHERE name = ?", Long.class, name);
     }
 
     private String awaitFinished(long runId) throws InterruptedException {
