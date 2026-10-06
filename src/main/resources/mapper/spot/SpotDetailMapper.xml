@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.SpotDetailMapper">
+
+    <!-- 장소 한 곳에 상세 테이블을 LEFT JOIN으로 붙인다. 장소 유형에 따라 public_spot_detail과 bakji_detail 중 하나만 행이 있어서,
+         없는 쪽의 열은 NULL로 나온다. 제보한 회원은 bakji_detail이 있을 때만 붙는다.
+         박지 확인 수는 상관 서브쿼리로 센다. 확인 행을 조인해서 GROUP BY로 세면 다른 열을 모두 묶어야 해서, 한 장소만 읽는 이 조회에서는
+         서브쿼리가 더 단순하다. 박지가 아니면 확인 행이 없으므로 0이 나온다.
+         공원 경계는 spot.protected_area_id가 있을 때만 붙고, 없으면 area_* 열은 NULL이다. 날씨 조회에 쓰려고 기상청 격자(weather_nx, weather_ny)도 함께 읽는다.
+         SRID 4326 점에서 ST_Latitude는 위도를, ST_Longitude는 경도를 꺼낸다. 그래서 좌표 순서를 직접 다루지 않는다. -->
+    <select id="selectActiveDetail" resultType="com.pitchmap.spot.infra.SpotDetailRow">
+        SELECT s.id AS spot_id,
+               s.type AS type,
+               s.name AS name,
+               ST_Latitude(s.location) AS lat,
+               ST_Longitude(s.location) AS lng,
+               s.address AS address,
+               s.weather_nx AS weather_nx,
+               s.weather_ny AS weather_ny,
+               s.park_warning AS park_warning,
+               pa.name AS area_name,
+               pa.source AS area_source,
+               pa.source_date AS area_source_date,
+               b.description AS description,
+               b.has_water AS has_water,
+               b.has_toilet AS has_toilet,
+               b.signal_level AS signal_level,
+               (SELECT COUNT(*) FROM bakji_confirmation c WHERE c.spot_id = s.id) AS confirmation_count,
+               b.reporter_id AS reporter_id,
+               m.nickname AS reporter_nickname,
+               d.source AS source,
+               d.category AS category,
+               d.facilities AS facilities,
+               d.phone AS phone,
+               d.homepage AS homepage,
+               d.source_date AS source_date,
+               d.operating_status AS operating_status,
+               d.closed_from AS closed_from,
+               d.closed_until AS closed_until
+        FROM spot s
+        LEFT JOIN public_spot_detail d ON d.spot_id = s.id
+        LEFT JOIN bakji_detail b ON b.spot_id = s.id
+        LEFT JOIN member m ON m.id = b.reporter_id
+        LEFT JOIN protected_area pa ON pa.id = s.protected_area_id
+        WHERE s.id = #{spotId}
+          AND s.status = 'ACTIVE'
+    </select>
+
+    <!-- 후기가 없으면 집계 함수가 행 하나를 돌려주고 COUNT는 0, AVG는 NULL이다. 평균은 소수 첫째 자리에서 반올림한다. -->
+    <select id="selectRating" resultType="com.pitchmap.spot.infra.SpotRatingRow">
+        SELECT COUNT(*) AS count,
+               ROUND(AVG(r.rating), 1) AS average
+        FROM spot_review r
+        WHERE r.spot_id = #{spotId}
+    </select>
+
+    <!-- 작성 시각이 같은 후기가 있어도 어느 것이 최근인지 정해지도록 id를 보조 정렬 키로 쓴다. 작성자 닉네임은 조회할 때의 회원 값이다. -->
+    <select id="selectRecentReviews" resultType="com.pitchmap.spot.infra.SpotRecentReviewRow">
+        SELECT r.id AS review_id,
+               r.member_id AS author_id,
+               m.nickname AS author_nickname,
+               r.visited_date AS visited_date,
+               r.rating AS rating,
+               r.content AS content,
+               r.created_at AS created_at
+        FROM spot_review r
+        JOIN member m ON m.id = r.member_id
+        WHERE r.spot_id = #{spotId}
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

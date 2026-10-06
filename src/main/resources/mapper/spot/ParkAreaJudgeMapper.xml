@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.ParkAreaJudgeMapper">
+
+    <!-- 좌표 순서: POINT(x, y)는 SRID가 없는 점을 만들고, ST_SRID가 SRID 4326을 붙인다. MySQL은 SRID 4326 도형의 내부 저장 형식에서
+         x를 경도, y를 위도로 읽는다. 그래서 점을 만들 때 경도를 먼저 넘긴다. 반대로 SRID 4326 WKT 문자열은 위도, 경도 순서라서
+         이 방식과 섞어 쓰지 않는다.
+         경계가 겹치는 곳에서는 여러 경계가 점을 포함한다. 매퍼는 ID가 가장 작은 경계 하나를 골라서, 같은 좌표를 몇 번 판정해도 같은 경계가
+         나오게 한다. 정렬 없이 MIN(id)로 고르는 이유는 ORDER BY id LIMIT 1로 고르면 실제 공원 경계 82곳에서 "Out of sort memory" 오류가
+         났기 때문이다. 박지 좌표 400개 가운데 15개가 실패했고, MIN(id)는 같은 좌표에서 성공했다. 오류의 원인은 확인하지 않았다. -->
+    <select id="selectContainingAreaId" resultType="java.lang.Long">
+        SELECT MIN(pa.id)
+        FROM protected_area pa
+        WHERE ST_Contains(pa.boundary, ST_SRID(POINT(#{lng}, #{lat}), 4326))
+    </select>
+
+    <!-- 박지 제보 응답이 경고한 공원의 이름을 보여 주려고 경계 하나의 이름만 읽는다. -->
+    <select id="selectAreaName" resultType="java.lang.String">
+        SELECT name
+        FROM protected_area
+        WHERE id = #{id}
+    </select>
+
+    <!-- 경계를 다시 적재하면 서버가 모든 박지를 다시 판정한다. 숨김, 삭제, 검토 대기 박지도 다시 보이게 될 수 있어서 상태로 거르지 않는다.
+         박지마다 경계를 찾는 SELECT를 상관 서브쿼리로 붙인 UPDATE 한 문장으로 판정하면, EXPLAIN에서 서브쿼리가 공간 인덱스 대신 기본 키 인덱스를
+         훑는다. 실제 공원 경계 82곳에서 박지 200건에 20.7초가 걸렸다. 그래서 서비스가 이 SELECT로 박지 좌표를 한 번 읽고,
+         박지 한 건씩 공간 인덱스를 쓰는 selectContainingAreaId로 경계를 찾는다. -->
+    <select id="selectBakjiPoints" resultType="com.pitchmap.spot.infra.BakjiPointRow">
+        SELECT s.id AS id,
+               ST_Latitude(s.location) AS lat,
+               ST_Longitude(s.location) AS lng
+        FROM spot s
+        WHERE s.type = 'BAKJI'
+        ORDER BY s.id
+    </select>
+
+    <!-- 같은 경계로 판정된 박지들의 판정 결과를 한 번에 기록한다. protectedAreaId가 null이면 경계 밖이라 경고를 끄고 근거 경계를 비운다.
+         판정 결과는 제보 내용을 고친 것이 아니라서 updated_at은 그대로 두고, 판정 시각은 area_checked_at에 남긴다. -->
+    <update id="updateJudgement">
+        UPDATE spot
+        SET protected_area_id = #{protectedAreaId,jdbcType=BIGINT},
+            park_warning = (#{protectedAreaId,jdbcType=BIGINT} IS NOT NULL),
+            area_checked_at = #{now}
+        WHERE type = 'BAKJI'
+          AND id IN
+        <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+            #{spotId}
+        </foreach>
+    </update>
+
+</mapper>

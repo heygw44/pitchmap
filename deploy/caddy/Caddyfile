@@ -1,0 +1,31 @@
+# 운영 Caddy 설정이다. 도메인 하나로 프론트엔드와 API를 함께 내보내서, 브라우저 입장에서 같은 출처가 되게 한다.
+# 그래서 CORS를 열지 않고, 세션 쿠키를 SameSite=Lax로 쓸 수 있다.
+# Caddy는 SITE_ADDRESS 도메인의 Let's Encrypt 인증서를 자동으로 받고 갱신하며, 80번 포트 요청을 HTTPS로 넘긴다.
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# API만 앱으로 넘긴다. /actuator는 넘기지 않으므로 상태 확인 주소가 밖으로 드러나지 않는다.
+	# Caddy는 클라이언트가 보낸 X-Forwarded-For를 버리고 실제 접속 IP로 새로 채운다. 그래서 앱은 이 헤더를 믿어도 된다.
+	handle /api/* {
+		reverse_proxy app:8080
+	}
+
+	handle {
+		root * /srv
+		# Vite는 파일 이름에 내용 해시를 붙인다. 그래서 assets 아래 파일은 브라우저가 오래 저장해도 된다.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# 화면 경로(/spots/1 등)는 파일이 없으므로 index.html을 주고, 라우팅은 프론트엔드가 한다.
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		# 브라우저가 이 도메인에는 HTTPS로만 접속하게 한다. duckdns.org의 다른 하위 도메인에는 적용하지 않는다.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@font-face { font-family: "MaruBuri"; src: url("/fonts/maruburi/MaruBuri-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "MaruBuri"; src: url("/fonts/maruburi/MaruBuri-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("/fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+/* Pretendard Variable의 @font-face는 index.html의 <link>로 불러오는 CSS에 들어 있다 */
+
+@theme {
+  /* Tailwind 기본 팔레트(stone, slate, blue 등)를 지워서 프로젝트 토큰만 쓰게 한다 */
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-serif: "MaruBuri", "Noto Serif KR", "AppleMyungjo", serif;
+  /* 라벨("출처", "기준일")은 한글이라 Pretendard로, 값의 숫자와 영문은 고정폭으로 그려진다 */
+  --font-mono: "IBM Plex Mono", "Pretendard Variable", ui-monospace, monospace;
+
+  /* 바탕: 종이 */
+  --color-paper: #f3efe6;         /* 화면 바탕. 흰색 대신 쓴다 */
+  --color-paper-deep: #e8e2d5;    /* 눌린 바탕, 신뢰 단계 0 배지 */
+  --color-card: #fbfaf6;          /* 시트·패널·카드·입력 */
+  --color-contour: #c9bfae;       /* 등고선 무늬, 장식용 구분선. 1.6:1이라 정보 전달에 쓰지 않는다 */
+
+  /* 글자: 먹 */
+  --color-ink: #1e2320;           /* 본문. paper 13.9:1, card 15.3:1 */
+  --color-ink-muted: #4e5650;     /* 보조 글자. paper 6.6:1, paper-deep 5.9:1 */
+  --color-ink-subtle: #686e69;    /* 메타, 입력 테두리. paper 4.55:1, card 5:1. paper-deep 위에는 쓰지 않는다(4:1) */
+
+  /* 숲: 기본 행동, 성공, 신뢰 회원 */
+  --color-forest: #2c5e45;        /* 기본 버튼, 링크. 흰 글자 7.5:1, card 위 글자 7.2:1 */
+  --color-forest-strong: #234b37; /* hover·pressed. 흰 글자 9.8:1 */
+  --color-forest-deep: #1d3f2f;   /* soft 배경 위 글자 9.6:1 */
+  --color-forest-soft: #e3ece4;   /* 선택·성공 배경 */
+
+  /* 바다: 정보, 본인확인, 포커스 링 */
+  --color-sea: #1f5f7a;           /* 흰 글자 7.1:1, paper 6.2:1, soft 위 6:1 */
+  --color-sea-strong: #184c62;    /* hover·pressed. 흰 글자 9.3:1 */
+  --color-sea-soft: #e2eef2;
+
+  /* 흙: 박지 */
+  --color-earth: #8a5a2e;         /* 흰 글자 5.9:1, paper 위 마커 5.1:1 */
+  --color-earth-strong: #6e4622;  /* soft 위 글자 6.7:1, 흰 글자 8.2:1 */
+  --color-earth-soft: #f1e6d6;
+
+  /* 경고·위험 */
+  --color-warning: #7a4a00;       /* 공원 경계 경고 글자. soft 위 6.5:1 */
+  --color-warning-line: #b7791f;  /* 경고 테두리·아이콘. paper 3.2:1, card 3.5:1 */
+  --color-warning-soft: #fbefd0;
+  --color-danger: #a8321e;        /* 오류·위험 행동. 녹슨 빨강. 흰 글자 6.7:1, soft 위 5.5:1 */
+  --color-danger-soft: #f8e6e1;
+
+  --radius-control: 0.25rem;      /* 버튼·입력·배지·카드 4px */
+  --radius-sheet: 0.5rem;         /* 시트·다이얼로그 8px. 시트는 윗모서리에만 */
+  --shadow-raise: 0 8px 24px rgb(30 35 32 / 0.14); /* 떠 있는 층(시트·다이얼로그·토스트)에만 */
+}
+
+/* 지도가 없는 화면의 종이 바탕에 등고선 무늬를 반복해서 깐다 */
+@utility bg-contour {
+  background-image: url("./contour.svg");
+  background-repeat: repeat;
+  background-size: 480px auto;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  /* 키보드로 이동할 때 포커스가 보이지 않는 일이 없게 기본 윤곽선을 바다색으로 둔다 */
+  :focus-visible {
+    outline: 2px solid var(--color-sea);
+    outline-offset: 2px;
+  }
+}

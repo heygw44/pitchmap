@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    # 값은 배포 환경(AWS SSM Parameter Store에서 주입한 환경 변수)에서 온다.
+    # 운영 값을 코드에 남기지 않으려고 우리는 기본값을 두지 않는다. 값이 빠지면 자리 표시자
+    # 문자열이 그대로 값으로 쓰여 앱이 첫 DB 접속에서 실패한다.
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- SELECT 열 순서를 record 구성요소 순서와 일부러 다르게 둔다. 그래야 MyBatis가 조회 DTO를 위치가 아니라 이름으로 매핑하는지 시험할 수 있다. -->
+<mapper namespace="com.pitchmap.common.persistence.DomainProbeMapper">
+
+    <insert id="insert">
+        INSERT INTO disposable_email_domain (domain, source, created_at)
+        VALUES (#{domain}, #{source}, #{createdAt})
+    </insert>
+
+    <select id="findByDomain" resultType="com.pitchmap.common.persistence.DomainProbeView">
+        SELECT created_at, source, domain
+        FROM disposable_email_domain
+        WHERE domain = #{domain}
+    </select>
+
+</mapper>

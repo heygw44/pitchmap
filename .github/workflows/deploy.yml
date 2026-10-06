@@ -1,0 +1,253 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 배포할 이미지 태그. GHCR에 이미 있는 커밋 SHA를 넣는다(수동 되돌리기).
+        required: true
+        type: string
+      rollback_drill:
+        description: 되돌림 연습. 위 태그의 앱 이미지를 바로 종료하는 이미지로 바꿔 배포하고, 서버가 직전 태그로 되돌리는지 확인한다.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# 배포는 한 번에 하나씩만 한다. 진행 중인 배포를 취소하면 서버가 반쯤 바뀐 상태로 남을 수 있어서 취소하지 않고 기다린다.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  APP_IMAGE: ghcr.io/heygw44/pitchmap-app
+  CADDY_IMAGE: ghcr.io/heygw44/pitchmap-caddy
+  IMAGE_SOURCE: https://github.com/heygw44/pitchmap
+
+jobs:
+  # main 푸시는 PR에서 돌린 것과 같은 check를 다시 통과해야 이미지를 만든다.
+  check:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: check
+    # 서버가 ARM(t4g)이라 arm64 러너에서 직접 빌드한다. x86 러너에서 에뮬레이션으로 빌드하는 것보다 빠르다.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 카카오 JS 키 변수 확인
+        env:
+          VITE_KAKAO_JS_KEY: ${{ vars.VITE_KAKAO_JS_KEY }}
+        run: |
+          if [ -z "$VITE_KAKAO_JS_KEY" ]; then
+            echo "::error::저장소 변수 VITE_KAKAO_JS_KEY가 비어 있다. 비어 있으면 운영 화면에 지도가 뜨지 않는다."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - run: ./gradlew bootJar --console=plain
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 앱 이미지 빌드·푸시
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.APP_IMAGE }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: caddy 이미지 빌드·푸시
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/caddy/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.CADDY_IMAGE }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+          build-args: VITE_KAKAO_JS_KEY=${{ vars.VITE_KAKAO_JS_KEY }}
+          cache-from: type=gha,scope=caddy
+          cache-to: type=gha,scope=caddy,mode=max
+
+  # 되돌림 연습용 이미지를 만든다. 입력한 태그의 앱 이미지 위에 시작하자마자 종료하는 명령만 덮어써서,
+  # 서버의 상태 확인이 반드시 실패하게 한다. caddy 이미지는 같은 내용을 연습용 태그로 다시 붙이기만 한다.
+  drill:
+    if: github.event_name == 'workflow_dispatch' && inputs.rollback_drill
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 실패하는 앱 이미지 만들기
+        id: image
+        env:
+          BASE_TAG: ${{ inputs.image_tag }}
+          DRILL_TAG: drill-${{ github.run_id }}
+        run: |
+          if ! printf '%s' "$BASE_TAG" | grep -Eq '^[A-Za-z0-9._-]{1,128}$'; then
+            echo "::error::이미지 태그 형식이 맞지 않는다"
+            exit 1
+          fi
+          printf 'FROM %s:%s\nENTRYPOINT ["sh", "-c", "echo rollback drill; exit 1"]\n' "$APP_IMAGE" "$BASE_TAG" \
+            | docker buildx build --platform linux/arm64 --push \
+                --label "org.opencontainers.image.source=$IMAGE_SOURCE" \
+                -t "$APP_IMAGE:$DRILL_TAG" -
+          docker buildx imagetools create -t "$CADDY_IMAGE:$DRILL_TAG" "$CADDY_IMAGE:$BASE_TAG"
+          echo "tag=$DRILL_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: [build, drill]
+    # main 푸시는 빌드가 성공했을 때, 수동 실행은 연습 이미지 만들기가 실패하지 않았을 때 배포한다.
+    # AWS 배포 역할도 main 브랜치에서 실행한 워크플로만 받아 주지만, 다른 브랜치에서는 여기서 먼저 멈춘다.
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.build.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && needs.drill.result != 'failure'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: 배포할 태그 정하기
+        id: target
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.image_tag }}
+          DRILL_TAG: ${{ needs.drill.outputs.tag }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            tag="$GITHUB_SHA"
+          elif [ -n "$DRILL_TAG" ]; then
+            tag="$DRILL_TAG"
+          else
+            tag="$INPUT_TAG"
+          fi
+          if ! printf '%s' "$tag" | grep -Eq '^[A-Za-z0-9._-]{1,128}$'; then
+            echo "::error::이미지 태그 형식이 맞지 않는다"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      # 서버는 이 커밋의 배포 스크립트와 Compose 파일을 공개 저장소에서 받아 실행한다.
+      # 그래서 이미지 태그가 이전 커밋이어도(수동 되돌리기) 배포 절차는 항상 최신 main을 따른다.
+      - name: 서버에 배포 명령 보내기
+        id: send
+        env:
+          INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          raw="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/deploy"
+          params="$(jq -n --arg raw "$raw" --arg tag "$TAG" '{
+            commands: [
+              "set -eu",
+              "mkdir -p /opt/pitchmap/data",
+              "cd /opt/pitchmap",
+              "curl -fsSL --retry 3 -o deploy.sh.new \($raw)/deploy.sh",
+              "curl -fsSL --retry 3 -o docker-compose.prod.yml.new \($raw)/docker-compose.prod.yml",
+              "mv deploy.sh.new deploy.sh && chmod 700 deploy.sh",
+              "mv docker-compose.prod.yml.new docker-compose.prod.yml",
+              "./deploy.sh \($tag)"
+            ],
+            executionTimeout: ["1200"]
+          }')"
+          command_id="$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy $TAG" \
+            --parameters "$params" \
+            --query Command.CommandId --output text)"
+          echo "command_id=$command_id" >> "$GITHUB_OUTPUT"
+
+      - name: 배포 결과 기다리기
+        id: result
+        env:
+          INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
+          COMMAND_ID: ${{ steps.send.outputs.command_id }}
+        run: |
+          status=Pending
+          for _ in $(seq 1 150); do
+            sleep 10
+            status="$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)"
+            case "$status" in
+              Pending|InProgress|Delayed) ;;
+              *) break ;;
+            esac
+          done
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query StandardOutputContent --output text
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query StandardErrorContent --output text >&2
+          code="$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query ResponseCode --output text)"
+          echo "SSM 상태: $status, 종료 코드: $code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      # deploy.sh 종료 코드: 0 성공, 2 실패했지만 직전 태그로 되돌림, 그 밖은 실패.
+      # 되돌림 연습은 2가 나와야 성공이다.
+      - name: 결과 판정
+        env:
+          CODE: ${{ steps.result.outputs.code }}
+          DRILL: ${{ needs.drill.outputs.tag != '' }}
+        run: |
+          if [ "$DRILL" = "true" ]; then
+            if [ "$CODE" = "2" ]; then
+              echo "되돌림 연습 성공: 서버가 직전에 성공한 태그로 되돌아갔다"
+              exit 0
+            fi
+            echo "::error::되돌림 연습 실패: 종료 코드 $CODE"
+            exit 1
+          fi
+          if [ "$CODE" = "0" ]; then
+            echo "배포 성공"
+            exit 0
+          fi
+          if [ "$CODE" = "2" ]; then
+            echo "::error::배포 실패. 서버는 직전에 성공한 태그로 되돌아갔다"
+          else
+            echo "::error::배포 실패. 종료 코드 $CODE"
+          fi
+          exit 1

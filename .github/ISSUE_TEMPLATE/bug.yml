@@ -1,12 +1,12 @@
 name: 버그
 description: 원인이 바로 보이는 오류 (원인 분석이 필요하면 '트러블슈팅'으로)
-title: "[버그] "
+title: "fix: "
 labels: ["fix"]
 body:
   - type: markdown
     attributes:
       value: |
-        공개 저장소다. 로그와 스크린샷에 비밀값(키, 토큰, 비밀번호)과 개인정보(이메일, 연락 수단)가 없는지 확인한다.
+        공개 저장소이므로 로그와 스크린샷에 비밀값(키, 토큰, 비밀번호)과 개인정보(이메일, 연락 수단)가 없는지 확인한다.
 
   - type: textarea
     id: symptom

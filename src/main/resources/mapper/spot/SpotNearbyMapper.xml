@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.SpotNearbyMapper">
+
+    <!-- 이 조회는 반경 조건을 두 번 건다.
+         MBRIntersects 조건은 MySQL이 spot.location의 공간 인덱스로 후보를 좁히게 하려고 둔다. 서비스가 반경 원을 모두 덮도록 넉넉하게 잡은
+         사각형이라서, 이 조건만으로는 반경 밖 장소도 후보에 남는다. 그래서 MySQL은 그 뒤 ST_Distance_Sphere 조건으로 반경 안(경계 포함)
+         장소만 남긴다. 거리 함수에는 인덱스가 걸리지 않으므로, 사각형 조건 없이 거리 조건만 쓰면 MySQL이 모든 장소의 거리를 계산한다.
+         ST_Distance_Sphere는 SRID 4326 같은 지리 좌표계의 점을 받고, 반지름 6,370,986m인 구 위의 거리(m)를 돌려준다. 결과에 싣는 거리와
+         반경 조건에 같은 함수를 써서, 응답의 거리가 반경보다 큰데 결과에 나오는 일이 없게 한다.
+         좌표 순서: POINT(x, y)는 SRID가 없는 점을 만들고, ST_SRID가 SRID 4326을 붙인다. MySQL은 SRID 4326 도형의 내부 저장 형식에서
+         x를 경도, y를 위도로 읽는다. 그래서 중심점과 사각형의 각 꼭짓점에 경도를 먼저 넘긴다. 반대로 SRID 4326 WKT 문자열은 위도, 경도
+         순서라서 이 방식과 섞어 쓰지 않는다.
+         매퍼는 시설 조건을 박지에만 건다. 야영장과 자연휴양림은 bakji_detail 행이 없지만, 유형이 BAKJI가 아니면 시설과 상관없이 조건을 통과한다.
+         거리가 같은 장소는 ID 순서로 정렬해서, 페이지를 넘겨도 같은 장소가 두 번 나오거나 빠지지 않게 한다. -->
+    <select id="selectNearby" resultType="com.pitchmap.spot.infra.SpotNearbyRow">
+        SELECT s.id AS spot_id,
+               s.type AS type,
+               s.name AS name,
+               ST_Latitude(s.location) AS lat,
+               ST_Longitude(s.location) AS lng,
+               s.park_warning AS park_warning,
+               d.operating_status AS operating_status,
+               d.closed_from AS closed_from,
+               d.closed_until AS closed_until,
+               ST_Distance_Sphere(s.location, ST_SRID(POINT(#{nearby.centerLng}, #{nearby.centerLat}), 4326))
+                   AS distance_meters
+        FROM spot s
+        LEFT JOIN public_spot_detail d ON d.spot_id = s.id
+        LEFT JOIN bakji_detail b ON b.spot_id = s.id
+        WHERE s.status = 'ACTIVE'
+          AND MBRIntersects(
+                  ST_SRID(
+                      POLYGON(LINESTRING(
+                          POINT(#{nearby.swLng}, #{nearby.swLat}),
+                          POINT(#{nearby.neLng}, #{nearby.swLat}),
+                          POINT(#{nearby.neLng}, #{nearby.neLat}),
+                          POINT(#{nearby.swLng}, #{nearby.neLat}),
+                          POINT(#{nearby.swLng}, #{nearby.swLat}))),
+                      4326),
+                  s.location)
+          AND ST_Distance_Sphere(s.location, ST_SRID(POINT(#{nearby.centerLng}, #{nearby.centerLat}), 4326))
+                  &lt;= #{nearby.radiusMeters}
+        <if test="!nearby.types.isEmpty()">
+          AND s.type IN
+            <foreach collection="nearby.types" item="type" open="(" separator="," close=")">
+                #{type}
+            </foreach>
+        </if>
+        <if test="nearby.hasWater">
+          AND (s.type &lt;&gt; 'BAKJI' OR b.has_water = TRUE)
+        </if>
+        <if test="nearby.hasToilet">
+          AND (s.type &lt;&gt; 'BAKJI' OR b.has_toilet = TRUE)
+        </if>
+        <if test="nearby.excludeWarning">
+          AND s.park_warning = FALSE
+        </if>
+        ORDER BY distance_meters, s.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

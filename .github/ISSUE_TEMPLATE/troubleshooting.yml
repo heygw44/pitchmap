@@ -1,13 +1,13 @@
 name: 트러블슈팅
 description: 원인을 찾기 위해 분석이 필요한 문제 (성능 저하, 간헐적 실패, 장애 등)
-title: "[트러블슈팅] "
+title: "troubleshooting: "
 labels: ["troubleshooting"]
 body:
   - type: markdown
     attributes:
       value: |
         실제로 생긴 문제만 등록한다. 처리 절차는 재현 → 측정 → 원인 분석 → 대안 검토 → 해결 → 같은 조건으로 다시 측정 → 회귀 테스트 → 기록이다.
-        공개 저장소다. 로그·그래프에 비밀값과 개인정보가 없는지 확인한다.
+        공개 저장소이므로 로그·그래프에 비밀값과 개인정보가 없는지 확인한다.
 
   - type: textarea
     id: symptom

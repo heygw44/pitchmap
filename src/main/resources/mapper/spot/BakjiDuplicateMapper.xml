@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.BakjiDuplicateMapper">
+
+    <!-- 반경 안 박지를 찾는 방식은 반경 검색(SpotNearbyMapper)과 같다. MBRIntersects 조건은 공간 인덱스로 후보를 좁히려고 두고,
+         ST_Distance_Sphere 조건이 반경 안(경계 포함)인지 정한다. 거리 함수에는 인덱스가 걸리지 않아서 사각형 조건을 함께 건다.
+         좌표 순서: POINT(x, y)는 SRID가 없는 점을 만들고, ST_SRID가 SRID 4326을 붙인다. MySQL은 SRID 4326 도형의 내부 저장 형식에서
+         x를 경도, y를 위도로 읽는다. 그래서 중심점과 사각형의 각 꼭짓점에 경도를 먼저 넘긴다.
+         거리가 같은 박지는 ID 순서로 정렬해서, 결과가 요청마다 같은 순서로 나오게 한다. -->
+    <select id="selectDuplicates" resultType="com.pitchmap.spot.infra.BakjiDuplicateRow">
+        SELECT s.id AS spot_id,
+               s.name AS name,
+               ST_Distance_Sphere(s.location, ST_SRID(POINT(#{dup.centerLng}, #{dup.centerLat}), 4326))
+                   AS distance_meters
+        FROM spot s
+        WHERE s.type = 'BAKJI'
+          AND s.status = 'ACTIVE'
+          AND MBRIntersects(
+                  ST_SRID(
+                      POLYGON(LINESTRING(
+                          POINT(#{dup.swLng}, #{dup.swLat}),
+                          POINT(#{dup.neLng}, #{dup.swLat}),
+                          POINT(#{dup.neLng}, #{dup.neLat}),
+                          POINT(#{dup.swLng}, #{dup.neLat}),
+                          POINT(#{dup.swLng}, #{dup.swLat}))),
+                      4326),
+                  s.location)
+          AND ST_Distance_Sphere(s.location, ST_SRID(POINT(#{dup.centerLng}, #{dup.centerLat}), 4326))
+                  &lt;= #{dup.radiusMeters}
+        <if test="dup.excludeSpotId != null">
+          AND s.id &lt;&gt; #{dup.excludeSpotId}
+        </if>
+        ORDER BY distance_meters, s.id
+        LIMIT #{dup.limit}
+    </select>
+
+</mapper>
