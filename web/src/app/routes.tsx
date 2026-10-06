@@ -1,6 +1,7 @@
 import { LoginPage } from '../features/member/LoginPage';
 import { SignupPage } from '../features/member/SignupPage';
 import { VerifyEmailPage } from '../features/member/VerifyEmailPage';
+import { IdentityVerificationPage } from '../features/trust/IdentityVerificationPage';
 import { MapPage } from '../features/spot/MapPage';
 import NotFoundPage from './NotFoundPage';
 import type { RouteDef } from './router';
@@ -24,4 +25,5 @@ export const routes: RouteDef[] = [
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },
+  { path: '/identity-verification', render: () => <IdentityVerificationPage /> },
 ];

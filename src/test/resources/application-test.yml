@@ -6,6 +6,9 @@ logging:
     org.testcontainers: INFO
     com.github.dockerjava: WARN
 pitchmap:
+  identity:
+    # 테스트에서만 쓰는 가짜 키다. 길이 하한(32바이트)을 넘기려고 길게 적었다.
+    ci-hmac-key: "test-only-ci-hmac-key-not-a-real-secret-0123456789"
   outbox:
     # 테스트가 발행 시점을 직접 정하려고 publishPending()을 호출한다. 그래서 주기적으로 도는 발행기는 끈다.
     publisher-enabled: false

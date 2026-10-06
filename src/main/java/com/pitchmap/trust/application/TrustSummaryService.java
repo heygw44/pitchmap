@@ -1,15 +1,34 @@
 package com.pitchmap.trust.application;
 
+import com.pitchmap.trust.domain.IdentityVerification;
+import com.pitchmap.trust.domain.IdentityVerificationRepository;
+import java.time.Clock;
+import java.time.Year;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class TrustSummaryService {
 
     private static final TrustSummary NOT_VERIFIED_LEVEL_ZERO = new TrustSummary(false, 0);
 
-    // 본인확인 기록을 저장하는 기능이 아직 없어서 모든 회원을 본인확인 전, 신뢰 단계 0으로 계산한다.
-    // 본인확인과 신뢰 단계 계산을 만들면 이 메서드가 회원별 기록을 읽도록 바꾼다. DB를 읽지 않으므로 지금은 트랜잭션을 열지 않는다.
+    private final IdentityVerificationRepository identityVerificationRepository;
+    private final Clock clock;
+
+    /** 호출하면 회원의 본인확인 여부와 신뢰 단계를 계산해 돌려준다. 본인확인 기록이 없으면 본인확인 전, 단계 0이다. */
+    @Transactional(readOnly = true)
     public TrustSummary summarize(long memberId) {
-        return NOT_VERIFIED_LEVEL_ZERO;
+        Year currentYear = Year.from(clock.instant().atZone(IdentityVerificationService.KOREA));
+        return identityVerificationRepository
+                .findByMemberId(memberId)
+                .map(verification -> summarizeOf(verification, currentYear))
+                .orElse(NOT_VERIFIED_LEVEL_ZERO);
+    }
+
+    // 본인확인을 마친 성인이 단계 1이다. 성인 여부는 본인확인 기록이 한 곳에서 판정한다.
+    TrustSummary summarizeOf(IdentityVerification verification, Year currentYear) {
+        return new TrustSummary(true, verification.isAdult(currentYear) ? 1 : 0);
     }
 }

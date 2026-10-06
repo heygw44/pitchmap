@@ -76,6 +76,10 @@ logging:
     correlation: "[%X{traceId:-}] "
 
 pitchmap:
+  identity:
+    # CI(본인확인기관의 고유 식별값)를 해시할 때 쓰는 HMAC 비밀 키다. 비밀값이라 파일에 쓰지 않고 환경 변수로만 받는다.
+    # 값이 없거나 32바이트보다 짧으면 앱이 시작하지 않는다. 키를 바꾸면 저장해 둔 CI 해시와 새 해시가 달라지므로 운영 키는 바꾸지 않는다.
+    ci-hmac-key: ${CI_HMAC_KEY:}
   mail:
     # 네이버 SMTP는 발신 주소가 인증한 계정과 다르면 메일을 거부한다. 그래서 기본값을 SMTP 계정으로 둔다.
     from: ${spring.mail.username:}
