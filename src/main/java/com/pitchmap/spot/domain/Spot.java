@@ -32,6 +32,9 @@ import org.locationtech.jts.geom.Point;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Spot {
 
+    /** 장소 이름의 최대 길이다. DB 컬럼 크기와 같다. */
+    public static final int NAME_MAX_LENGTH = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -92,9 +95,7 @@ public class Spot {
         if (name == null || location == null || judgement == null || now == null) {
             throw new IllegalArgumentException("박지를 만드는 데 필요한 값이 null입니다.");
         }
-        if (name.isBlank()) {
-            throw new IllegalArgumentException("박지 이름이 비어 있습니다.");
-        }
+        requireValidName(name);
         Spot spot = new Spot(SpotType.BAKJI, name, location, WeatherGrid.from(location), now);
         spot.applyParkAreaJudgement(judgement);
         return spot;
@@ -112,6 +113,51 @@ public class Spot {
         this.parkWarning = judgement.parkWarning();
         this.protectedAreaId = judgement.protectedAreaId();
         this.areaCheckedAt = judgement.checkedAt();
+    }
+
+    /** 호출하면 이름을 바꾸고 수정 시각을 now로 갱신한다. 이름이 비어 있거나 {@value #NAME_MAX_LENGTH}자를 넘으면 {@link IllegalArgumentException}을 던진다. */
+    public void rename(String name, Instant now) {
+        requireValidName(name);
+        this.name = name;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 좌표를 바꾸고, 기상청 격자를 새 좌표로 다시 계산하고, 공원 경계 판정 결과를 새 판정으로 바꾼다. 수정 시각은 now로 갱신한다.
+     * 좌표가 옮겨졌으므로 판정은 호출하는 쪽이 새 좌표로 미리 해서 넘긴다.
+     *
+     * <p>새 좌표가 기상청 격자 범위 밖이면 {@link WeatherGrid#from}이 던진 {@link IllegalArgumentException}을 던지고 아무것도 바꾸지 않는다.
+     */
+    public void moveTo(GeoPoint newLocation, ParkAreaJudgement judgement, Instant now) {
+        if (newLocation == null || judgement == null || now == null) {
+            throw new IllegalArgumentException("장소를 옮기는 데 필요한 값이 null입니다.");
+        }
+        WeatherGrid grid = WeatherGrid.from(newLocation);
+        this.location = newLocation.toPoint();
+        this.weatherNx = (short) grid.nx();
+        this.weatherNy = (short) grid.ny();
+        applyParkAreaJudgement(judgement);
+        this.updatedAt = now;
+    }
+
+    /** 호출하면 상태를 {@link SpotStatus#DELETED}로 바꾸고 수정 시각을 now로 갱신한다. 행은 지우지 않는다. */
+    public void delete(Instant now) {
+        this.status = SpotStatus.DELETED;
+        this.updatedAt = now;
+    }
+
+    /** 사용자가 제보한 박지이고 지도에 보이는 상태(ACTIVE)이면 true다. 제보자가 고치거나 지울 수 있는 박지인지 가릴 때 쓴다. */
+    public boolean isActiveBakji() {
+        return type == SpotType.BAKJI && status == SpotStatus.ACTIVE;
+    }
+
+    private static void requireValidName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("박지 이름이 비어 있습니다.");
+        }
+        if (name.length() > NAME_MAX_LENGTH) {
+            throw new IllegalArgumentException("장소 이름은 " + NAME_MAX_LENGTH + "자 이하여야 합니다.");
+        }
     }
 
     /** 호출하면 저장된 JTS 점(x는 경도, y는 위도)을 위도·경도 좌표로 바꿔 돌려준다. */

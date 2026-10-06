@@ -14,6 +14,9 @@ public interface ParkAreaJudgeMapper {
     /** 호출하면 좌표를 포함하는 공원 경계의 ID를 돌려준다. 여러 경계가 겹치면 가장 작은 ID를, 포함하는 경계가 없으면 null을 돌려준다. */
     Long selectContainingAreaId(@Param("lat") double latitude, @Param("lng") double longitude);
 
+    /** 호출하면 id인 공원 경계의 이름을 돌려준다. 그런 경계가 없으면 null을 돌려준다. */
+    String selectAreaName(@Param("id") long id);
+
     /** 호출하면 상태와 상관없이 모든 박지의 ID와 좌표를 ID 순서로 돌려준다. */
     List<BakjiPointRow> selectBakjiPoints();
 

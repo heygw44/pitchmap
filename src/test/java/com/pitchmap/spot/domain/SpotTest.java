@@ -79,4 +79,78 @@ class SpotTest {
         assertThat(spot.getAreaCheckedAt()).isEqualTo(rejudgedAt);
         assertThat(spot.getUpdatedAt()).isEqualTo(NOW);
     }
+
+    @Test
+    @DisplayName("[F-07] 박지를 새 좌표로 옮기면 좌표, 기상청 격자, 경계 판정 결과, 수정 시각을 바꾸고 위도·경도 순서를 지킨다")
+    void moveToReplacesLocationGridJudgementAndUpdatedAt() {
+        // given: 서울시청에서 부산시청 쪽 좌표로 옮긴다. 위도와 경도를 뒤바꾸면 격자가 달라진다.
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        GeoPoint busan = new GeoPoint(35.1796, 129.0756);
+        Instant movedAt = NOW.plusSeconds(60);
+        ParkAreaJudgement judgement = ParkAreaJudgement.inside(PROTECTED_AREA_ID, movedAt);
+
+        // when
+        spot.moveTo(busan, judgement, movedAt);
+
+        // then
+        assertThat(spot.getLocation()).isEqualTo(busan);
+        WeatherGrid expected = WeatherGrid.from(busan);
+        assertThat(spot.getWeatherNx()).isEqualTo((short) expected.nx());
+        assertThat(spot.getWeatherNy()).isEqualTo((short) expected.ny());
+        assertThat(spot.getWeatherNx()).isNotEqualTo((short) 60);
+        assertThat(spot.isParkWarning()).isTrue();
+        assertThat(spot.getProtectedAreaId()).isEqualTo(PROTECTED_AREA_ID);
+        assertThat(spot.getAreaCheckedAt()).isEqualTo(movedAt);
+        assertThat(spot.getUpdatedAt()).isEqualTo(movedAt);
+        assertThat(spot.getCreatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("[F-07] 기상청 격자 밖 좌표로 옮기려 하면 거부하고 좌표를 그대로 둔다")
+    void moveToRejectsLocationOutsideWeatherGrid() {
+        // given
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        GeoPoint tokyo = new GeoPoint(35.6762, 139.6503);
+
+        // when & then
+        assertThatThrownBy(() -> spot.moveTo(tokyo, ParkAreaJudgement.outside(NOW), NOW.plusSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(spot.getLocation()).isEqualTo(SEOUL_CITY_HALL);
+        assertThat(spot.getUpdatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("[F-07] 박지 이름을 바꾸면 수정 시각도 바뀌고, 빈 이름이나 101자 이름은 거부한다")
+    void renameChangesNameAndRejectsInvalidName() {
+        // given
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        Instant renamedAt = NOW.plusSeconds(5);
+
+        // when
+        spot.rename("계곡 옆 평지", renamedAt);
+
+        // then
+        assertThat(spot.getName()).isEqualTo("계곡 옆 평지");
+        assertThat(spot.getUpdatedAt()).isEqualTo(renamedAt);
+        assertThatThrownBy(() -> spot.rename(" ", renamedAt)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> spot.rename("가".repeat(101), renamedAt)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(spot.getName()).isEqualTo("계곡 옆 평지");
+    }
+
+    @Test
+    @DisplayName("[F-07] 박지를 삭제하면 상태가 DELETED가 되고 ACTIVE 박지가 아니게 된다")
+    void deleteMarksSpotDeleted() {
+        // given
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        assertThat(spot.isActiveBakji()).isTrue();
+        Instant deletedAt = NOW.plusSeconds(10);
+
+        // when
+        spot.delete(deletedAt);
+
+        // then
+        assertThat(spot.getStatus()).isEqualTo(SpotStatus.DELETED);
+        assertThat(spot.getUpdatedAt()).isEqualTo(deletedAt);
+        assertThat(spot.isActiveBakji()).isFalse();
+    }
 }

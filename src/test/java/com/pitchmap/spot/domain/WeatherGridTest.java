@@ -98,4 +98,30 @@ class WeatherGridTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("기상청 격자 범위");
     }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"서울시청, 37.5665, 126.978", "부산시청, 35.1796, 129.0756", "제주시청, 33.4996, 126.5312"})
+    @DisplayName("[F-09] 기상청 격자 안 좌표는 covers가 true를 돌려준다")
+    void coversCoordinatesInsideKmaGrid(String place, double latitude, double longitude) {
+        // when & then
+        assertThat(WeatherGrid.covers(new GeoPoint(latitude, longitude)))
+                .as(place)
+                .isTrue();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+        "도쿄, 35.6762, 139.6503",
+        "베이징, 39.9042, 116.4074",
+        "위도·경도 0, 0, 0",
+        "북극점, 90, 0",
+        "남극점, -90, 126",
+    })
+    @DisplayName("[F-09] 기상청 격자 밖 좌표는 예외 없이 covers가 false를 돌려준다")
+    void doesNotCoverCoordinatesOutsideKmaGrid(String place, double latitude, double longitude) {
+        // when & then
+        assertThat(WeatherGrid.covers(new GeoPoint(latitude, longitude)))
+                .as(place)
+                .isFalse();
+    }
 }

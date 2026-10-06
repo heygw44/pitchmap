@@ -14,6 +14,13 @@
         WHERE ST_Contains(pa.boundary, ST_SRID(POINT(#{lng}, #{lat}), 4326))
     </select>
 
+    <!-- 박지 제보 응답이 경고한 공원의 이름을 보여 주려고 경계 하나의 이름만 읽는다. -->
+    <select id="selectAreaName" resultType="java.lang.String">
+        SELECT name
+        FROM protected_area
+        WHERE id = #{id}
+    </select>
+
     <!-- 경계를 다시 적재하면 서버가 모든 박지를 다시 판정한다. 숨김, 삭제, 검토 대기 박지도 다시 보이게 될 수 있어서 상태로 거르지 않는다.
          박지마다 경계를 찾는 SELECT를 상관 서브쿼리로 붙인 UPDATE 한 문장으로 판정하면, EXPLAIN에서 서브쿼리가 공간 인덱스 대신 기본 키 인덱스를
          훑는다. 실제 공원 경계 82곳에서 박지 200건에 20.7초가 걸렸다. 그래서 서비스가 이 SELECT로 박지 좌표를 한 번 읽고,
