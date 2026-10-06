@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.within;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.spot.domain.GeoPoint;
+import com.pitchmap.spot.domain.SpotRepository;
 import com.pitchmap.spot.domain.WeatherGrid;
-import com.pitchmap.spot.infra.SpotLocationProbeRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +44,7 @@ class PublicSpotSyncServiceIntegrationTest {
     private JsonMapper jsonMapper;
 
     @Autowired
-    private SpotLocationProbeRepository spotLocationProbeRepository;
+    private SpotRepository spotRepository;
 
     @Autowired
     private MutableClock clock;
@@ -112,7 +112,7 @@ class PublicSpotSyncServiceIntegrationTest {
         assertThat(((Number) stored.get("srid")).intValue()).isEqualTo(4326);
         // SRID 4326 좌표의 WKT는 위도, 경도 순서다.
         assertThat(stored.get("wkt")).isEqualTo("POINT(37.5665 126.978)");
-        assertThat(spotLocationProbeRepository.findById(spotId).orElseThrow().getLocation())
+        assertThat(spotRepository.findById(spotId).orElseThrow().getLocation())
                 .isEqualTo(new GeoPoint(SEOUL_LATITUDE, SEOUL_LONGITUDE));
     }
 

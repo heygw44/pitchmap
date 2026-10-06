@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.within;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.spot.domain.GeoPoint;
+import com.pitchmap.spot.domain.ParkAreaJudgement;
+import com.pitchmap.spot.domain.Spot;
+import com.pitchmap.spot.domain.SpotRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +26,7 @@ class GeoPointPersistenceIntegrationTest {
     private static final int WGS84_SRID = 4326;
 
     @Autowired
-    private SpotLocationProbeRepository repository;
+    private SpotRepository repository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -32,11 +35,12 @@ class GeoPointPersistenceIntegrationTest {
     @DisplayName("[ADR-001] JPA로 저장한 좌표를 MySQL이 같은 위도·경도로 읽는다")
     void coordinateSavedByJpaIsReadBackByMySqlWithSameLatitudeAndLongitude() {
         // given
-        SpotLocationProbe probe = new SpotLocationProbe(
-                "서울시청", new GeoPoint(SEOUL_LATITUDE, SEOUL_LONGITUDE), MutableClock.DEFAULT_INSTANT);
+        Instant now = MutableClock.DEFAULT_INSTANT;
+        Spot spot =
+                Spot.bakji("서울시청", new GeoPoint(SEOUL_LATITUDE, SEOUL_LONGITUDE), ParkAreaJudgement.outside(now), now);
 
         // when
-        long id = repository.save(probe).getId();
+        long id = repository.save(spot).getId();
         StoredLocation stored = jdbcTemplate.queryForObject(
                 "SELECT ST_Latitude(location) AS latitude, ST_Longitude(location) AS longitude,"
                         + " ST_SRID(location) AS srid, ST_AsText(location) AS wkt FROM spot WHERE id = ?",
@@ -59,7 +63,7 @@ class GeoPointPersistenceIntegrationTest {
         long id = insertSpotWithWkt("서울시청", "POINT(37.5665 126.978)");
 
         // when
-        SpotLocationProbe found = repository.findById(id).orElseThrow();
+        Spot found = repository.findById(id).orElseThrow();
 
         // then
         assertThat(found.getLocation()).isEqualTo(new GeoPoint(SEOUL_LATITUDE, SEOUL_LONGITUDE));
