@@ -153,4 +153,32 @@ class SpotTest {
         assertThat(spot.getUpdatedAt()).isEqualTo(deletedAt);
         assertThat(spot.isActiveBakji()).isFalse();
     }
+
+    @Test
+    @DisplayName("[F-08] ACTIVE 박지를 검토 대기로 바꾸면 상태가 PENDING_REVIEW가 되고 수정 시각을 갱신하며 ACTIVE 박지가 아니게 된다")
+    void markPendingReviewChangesActiveBakji() {
+        // given
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        Instant reviewedAt = NOW.plusSeconds(10);
+
+        // when
+        spot.markPendingReview(reviewedAt);
+
+        // then
+        assertThat(spot.getStatus()).isEqualTo(SpotStatus.PENDING_REVIEW);
+        assertThat(spot.getUpdatedAt()).isEqualTo(reviewedAt);
+        assertThat(spot.isActiveBakji()).isFalse();
+    }
+
+    @Test
+    @DisplayName("[F-08] ACTIVE가 아닌 박지를 검토 대기로 바꾸면 IllegalStateException을 던지고 상태는 그대로다")
+    void markPendingReviewRejectsNonActiveSpot() {
+        // given
+        Spot spot = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        spot.delete(NOW.plusSeconds(1));
+
+        // when & then
+        assertThatThrownBy(() -> spot.markPendingReview(NOW.plusSeconds(2))).isInstanceOf(IllegalStateException.class);
+        assertThat(spot.getStatus()).isEqualTo(SpotStatus.DELETED);
+    }
 }

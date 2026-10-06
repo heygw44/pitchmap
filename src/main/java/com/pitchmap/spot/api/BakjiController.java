@@ -2,6 +2,7 @@ package com.pitchmap.spot.api;
 
 import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.spot.application.BakjiCommandService;
+import com.pitchmap.spot.application.BakjiFeedbackService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 class BakjiController {
 
     private final BakjiCommandService bakjiCommandService;
+    private final BakjiFeedbackService bakjiFeedbackService;
 
-    BakjiController(BakjiCommandService bakjiCommandService) {
+    BakjiController(BakjiCommandService bakjiCommandService, BakjiFeedbackService bakjiFeedbackService) {
         this.bakjiCommandService = bakjiCommandService;
+        this.bakjiFeedbackService = bakjiFeedbackService;
     }
 
     @Operation(
@@ -69,5 +72,33 @@ class BakjiController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long spotId) {
         bakjiCommandService.delete(loginMember.memberId(), spotId);
+    }
+
+    @Operation(
+            summary = "박지 확인",
+            description = "이메일 인증을 마친 회원이 박지를 다녀왔고 정보가 맞다고 확인한다. 한 회원은 같은 박지를 한 번만 확인할 수 있고, "
+                    + "이미 확인했으면 409 BAKJI_ALREADY_CONFIRMED로 응답한다. 제보자가 자기 박지를 확인해도 막지 않는다. "
+                    + "응답은 201과 함께 확인한 뒤의 확인 수(confirmationCount)를 준다. "
+                    + "장소가 없거나, 박지가 아니거나, 지도에 보이는(ACTIVE) 상태가 아니면 404 NOT_FOUND로 응답한다.")
+    @PostMapping("/{spotId}/confirmations")
+    @ResponseStatus(HttpStatus.CREATED)
+    BakjiConfirmationResponse confirm(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long spotId) {
+        return new BakjiConfirmationResponse(bakjiFeedbackService.confirm(loginMember.memberId(), spotId));
+    }
+
+    @Operation(
+            summary = "박지 신고",
+            description = "이메일 인증을 마친 회원이 잘못된 박지를 신고하고, 201로 응답하며 본문은 없다. "
+                    + "reason은 ILLEGAL_AREA, CLOSED, FALSE_INFO 중 하나이고 모르는 값은 400 INVALID_INPUT이다. content는 없어도 되고 1,000자 이하다. "
+                    + "한 회원은 같은 박지를 한 번만 신고할 수 있고, 이미 신고했으면 409 BAKJI_ALREADY_REPORTED로 응답한다. 제보자가 자기 박지를 신고해도 막지 않는다. "
+                    + "신고가 5건 이상 쌓이면 서버가 같은 요청 안에서 박지를 PENDING_REVIEW로 바꿔 지도, 목록, 상세에서 뺀다. "
+                    + "장소가 없거나, 박지가 아니거나, 지도에 보이는(ACTIVE) 상태가 아니면 404 NOT_FOUND로 응답한다. 그래서 검토 대기가 된 박지는 더 신고할 수 없다.")
+    @PostMapping("/{spotId}/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    void reportProblem(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long spotId,
+            @Valid @RequestBody BakjiProblemReportRequest request) {
+        bakjiFeedbackService.reportProblem(loginMember.memberId(), spotId, request.toCommand());
     }
 }

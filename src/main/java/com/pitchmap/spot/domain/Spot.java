@@ -146,6 +146,18 @@ public class Spot {
         this.updatedAt = now;
     }
 
+    /**
+     * 호출하면 상태를 {@link SpotStatus#PENDING_REVIEW}로 바꾸고 수정 시각을 now로 갱신한다. 신고가 쌓여 관리자 검토를 기다리게 하는 전이다.
+     * 지금 상태가 ACTIVE가 아니면 호출하는 쪽의 버그라서 {@link IllegalStateException}을 던진다.
+     */
+    public void markPendingReview(Instant now) {
+        if (status != SpotStatus.ACTIVE) {
+            throw new IllegalStateException("지도에 보이는 장소만 검토 대기로 바꿀 수 있습니다. 현재 상태: " + status);
+        }
+        this.status = SpotStatus.PENDING_REVIEW;
+        this.updatedAt = now;
+    }
+
     /** 사용자가 제보한 박지이고 지도에 보이는 상태(ACTIVE)이면 true다. 제보자가 고치거나 지울 수 있는 박지인지 가릴 때 쓴다. */
     public boolean isActiveBakji() {
         return type == SpotType.BAKJI && status == SpotStatus.ACTIVE;
