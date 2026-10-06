@@ -17,7 +17,7 @@ public interface SpotAreaMapper {
     List<SpotMarkerRow> selectMarkers(@Param("area") SpotAreaCondition area, @Param("limit") int limit);
 
     /**
-     * 호출하면 {@link #selectMarkers}와 같은 장소를 grid 칸별로 묶어 칸마다 평균 좌표와 장소 수를 읽는다. 장소가 없는 칸은 결과에 나오지 않고, 결과는
+     * 호출하면 {@link #selectMarkers}와 같은 장소를 grid 칸별로 묶어 칸마다 중심 좌표와 장소 수를 읽는다. 장소가 없는 칸은 결과에 나오지 않고, 결과는
      * 남쪽 행부터, 같은 행에서는 서쪽 칸부터 나온다.
      */
     List<SpotClusterRow> selectClusters(@Param("area") SpotAreaCondition area, @Param("grid") SpotClusterGrid grid);

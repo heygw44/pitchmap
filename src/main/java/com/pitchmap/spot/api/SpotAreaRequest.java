@@ -39,6 +39,16 @@ public record SpotAreaRequest(
         @Max(value = 14, message = "지도 확대 수준은 14 이하여야 합니다.")
         Integer zoom,
 
+        @NotNull(message = "지도 화면의 가로 크기를 입력해야 합니다.")
+        @Min(value = 1, message = "지도 화면의 가로 크기는 1 이상이어야 합니다.")
+        @Max(value = 10000, message = "지도 화면의 가로 크기는 10000 이하여야 합니다.")
+        Integer width,
+
+        @NotNull(message = "지도 화면의 세로 크기를 입력해야 합니다.")
+        @Min(value = 1, message = "지도 화면의 세로 크기는 1 이상이어야 합니다.")
+        @Max(value = 10000, message = "지도 화면의 세로 크기는 10000 이하여야 합니다.")
+        Integer height,
+
         Set<@NotNull(message = "장소 유형에 빈 값이 있습니다.") SpotType> types,
         Boolean hasWater,
         Boolean hasToilet,
@@ -61,6 +71,8 @@ public record SpotAreaRequest(
                 swLng,
                 neLat,
                 neLng,
+                width,
+                height,
                 types == null ? Set.of() : types,
                 Boolean.TRUE.equals(hasWater),
                 Boolean.TRUE.equals(hasToilet),
