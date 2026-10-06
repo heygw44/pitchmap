@@ -35,7 +35,7 @@ public record WeatherGrid(int nx, int ny) {
     private static final double ORIGIN_RADIUS = radiusAt(ORIGIN_LATITUDE_RADIANS);
 
     public WeatherGrid {
-        if (nx < 1 || nx > GRID_WIDTH || ny < 1 || ny > GRID_HEIGHT) {
+        if (!isInRange(nx, ny)) {
             throw new IllegalArgumentException(
                     "기상청 격자 범위(X 1~" + GRID_WIDTH + ", Y 1~" + GRID_HEIGHT + ")를 벗어났습니다. nx=" + nx + ", ny=" + ny);
         }
@@ -43,12 +43,33 @@ public record WeatherGrid(int nx, int ny) {
 
     /** 호출하면 위도·경도를 기상청 단기예보 5km 격자 좌표로 바꾼다. 결과가 기상청 격자 범위 밖이면 {@link IllegalArgumentException}을 던진다. */
     public static WeatherGrid from(GeoPoint point) {
+        ProjectedIndex index = project(point);
+        return new WeatherGrid(index.nx(), index.ny());
+    }
+
+    /**
+     * 호출하면 좌표를 격자로 바꾼 번호가 기상청 격자 범위 안인지 돌려준다. {@link #from}과 같은 계산을 쓰지만 범위 밖이어도 예외를 던지지 않는다.
+     * 그래서 호출하는 쪽은 예외를 잡지 않고 범위 밖 좌표를 미리 걸러 낼 수 있다.
+     */
+    public static boolean covers(GeoPoint point) {
+        ProjectedIndex index = project(point);
+        return isInRange(index.nx(), index.ny());
+    }
+
+    private static boolean isInRange(int nx, int ny) {
+        return nx >= 1 && nx <= GRID_WIDTH && ny >= 1 && ny <= GRID_HEIGHT;
+    }
+
+    private static ProjectedIndex project(GeoPoint point) {
         double radius = radiusAt(Math.toRadians(point.latitude()));
         double theta = longitudeOffsetFromOrigin(point.longitude()) * CONE_CONSTANT;
         double x = radius * Math.sin(theta) + ORIGIN_X_GRID;
         double y = ORIGIN_RADIUS - radius * Math.cos(theta) + ORIGIN_Y_GRID;
-        return new WeatherGrid(toGridIndex(x), toGridIndex(y));
+        return new ProjectedIndex(toGridIndex(x), toGridIndex(y));
     }
+
+    // 범위를 검사하기 전의 격자 번호다. 레코드 생성자는 범위 밖 번호를 거부하므로, 범위를 먼저 확인하려고 따로 둔다.
+    private record ProjectedIndex(int nx, int ny) {}
 
     private static double longitudeOffsetFromOrigin(double longitude) {
         double offset = Math.toRadians(longitude) - ORIGIN_LONGITUDE_RADIANS;
