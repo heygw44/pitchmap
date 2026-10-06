@@ -207,6 +207,36 @@ class MeApiIntegrationTest {
         assertThat(result).bodyJson().extractingPath("$.nickname").isEqualTo(member.getNickname());
     }
 
+    @Test
+    @DisplayName("[F-11] 본인확인을 마친 성인의 내 정보는 identityVerified true, trustLevel 1이고, 미성년은 true, 0이다")
+    void meReflectsIdentityVerification() {
+        Cookie adult = verifiedSession(saveMember());
+        Cookie minor = verifiedSession(saveMember());
+        // 테스트 시계는 한국 날짜로 2026-10-05라서, 2007년생은 성인이고 2008년생은 미성년이다.
+        verifyIdentity(adult, 2007, "demo-adult");
+        verifyIdentity(minor, 2008, "demo-minor");
+
+        MvcTestResult adultMe = mvc.get().uri(ME_PATH).cookie(adult).exchange();
+        MvcTestResult minorMe = mvc.get().uri(ME_PATH).cookie(minor).exchange();
+
+        assertThat(adultMe).bodyJson().extractingPath("$.identityVerified").isEqualTo(true);
+        assertThat(adultMe).bodyJson().extractingPath("$.trustLevel").isEqualTo(1);
+        assertThat(minorMe).bodyJson().extractingPath("$.identityVerified").isEqualTo(true);
+        assertThat(minorMe).bodyJson().extractingPath("$.trustLevel").isEqualTo(0);
+    }
+
+    private void verifyIdentity(Cookie session, int birthYear, String demoIdentityKey) {
+        MvcTestResult result = mvc.post()
+                .uri("/api/me/identity-verification")
+                .with(csrf())
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"birthYear\":%d,\"gender\":\"FEMALE\",\"demoIdentityKey\":\"%s\"}"
+                        .formatted(birthYear, demoIdentityKey))
+                .exchange();
+        assertThat(result).hasStatus(HttpStatus.OK);
+    }
+
     private Member saveMember() {
         return memberRepository.save(aMember()
                 .email(TestSequence.email())

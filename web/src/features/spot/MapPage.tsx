@@ -375,6 +375,17 @@ function AccountChip() {
   return (
     <div className="pointer-events-auto inline-flex min-w-0 items-center rounded-control border border-contour bg-card pl-3">
       <span className="max-w-32 truncate text-sm text-ink">{session.me.nickname}</span>
+      {session.me.identityVerified ? (
+        <span className="ml-2">
+          <Badge tone="sea" icon="check">
+            본인확인
+          </Badge>
+        </span>
+      ) : (
+        <Link to="/identity-verification" className="ml-2 min-h-11 content-center text-sm font-semibold text-forest">
+          본인확인
+        </Link>
+      )}
       <Button variant="ghost" loading={loggingOut} onClick={handleLogout} className="px-3">
         로그아웃
       </Button>

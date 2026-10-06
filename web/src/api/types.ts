@@ -67,6 +67,22 @@ export interface Me {
   trustLevel: number;
 }
 
+// 본인확인
+
+export interface IdentityVerificationRequest {
+  birthYear: number;
+  gender: SelfGender;
+  // 시연용 식별 문자열이다. 같은 값이면 서버가 같은 사람으로 본다.
+  demoIdentityKey: string;
+}
+
+export interface IdentityVerificationResponse {
+  identityVerified: boolean;
+  // 성인 기준에 못 미치면 false이고 신뢰 단계는 0이다.
+  adult: boolean;
+  trustLevel: number;
+}
+
 // 장소
 
 export type SpotType = 'CAMPSITE' | 'FOREST' | 'BAKJI';
