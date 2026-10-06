@@ -10,7 +10,9 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.AliasFor;
 import org.springframework.test.context.ActiveProfiles;
 
 // 이 어노테이션 하나에 설정을 모아서, 모든 통합 테스트가 같은 컨텍스트 캐시 키, MySQL 컨테이너, WireMock 서버를 공유하게 한다.
@@ -29,4 +31,10 @@ import org.springframework.test.context.ActiveProfiles;
     WireMockTestConfig.class
 })
 @ExtendWith({DatabaseCleanupExtension.class, ClockResetExtension.class, WireMockResetExtension.class})
-public @interface IntegrationTest {}
+public @interface IntegrationTest {
+
+    // 기본은 서버를 띄우지 않는 MOCK이다. Tomcat이 직접 처리하는 동작(프록시 헤더 등)을 확인하는 테스트만 RANDOM_PORT를 고른다.
+    // 웹 환경이 다르면 Spring이 컨텍스트를 따로 띄우므로, 꼭 필요한 테스트에만 쓴다.
+    @AliasFor(annotation = SpringBootTest.class, attribute = "webEnvironment")
+    WebEnvironment webEnvironment() default WebEnvironment.MOCK;
+}

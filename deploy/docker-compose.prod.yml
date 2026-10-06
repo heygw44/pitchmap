@@ -1,0 +1,77 @@
+# 운영 서버(/opt/pitchmap)에서 deploy.sh가 쓰는 Compose 파일이다. 로컬 개발용은 저장소 루트의 docker-compose.yml이다.
+# 값은 deploy.sh가 Parameter Store와 server.env를 합쳐 만든 /opt/pitchmap/.env에서 온다.
+# 서비스마다 필요한 변수만 environment에 나열한다. 그래서 앱 컨테이너에는 DB root 비밀번호가 들어가지 않는다.
+# 메모리가 2GB인 서버라 서비스마다 한도를 둔다. 지표로 부족이 확인되면 이 값을 조정한다.
+name: pitchmap
+
+services:
+  caddy:
+    image: ${CADDY_IMAGE:?}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?}
+    volumes:
+      # 인증서와 계정 키를 볼륨에 둔다. 컨테이너를 새로 만들 때마다 인증서를 다시 받으면 Let's Encrypt 발급 한도에 걸린다.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    mem_limit: 128m
+
+  app:
+    image: ${APP_IMAGE:?}
+    restart: unless-stopped
+    ports:
+      # 배포 스크립트가 서버 안에서 /actuator/health를 확인하는 용도라 127.0.0.1에만 연다. 밖에서는 caddy만 보인다.
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:?}
+      DB_USERNAME: ${DB_USERNAME:?}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      MAIL_USERNAME: ${MAIL_USERNAME:?}
+      MAIL_APP_PASSWORD: ${MAIL_APP_PASSWORD:?}
+      PUBLICDATA_SERVICE_KEY: ${PUBLICDATA_SERVICE_KEY:?}
+      CI_HMAC_KEY: ${CI_HMAC_KEY:?}
+      WEB_BASE_URL: https://${SITE_ADDRESS:?}
+      PUBLICDATA_FOREST_FILE: ${PUBLICDATA_FOREST_FILE:-}
+      PUBLICDATA_PARK_BOUNDARY_FILE: ${PUBLICDATA_PARK_BOUNDARY_FILE:-}
+    volumes:
+      # 공공데이터 파일(휴양림 CSV, 공원 경계 TSV)은 저장소에 없어서 서버의 /opt/pitchmap/data에 둔다.
+      - ./data:/data:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 768m
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: ${DB_NAME:?}
+      MYSQL_USER: ${DB_USERNAME:?}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      # 로컬과 같게 DB 시간을 UTC로 둔다.
+      - --default-time-zone=+00:00
+    # 포트를 열지 않는다. 앱은 Compose 내부 네트워크로만 접속한다.
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    mem_limit: 640m
+
+volumes:
+  caddy-data:
+  caddy-config:
+  mysql-data:
