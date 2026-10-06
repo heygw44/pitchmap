@@ -26,9 +26,15 @@ import com.pitchmap.spot.application.SpotNearbyItem;
 import com.pitchmap.spot.application.SpotNearbyPage;
 import com.pitchmap.spot.application.SpotNearbyQuery;
 import com.pitchmap.spot.application.SpotNearbyQueryService;
+import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
+import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
+import com.pitchmap.weather.application.SunTimes;
+import com.pitchmap.weather.application.WeatherForecast;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +60,15 @@ class SpotControllerTest {
 
     private static final String PATH = "/api/spots";
     private static final String NEARBY_PATH = "/api/spots/nearby";
+
+    private static final SpotParkWarning WARNED = new SpotParkWarning(
+            true,
+            "설악산 국립공원",
+            "KDPA",
+            LocalDate.of(2026, 1, 1),
+            "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
+            "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요.");
+    private static final SpotParkWarning NOT_WARNED = new SpotParkWarning(false, null, null, null, null, null);
 
     @Autowired
     private MockMvcTester mvc;
@@ -487,8 +502,8 @@ class SpotControllerTest {
         // given
         SpotBakjiDetail bakji = new SpotBakjiDetail("능선 끝 평지", false, true, "WEAK", 12L, 31L, "새벽능선");
         when(spotDetailQueryService.findDetail(101L))
-                .thenReturn(
-                        new SpotDetail(101L, SpotType.BAKJI, "능선 끝 평지", 37.71, 128.75, "강원 평창군", true, bakji, null));
+                .thenReturn(new SpotDetail(
+                        101L, SpotType.BAKJI, "능선 끝 평지", 37.71, 128.75, "강원 평창군", WARNED, bakji, null, null));
 
         // when
         MvcTestResult result = mvc.get().uri(PATH + "/101").exchange();
@@ -504,7 +519,11 @@ class SpotControllerTest {
                     "confirmationCount": 12, "reporter": { "memberId": 31, "nickname": "새벽능선" }
                   },
                   "publicDetail": null,
-                  "parkWarning": { "warned": true },
+                  "parkWarning": {
+                    "warned": true, "areaName": "설악산 국립공원", "source": "KDPA", "sourceDate": "2026-01-01",
+                    "notice": "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
+                    "guide": "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요."
+                  },
                   "rating": { "average": null, "count": 0 },
                   "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [], "weather": null
                 }
@@ -529,7 +548,7 @@ class SpotControllerTest {
                 true);
         when(spotDetailQueryService.findDetail(102L))
                 .thenReturn(new SpotDetail(
-                        102L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, false, null, publicDetail));
+                        102L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, NOT_WARNED, null, publicDetail, null));
 
         // when
         MvcTestResult result = mvc.get().uri(PATH + "/102").exchange();
@@ -557,6 +576,117 @@ class SpotControllerTest {
                   "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [], "weather": null
                 }
                 """);
+    }
+
+    @Test
+    @DisplayName("[F-05][F-09][SF-05] 경고 박지에 날씨가 있으면 경고 필드 전체와 단기·중기 예보, 출몰시각을 응답한다")
+    void readsWarnedBakjiDetailWithWeather() {
+        // given
+        SpotBakjiDetail bakji = new SpotBakjiDetail("능선 끝 평지", false, true, "WEAK", 12L, 31L, "새벽능선");
+        WeatherForecast forecast = new WeatherForecast(
+                "기상청",
+                List.of(new WeatherForecast.ShortTermForecast(Instant.parse("2026-10-04T05:00:00Z"), 18, 30, 2.5)),
+                List.of(new WeatherForecast.MidTermForecast(LocalDate.of(2026, 10, 8), 10, 20, "맑음", "구름많음", 10, 20)));
+        SunTimes sun =
+                new SunTimes(LocalDate.of(2026, 10, 4), LocalTime.of(7, 1), LocalTime.of(18, 11), LocalTime.of(18, 38));
+        when(spotDetailQueryService.findDetail(103L))
+                .thenReturn(new SpotDetail(
+                        103L,
+                        SpotType.BAKJI,
+                        "능선 끝 평지",
+                        37.71,
+                        128.75,
+                        "강원 평창군",
+                        WARNED,
+                        bakji,
+                        null,
+                        new SpotWeather(forecast, sun)));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/103").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {
+                  "spotId": 103, "type": "BAKJI", "name": "능선 끝 평지", "lat": 37.71, "lng": 128.75,
+                  "address": "강원 평창군",
+                  "bakji": {
+                    "description": "능선 끝 평지", "hasWater": false, "hasToilet": true, "signalLevel": "WEAK",
+                    "confirmationCount": 12, "reporter": { "memberId": 31, "nickname": "새벽능선" }
+                  },
+                  "publicDetail": null,
+                  "parkWarning": {
+                    "warned": true, "areaName": "설악산 국립공원", "source": "KDPA", "sourceDate": "2026-01-01",
+                    "notice": "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
+                    "guide": "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요."
+                  },
+                  "rating": { "average": null, "count": 0 },
+                  "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [],
+                  "weather": {
+                    "source": "기상청",
+                    "shortTerm": [
+                      { "at": "2026-10-04T05:00:00Z", "temperature": 18, "precipitationProbability": 30,
+                        "windSpeed": 2.5 }
+                    ],
+                    "midTerm": [
+                      { "date": "2026-10-08", "minTemperature": 10, "maxTemperature": 20, "amSky": "맑음",
+                        "pmSky": "구름많음", "amPrecipitationProbability": 10, "pmPrecipitationProbability": 20 }
+                    ],
+                    "sun": { "date": "2026-10-04", "sunrise": "07:01", "sunset": "18:11", "civilTwilightEnd": "18:38" }
+                  }
+                }
+                """);
+    }
+
+    @Test
+    @DisplayName("[F-05][F-09] 천문연만 실패해 sun이 없으면 weather 안에 sun 필드를 null로 남긴다")
+    void keepsSunFieldAsNullWhenSunMissing() {
+        // given
+        WeatherForecast forecast = new WeatherForecast("기상청", List.of(), List.of());
+        when(spotDetailQueryService.findDetail(104L))
+                .thenReturn(new SpotDetail(
+                        104L,
+                        SpotType.CAMPSITE,
+                        "숲속 야영장",
+                        37.52,
+                        127.81,
+                        null,
+                        NOT_WARNED,
+                        null,
+                        null,
+                        new SpotWeather(forecast, null)));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/104").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.weather.source").isEqualTo("기상청");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.weather.shortTerm")
+                .asList()
+                .isEmpty();
+        assertThat(result).bodyJson().extractingPath("$.weather").asMap().containsKey("sun");
+        assertThat(result).bodyJson().extractingPath("$.weather.sun").isNull();
+    }
+
+    @Test
+    @DisplayName("[F-05] 경고가 아닌 장소의 parkWarning은 warned false만 담고 다른 필드는 응답에서 뺀다")
+    void notWarnedParkWarningHasOnlyWarnedField() {
+        // given
+        when(spotDetailQueryService.findDetail(105L))
+                .thenReturn(new SpotDetail(
+                        105L, SpotType.CAMPSITE, "숲속 야영장", 37.52, 127.81, null, NOT_WARNED, null, null, null));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/105").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.parkWarning").isEqualTo(Map.of("warned", false));
+        assertThat(result).bodyJson().extractingPath("$.weather").isNull();
     }
 
     @Test

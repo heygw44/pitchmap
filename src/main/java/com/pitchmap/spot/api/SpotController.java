@@ -80,9 +80,14 @@ class SpotController {
                     + "운영 상태, 휴장 기간을 채우고 bakji는 null로 준다. 원천에 시설 정보가 없으면 facilities는 null이다. "
                     + "closedNow는 서버가 오늘 한국 날짜로 계산한 휴장 여부다. 원천의 휴장 정보가 정확하지 않아서 "
                     + "서버는 휴장 중인 장소도 숨기지 않고 표시만 한다. "
-                    + "parkWarning은 지금은 공원 경계 경고 여부(warned)만 준다. "
+                    + "parkWarning.warned는 장소가 공원 경계 안일 가능성이 있는지를 뜻한다. 경고가 아니면 warned만 주고, "
+                    + "경고이면 공원 이름(areaName), 경계 데이터 출처(source)와 기준일(sourceDate), 참고용 고지(notice), "
+                    + "안내(guide)를 함께 준다. 공원 경계 행이 없는 경고에는 areaName, source, sourceDate가 빠진다. "
+                    + "weather에는 기상청 단기·중기 예보와 오늘(한국 날짜) 출몰시각(sun)을 준다. "
+                    + "기상청 호출이 실패하거나 늦으면 weather는 null이고 나머지 필드는 정상으로 응답한다. 이때 천문연은 부르지 않는다. "
+                    + "기상청은 성공하고 천문연만 실패하면 weather는 채우고 sun만 null로 준다. "
                     + "아직 채우지 않는 항목이 있어서, rating은 average가 null이고 count가 0이며, "
-                    + "recentReviews, expectedPeople, recruitingBasecamps는 빈 배열, weather는 null로 준다. "
+                    + "recentReviews, expectedPeople, recruitingBasecamps는 빈 배열로 준다. "
                     + "장소가 없거나 숨김, 삭제, 검토 대기 상태이면 404 NOT_FOUND로 응답한다. "
                     + "spotId가 숫자가 아니면 400 INVALID_INPUT으로 응답한다.")
     @GetMapping("/{spotId}")
