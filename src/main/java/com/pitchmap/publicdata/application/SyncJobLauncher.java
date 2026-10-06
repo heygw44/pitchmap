@@ -1,7 +1,6 @@
 package com.pitchmap.publicdata.application;
 
 import com.pitchmap.common.error.BusinessException;
-import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.publicdata.application.SyncJobRunService.SyncJobStart;
 import com.pitchmap.publicdata.domain.PublicDataErrorCode;
 import com.pitchmap.publicdata.domain.SyncJobType;
@@ -35,6 +34,8 @@ public class SyncJobLauncher {
     private final GoCampingSyncProperties goCampingSyncProperties;
     private final ForestLoadProperties forestLoadProperties;
     private final ParkBoundaryLoadProperties parkBoundaryLoadProperties;
+    private final BakjiRejudgeService bakjiRejudgeService;
+    private final BakjiRejudgeProperties bakjiRejudgeProperties;
     private final ThreadPoolTaskExecutor syncJobExecutor;
 
     SyncJobLauncher(
@@ -45,6 +46,8 @@ public class SyncJobLauncher {
             GoCampingSyncProperties goCampingSyncProperties,
             ForestLoadProperties forestLoadProperties,
             ParkBoundaryLoadProperties parkBoundaryLoadProperties,
+            BakjiRejudgeService bakjiRejudgeService,
+            BakjiRejudgeProperties bakjiRejudgeProperties,
             @Qualifier(SyncJobExecutorConfig.SYNC_JOB_EXECUTOR) ThreadPoolTaskExecutor syncJobExecutor) {
         this.syncJobRunService = syncJobRunService;
         this.goCampingSyncService = goCampingSyncService;
@@ -53,14 +56,16 @@ public class SyncJobLauncher {
         this.goCampingSyncProperties = goCampingSyncProperties;
         this.forestLoadProperties = forestLoadProperties;
         this.parkBoundaryLoadProperties = parkBoundaryLoadProperties;
+        this.bakjiRejudgeService = bakjiRejudgeService;
+        this.bakjiRejudgeProperties = bakjiRejudgeProperties;
         this.syncJobExecutor = syncJobExecutor;
     }
 
     /**
      * 호출하면 작업 종류의 실행 기록을 만들고 작업을 실행기에 넘긴 뒤, 작업이 끝나기를 기다리지 않고 실행 기록 ID를 돌려준다.
      *
-     * <p>같은 종류가 이미 실행 중이면 {@code SYNC_JOB_ALREADY_RUNNING}을 던진다. 박지 재판정은 아직 구현하지 않은 작업이라
-     * {@code INVALID_INPUT}을 던지고 실행 기록도 만들지 않는다.
+     * <p>같은 종류가 이미 실행 중이면 {@code SYNC_JOB_ALREADY_RUNNING}을 던진다. 공원 경계 적재가 성공하면 같은 작업 스레드가 이어서 박지 재판정을
+     * 시작하고, 그 재판정은 별도의 실행 기록으로 남는다.
      */
     public long launch(SyncJobType jobType) {
         Job job = jobFor(jobType);
@@ -76,9 +81,18 @@ public class SyncJobLauncher {
         return switch (jobType) {
             case GOCAMPING -> new Job(goCampingSyncProperties.staleAfter(), goCampingSyncService::run);
             case FOREST -> new Job(forestLoadProperties.staleAfter(), forestLoadService::run);
-            case PARK_BOUNDARY -> new Job(parkBoundaryLoadProperties.staleAfter(), parkBoundaryLoadService::run);
-            case BAKJI_REJUDGE -> throw new BusinessException(CommonErrorCode.INVALID_INPUT, "박지 재판정은 아직 실행할 수 없습니다.");
+            case PARK_BOUNDARY -> new Job(parkBoundaryLoadProperties.staleAfter(), this::loadParkBoundaryThenRejudge);
+            case BAKJI_REJUDGE -> new Job(bakjiRejudgeProperties.staleAfter(), bakjiRejudgeService::run);
         };
+    }
+
+    // 경계가 바뀌면 박지의 공원 경고도 새 경계로 맞춰야 하므로, 적재가 성공한 뒤에만 재판정을 시작한다. 적재가 예외를 던지면 재판정은 시작하지 않는다.
+    // 다른 재판정이 이미 돌고 있으면 새로 시작하지 않고 WARN 로그만 남긴다.
+    private void loadParkBoundaryThenRejudge(SyncJobStart start) {
+        parkBoundaryLoadService.run(start);
+        if (bakjiRejudgeService.rejudge().isEmpty()) {
+            log.warn("bakji rejudge skipped because another rejudge is running parkBoundaryRunId={}", start.runId());
+        }
     }
 
     // 실행기가 작업을 받지 않으면 작업은 시작조차 하지 않았으므로, 방금 만든 RUNNING 기록을 실패로 바꾼다.

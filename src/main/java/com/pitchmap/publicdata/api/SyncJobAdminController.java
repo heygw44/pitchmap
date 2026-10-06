@@ -34,10 +34,10 @@ class SyncJobAdminController {
 
     @Operation(
             summary = "공공데이터 적재·동기화 실행",
-            description = "jobType 작업(GOCAMPING, FOREST, PARK_BOUNDARY)의 실행 기록을 만들고 작업을 백그라운드에서 시작한다. "
+            description = "jobType 작업(GOCAMPING, FOREST, PARK_BOUNDARY, BAKJI_REJUDGE)의 실행 기록을 만들고 작업을 백그라운드에서 시작한다. "
                     + "작업이 끝나기를 기다리지 않고 202와 실행 기록 ID를 돌려주므로, 결과는 실행 기록 목록에서 확인한다. "
                     + "같은 종류의 작업이 실행 중이면 409 SYNC_JOB_ALREADY_RUNNING으로 응답한다. "
-                    + "박지 재판정(BAKJI_REJUDGE)은 아직 구현하지 않아 400 INVALID_INPUT으로 응답한다.")
+                    + "PARK_BOUNDARY 적재가 성공하면 서버가 바로 이어서 박지 재판정(BAKJI_REJUDGE)을 별도의 실행 기록으로 시작한다.")
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     SyncJobLaunchResponse launch(@Valid @RequestBody SyncJobLaunchRequest request) {

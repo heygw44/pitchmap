@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 import com.pitchmap.common.error.BusinessException;
-import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
 import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.common.security.SecurityConfig;
@@ -144,21 +143,6 @@ class SyncJobAdminControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.CONFLICT);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("SYNC_JOB_ALREADY_RUNNING");
-    }
-
-    @Test
-    @DisplayName("[F-06] 아직 실행할 수 없는 박지 재판정을 요청하면 400 INVALID_INPUT으로 응답한다")
-    void bakjiRejudgeReturnsInvalidInput() {
-        // given
-        when(syncJobLauncher.launch(SyncJobType.BAKJI_REJUDGE))
-                .thenThrow(new BusinessException(CommonErrorCode.INVALID_INPUT, "박지 재판정은 아직 실행할 수 없습니다."));
-
-        // when
-        MvcTestResult result = launch(admin(), "{\"jobType\":\"BAKJI_REJUDGE\"}");
-
-        // then
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
     }
 
     @ParameterizedTest
