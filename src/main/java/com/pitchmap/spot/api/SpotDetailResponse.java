@@ -1,17 +1,26 @@
 package com.pitchmap.spot.api;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pitchmap.spot.application.PublicSpotOperatingStatus;
 import com.pitchmap.spot.application.PublicSpotSource;
 import com.pitchmap.spot.application.SpotBakjiDetail;
 import com.pitchmap.spot.application.SpotDetail;
 import com.pitchmap.spot.application.SpotFacilities;
+import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
+import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
+import com.pitchmap.weather.application.SunTimes;
+import com.pitchmap.weather.application.WeatherForecast;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
-// 날씨, 평점, 최근 후기, 예상 인원, 모집 중인 베이스캠프는 아직 채우지 않는다.
+// 평점, 최근 후기, 예상 인원, 모집 중인 베이스캠프는 아직 채우지 않는다.
 // 클라이언트가 응답 모양에 맞춰 화면을 만들 수 있도록 서버는 빈 값(null, 0, 빈 배열)을 넣어 준다.
+// parkWarning은 경고가 아니면 warned만 내보낸다. weather는 기상청 호출이 실패하면 null이고, 천문연만 실패하면 weather 안의 sun이 null이다.
 public record SpotDetailResponse(
         long spotId,
         SpotType type,
@@ -26,7 +35,7 @@ public record SpotDetailResponse(
         List<Object> recentReviews,
         List<Object> expectedPeople,
         List<Object> recruitingBasecamps,
-        Object weather) {
+        Weather weather) {
 
     static SpotDetailResponse from(SpotDetail detail) {
         return new SpotDetailResponse(
@@ -38,12 +47,12 @@ public record SpotDetailResponse(
                 detail.address(),
                 detail.bakji() == null ? null : Bakji.from(detail.bakji()),
                 detail.publicDetail() == null ? null : PublicDetail.from(detail.publicDetail()),
-                new ParkWarning(detail.parkWarning()),
+                ParkWarning.from(detail.parkWarning()),
                 new Rating(null, 0),
                 List.of(),
                 List.of(),
                 List.of(),
-                null);
+                detail.weather() == null ? null : Weather.from(detail.weather()));
     }
 
     public record Bakji(
@@ -119,7 +128,75 @@ public record SpotDetailResponse(
         }
     }
 
-    public record ParkWarning(boolean warned) {}
+    /** 경고가 아니면 warned만 내보낸다. 경고인데 공원 경계 행이 없으면 areaName, source, sourceDate도 뺀다. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ParkWarning(
+            boolean warned, String areaName, String source, LocalDate sourceDate, String notice, String guide) {
+
+        static ParkWarning from(SpotParkWarning warning) {
+            return new ParkWarning(
+                    warning.warned(),
+                    warning.areaName(),
+                    warning.source(),
+                    warning.sourceDate(),
+                    warning.notice(),
+                    warning.guide());
+        }
+    }
+
+    /** sun은 천문연이 실패해도 필드를 남기고 null로 준다. */
+    public record Weather(String source, List<ShortTerm> shortTerm, List<MidTerm> midTerm, Sun sun) {
+
+        static Weather from(SpotWeather weather) {
+            WeatherForecast forecast = weather.forecast();
+            return new Weather(
+                    forecast.source(),
+                    forecast.shortTerm().stream().map(ShortTerm::from).toList(),
+                    forecast.midTerm().stream().map(MidTerm::from).toList(),
+                    weather.sun() == null ? null : Sun.from(weather.sun()));
+        }
+    }
+
+    public record ShortTerm(Instant at, Integer temperature, Integer precipitationProbability, Double windSpeed) {
+
+        static ShortTerm from(WeatherForecast.ShortTermForecast forecast) {
+            return new ShortTerm(
+                    forecast.at(), forecast.temperature(), forecast.precipitationProbability(), forecast.windSpeed());
+        }
+    }
+
+    public record MidTerm(
+            LocalDate date,
+            Integer minTemperature,
+            Integer maxTemperature,
+            String amSky,
+            String pmSky,
+            Integer amPrecipitationProbability,
+            Integer pmPrecipitationProbability) {
+
+        static MidTerm from(WeatherForecast.MidTermForecast forecast) {
+            return new MidTerm(
+                    forecast.date(),
+                    forecast.minTemperature(),
+                    forecast.maxTemperature(),
+                    forecast.amSky(),
+                    forecast.pmSky(),
+                    forecast.amPrecipitationProbability(),
+                    forecast.pmPrecipitationProbability());
+        }
+    }
+
+    // 시각은 초 없이 "HH:mm"(한국 시각)으로 내보낸다.
+    public record Sun(
+            LocalDate date,
+            @JsonFormat(pattern = "HH:mm") LocalTime sunrise,
+            @JsonFormat(pattern = "HH:mm") LocalTime sunset,
+            @JsonFormat(pattern = "HH:mm") LocalTime civilTwilightEnd) {
+
+        static Sun from(SunTimes sun) {
+            return new Sun(sun.date(), sun.sunrise(), sun.sunset(), sun.civilTwilightEnd());
+        }
+    }
 
     public record Rating(Double average, long count) {}
 }

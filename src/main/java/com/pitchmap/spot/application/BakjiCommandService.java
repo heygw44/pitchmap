@@ -41,9 +41,6 @@ public class BakjiCommandService {
     private static final int DUPLICATE_RADIUS_METERS = 50;
     private static final int MAX_DUPLICATE_CANDIDATES = 10;
 
-    private static final String WARNED_GUIDE = "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요.";
-    private static final String NORMAL_GUIDE = "머문 자리에 흔적을 남기지 마세요. 쓰레기는 모두 되가져가세요.";
-
     private final SpotRepository spotRepository;
     private final BakjiDetailRepository bakjiDetailRepository;
     private final ParkAreaJudgeService parkAreaJudgeService;
@@ -182,7 +179,7 @@ public class BakjiCommandService {
     private BakjiSubmission submissionOf(Spot spot) {
         boolean warned = spot.isParkWarning();
         String areaName = warned ? findAreaName(spot) : null;
-        String guide = warned ? WARNED_GUIDE : NORMAL_GUIDE;
+        String guide = warned ? ParkWarningTexts.WARNED_GUIDE : ParkWarningTexts.NORMAL_GUIDE;
         return new BakjiSubmission(spot.getId(), warned, areaName, guide, findDuplicateCandidates(spot));
     }
 

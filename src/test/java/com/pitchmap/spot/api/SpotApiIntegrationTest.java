@@ -1,8 +1,12 @@
 package com.pitchmap.spot.api;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.trace.TraceIdFilter;
@@ -29,6 +33,9 @@ class SpotApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private WireMockServer wireMock;
 
     @Test
     @DisplayName("[F-03] 로그인하지 않은 사용자가 CSRF 토큰 없이 영역을 조회하면 영역 안 장소만 마커로 받고, 휴장 중인 야영장도 숨기지 않는다")
@@ -244,6 +251,30 @@ class SpotApiIntegrationTest {
                 .extractingPath("$.recruitingBasecamps")
                 .asList()
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-05][NFR-05] 기상청 응답이 응답 대기 시간보다 늦어도 200으로 응답하고 weather만 null이다")
+    void detailRespondsWithoutWeatherWhenKmaIsSlow() {
+        // given: 테스트 프로필의 응답 대기 시간은 1초라서, 2초 늦은 응답은 시간 초과로 실패한다.
+        long reporterId = insertMember("느린날씨제보자");
+        long spotId = insertBakji("날씨 지연 박지", "ACTIVE", reporterId);
+        wireMock.stubFor(get(urlPathEqualTo("/1360000/VilageFcstInfoService_2.0/getVilageFcst"))
+                .willReturn(okJson("{}").withFixedDelay(2_000)));
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/" + spotId).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.weather").isNull();
+        assertThat(result).bodyJson().extractingPath("$.spotId").isEqualTo((int) spotId);
+        assertThat(result).bodyJson().extractingPath("$.name").isEqualTo("날씨 지연 박지");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.bakji.reporter.nickname")
+                .isEqualTo("느린날씨제보자");
+        assertThat(result).bodyJson().extractingPath("$.parkWarning.warned").isEqualTo(false);
     }
 
     @Test

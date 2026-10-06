@@ -1,27 +1,46 @@
 package com.pitchmap.spot.application;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
 import com.pitchmap.spot.domain.SpotType;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @IntegrationTest
 class SpotDetailQueryServiceIntegrationTest {
+
+    private static final String VILAGE_FCST_PATH = "/1360000/VilageFcstInfoService_2.0/getVilageFcst";
+    private static final String MID_LAND_FCST_PATH = "/1360000/MidFcstInfoService/getMidLandFcst";
+    private static final String MID_TA_PATH = "/1360000/MidFcstInfoService/getMidTa";
+    private static final String RISE_SET_PATH = "/B090041/openapi/service/RiseSetInfoService/getLCRiseSetInfo";
 
     // 위도와 경도가 크게 다른 좌표라서, 조회 SQL이 두 값을 바꿔 읽으면 단언이 실패한다.
     private static final Coordinate RIDGE = new Coordinate(37.71, 128.75);
@@ -34,6 +53,9 @@ class SpotDetailQueryServiceIntegrationTest {
 
     @Autowired
     private MutableClock clock;
+
+    @Autowired
+    private WireMockServer wireMock;
 
     @Test
     @DisplayName("[F-05] 박지 상세는 박지 정보, 제보자 닉네임, 확인 수를 채우고 공공데이터 상세는 비운다")
@@ -60,7 +82,7 @@ class SpotDetailQueryServiceIntegrationTest {
         assertThat(detail.lat()).isCloseTo(RIDGE.lat(), within(1e-9));
         assertThat(detail.lng()).isCloseTo(RIDGE.lng(), within(1e-9));
         assertThat(detail.address()).isEqualTo("강원특별자치도 어딘가");
-        assertThat(detail.parkWarning()).isTrue();
+        assertThat(detail.parkWarning().warned()).isTrue();
         assertThat(detail.publicDetail()).isNull();
         assertThat(detail.bakji())
                 .isEqualTo(new SpotBakjiDetail("바람이 덜한 안쪽 평지", true, false, "WEAK", 2, reporterId, "새벽능선"));
@@ -83,7 +105,7 @@ class SpotDetailQueryServiceIntegrationTest {
 
         // then
         assertThat(detail.address()).isNull();
-        assertThat(detail.parkWarning()).isFalse();
+        assertThat(detail.parkWarning().warned()).isFalse();
         assertThat(detail.bakji().confirmationCount()).isZero();
         assertThat(detail.bakji().description()).isNull();
         assertThat(detail.bakji().signalLevel()).isNull();
@@ -244,6 +266,175 @@ class SpotDetailQueryServiceIntegrationTest {
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(CommonErrorCode.NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("[F-05] 경계 행이 있는 경고 박지는 공원 이름, 출처, 기준일, 참고용 고지, 안내를 채운다")
+    void fillsParkWarningWithAreaForWarnedBakji() {
+        // given
+        long areaId = insertProtectedArea("설악산 국립공원");
+        long spotId = insertWarnedBakji(areaId);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.parkWarning())
+                .isEqualTo(new SpotParkWarning(
+                        true,
+                        "설악산 국립공원",
+                        "KDPA",
+                        LocalDate.parse("2026-01-01"),
+                        "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
+                        "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요."));
+    }
+
+    @Test
+    @DisplayName("[F-05] 경계 행이 없는 경고 박지는 공원 이름, 출처, 기준일만 비우고 고지와 안내는 채운다")
+    void fillsNoticeAndGuideForWarnedBakjiWithoutArea() {
+        // given
+        long spotId = insertWarnedBakji(null);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.parkWarning())
+                .isEqualTo(new SpotParkWarning(
+                        true,
+                        null,
+                        null,
+                        null,
+                        "참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.",
+                        "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요."));
+    }
+
+    @Test
+    @DisplayName("[F-05] 경고가 아닌 장소는 warned만 false이고 나머지 경고 필드는 null이다")
+    void leavesOtherParkWarningFieldsNullWhenNotWarned() {
+        // given
+        long spotId = insertSpot("CAMPSITE", "ACTIVE", TestSequence.unique("야영장"), null, false, RIDGE);
+        insertPublicDetail(spotId, "GOCAMPING", null, null, "OPERATING", null, null);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.parkWarning()).isEqualTo(new SpotParkWarning(false, null, null, null, null, null));
+    }
+
+    @Test
+    @DisplayName("[F-05][F-09] 기상청과 천문연이 정상이면 단기·중기 예보, 출처, 오늘 한국 날짜의 출몰시각을 채운다")
+    void fillsWeatherAndSunWhenBothApisSucceed() {
+        // given
+        long spotId = insertSeoulCampsite();
+        stubKmaSuccess();
+        stubKasi(okXml(readFixture("kasi/rise-set.xml")));
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.weather()).isNotNull();
+        assertThat(detail.weather().forecast().source()).isEqualTo("기상청");
+        assertThat(detail.weather().forecast().shortTerm()).isNotEmpty();
+        assertThat(detail.weather().forecast().midTerm()).hasSize(7);
+        assertThat(detail.weather().sun().date()).isEqualTo(LocalDate.parse("2026-10-04"));
+        assertThat(detail.weather().sun().sunrise()).isEqualTo(LocalTime.of(6, 30));
+        wireMock.verify(getRequestedFor(urlPathEqualTo(RISE_SET_PATH)).withQueryParam("locdate", equalTo("20261004")));
+    }
+
+    @Test
+    @DisplayName("[F-05][NFR-05] 기상청이 500이면 weather만 null이고 나머지는 정상이며 천문연은 부르지 않는다")
+    void leavesWeatherNullAndSkipsKasiWhenKmaFails() {
+        // given
+        long spotId = insertSeoulCampsite();
+        wireMock.stubFor(get(urlPathEqualTo(VILAGE_FCST_PATH)).willReturn(serverError()));
+        stubKasi(okXml(readFixture("kasi/rise-set.xml")));
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.weather()).isNull();
+        assertThat(detail.name()).isNotBlank();
+        assertThat(detail.publicDetail()).isNotNull();
+        assertThat(wireMock.findAll(getRequestedFor(urlPathEqualTo(RISE_SET_PATH))))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-05][NFR-05] 기상청은 성공하고 천문연만 실패하면 weather는 채우고 sun만 null이다")
+    void leavesSunNullWhenOnlyKasiFails() {
+        // given
+        long spotId = insertSeoulCampsite();
+        stubKmaSuccess();
+        stubKasi(serverError());
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.weather()).isNotNull();
+        assertThat(detail.weather().forecast().shortTerm()).isNotEmpty();
+        assertThat(detail.weather().sun()).isNull();
+    }
+
+    private long insertSeoulCampsite() {
+        // 한국 시각 2026-10-04 12:58. 날씨 픽스처를 받은 시각이다.
+        clock.setInstant(Instant.parse("2026-10-04T03:58:00Z"));
+        long spotId = insertSpot("CAMPSITE", "ACTIVE", TestSequence.unique("야영장"), null, false, RIDGE);
+        insertPublicDetail(spotId, "GOCAMPING", null, null, "OPERATING", null, null);
+        return spotId;
+    }
+
+    private void stubKmaSuccess() {
+        wireMock.stubFor(get(urlPathEqualTo(VILAGE_FCST_PATH)).willReturn(okJson(readFixture("kma/vilage-fcst.json"))));
+        wireMock.stubFor(
+                get(urlPathEqualTo(MID_LAND_FCST_PATH)).willReturn(okJson(readFixture("kma/mid-land-fcst.json"))));
+        wireMock.stubFor(get(urlPathEqualTo(MID_TA_PATH)).willReturn(okJson(readFixture("kma/mid-ta.json"))));
+    }
+
+    private void stubKasi(ResponseDefinitionBuilder response) {
+        wireMock.stubFor(get(urlPathEqualTo(RISE_SET_PATH)).willReturn(response));
+    }
+
+    private static ResponseDefinitionBuilder okXml(String body) {
+        return aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "text/xml;charset=UTF-8")
+                .withBody(body);
+    }
+
+    private static String readFixture(String path) {
+        try {
+            return new ClassPathResource("fixtures/weather/" + path).getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private long insertProtectedArea(String name) {
+        jdbcTemplate.update(
+                "INSERT INTO protected_area (name, area_type, source, source_date, boundary, created_at, updated_at)"
+                        + " VALUES (?, 'NATIONAL_PARK', 'KDPA', '2026-01-01',"
+                        + " ST_GeomFromText('MULTIPOLYGON(((128 37, 129 37, 129 38, 128 38, 128 37)))', 4326,"
+                        + " 'axis-order=long-lat'), NOW(6), NOW(6))",
+                name);
+        return jdbcTemplate.queryForObject("SELECT id FROM protected_area WHERE name = ?", Long.class, name);
+    }
+
+    // 경고 박지를 만든다. areaId가 null이면 경계 행을 가리키지 않는 경고다.
+    private long insertWarnedBakji(Long areaId) {
+        String name = TestSequence.unique("경고박지");
+        long spotId = insertSpot("BAKJI", "ACTIVE", name, null, true, RIDGE);
+        jdbcTemplate.update("UPDATE spot SET protected_area_id = ? WHERE id = ?", areaId, spotId);
+        jdbcTemplate.update(
+                "INSERT INTO bakji_detail (spot_id, reporter_id, has_water, has_toilet, created_at, updated_at)"
+                        + " VALUES (?, ?, FALSE, FALSE, NOW(6), NOW(6))",
+                spotId,
+                insertMember(TestSequence.nickname()));
+        return spotId;
     }
 
     private long insertSpot(
