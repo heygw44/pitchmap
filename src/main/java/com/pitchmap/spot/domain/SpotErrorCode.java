@@ -4,7 +4,9 @@ import com.pitchmap.common.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 public enum SpotErrorCode implements ErrorCode {
-    SPOT_RADIUS_TOO_LARGE(HttpStatus.BAD_REQUEST, "반경은 50km 이하여야 합니다.");
+    SPOT_RADIUS_TOO_LARGE(HttpStatus.BAD_REQUEST, "반경은 50km 이하여야 합니다."),
+    BAKJI_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "이미 확인한 박지입니다."),
+    BAKJI_ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 박지입니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

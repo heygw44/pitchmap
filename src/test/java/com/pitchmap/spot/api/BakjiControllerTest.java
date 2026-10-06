@@ -18,9 +18,12 @@ import com.pitchmap.common.security.SecurityConfig;
 import com.pitchmap.common.trace.TraceIdFilter;
 import com.pitchmap.spot.application.BakjiCommandService;
 import com.pitchmap.spot.application.BakjiDuplicateCandidate;
+import com.pitchmap.spot.application.BakjiFeedbackService;
+import com.pitchmap.spot.application.BakjiProblemReportCommand;
 import com.pitchmap.spot.application.BakjiReportCommand;
 import com.pitchmap.spot.application.BakjiSubmission;
 import com.pitchmap.spot.application.BakjiUpdateCommand;
+import com.pitchmap.spot.domain.SpotErrorCode;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,9 @@ class BakjiControllerTest {
 
     @MockitoBean
     private BakjiCommandService bakjiCommandService;
+
+    @MockitoBean
+    private BakjiFeedbackService bakjiFeedbackService;
 
     @Test
     @DisplayName("[F-07] 경고 박지를 제보하면 201과 함께 경고, 공원 이름, 안내 문구, 중복 후보를 응답한다")
@@ -245,6 +251,126 @@ class BakjiControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
         verifyNoInteractions(bakjiCommandService);
+    }
+
+    @Test
+    @DisplayName("[F-08] 박지를 확인하면 201과 함께 확인 수를 응답하고, 확인한 회원의 ID와 장소 ID로 서비스를 부른다")
+    void confirmReturnsCreatedWithCount() {
+        // given
+        when(bakjiFeedbackService.confirm(MEMBER_ID, 205L)).thenReturn(3L);
+
+        // when
+        MvcTestResult result = mvc.post()
+                .uri(PATH + "/205/confirmations")
+                .with(verified())
+                .with(csrf())
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                { "confirmationCount": 3 }
+                """);
+    }
+
+    @Test
+    @DisplayName("[F-08] 이미 확인한 박지를 서비스가 BAKJI_ALREADY_CONFIRMED로 거부하면 409를 응답한다")
+    void confirmAgainReturnsConflict() {
+        // given
+        when(bakjiFeedbackService.confirm(anyLong(), anyLong()))
+                .thenThrow(new BusinessException(SpotErrorCode.BAKJI_ALREADY_CONFIRMED));
+
+        // when
+        MvcTestResult result = mvc.post()
+                .uri(PATH + "/205/confirmations")
+                .with(verified())
+                .with(csrf())
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("BAKJI_ALREADY_CONFIRMED");
+    }
+
+    @Test
+    @DisplayName("[F-08] 박지를 신고하면 201을 본문 없이 응답하고, 요청 값을 서비스 명령으로 넘긴다")
+    void problemReportReturnsCreatedWithoutBody() {
+        // when
+        MvcTestResult result = postReport(verified(), 205L, "{\"reason\":\"CLOSED\",\"content\":\"입구가 막혀 있다\"}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).body().isEmpty();
+        verify(bakjiFeedbackService)
+                .reportProblem(MEMBER_ID, 205L, new BakjiProblemReportCommand("CLOSED", "입구가 막혀 있다"));
+    }
+
+    @Test
+    @DisplayName("[F-08] 신고 사유가 없으면 400 INVALID_INPUT과 reason 필드 오류를 응답하고 서비스를 부르지 않는다")
+    void problemReportWithoutReasonReturnsFieldError() {
+        // when
+        MvcTestResult result = postReport(verified(), 205L, "{\"content\":\"설명\"}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='reason')]")
+                .asList()
+                .hasSize(1);
+        verifyNoInteractions(bakjiFeedbackService);
+    }
+
+    @Test
+    @DisplayName("[F-08] 신고 내용이 1001자이면 400 INVALID_INPUT과 content 필드 오류를 응답하고, 1000자는 받는다")
+    void problemReportContentLengthIsLimited() {
+        // when
+        MvcTestResult max = postReport(verified(), 205L, reportBody("가".repeat(1000)));
+        MvcTestResult over = postReport(verified(), 205L, reportBody("가".repeat(1001)));
+
+        // then
+        assertThat(max).hasStatus(HttpStatus.CREATED);
+        assertThat(over).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(over).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(over)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[?(@.field=='content')]")
+                .asList()
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("[F-08] 로그인하지 않은 사용자가 확인하거나 신고하면 401 AUTHENTICATION_REQUIRED를 응답한다")
+    void anonymousConfirmAndReportAreUnauthorized() {
+        // when
+        MvcTestResult confirm =
+                mvc.post().uri(PATH + "/205/confirmations").with(csrf()).exchange();
+        MvcTestResult report = postReport(anonymous(), 205L, reportBody("설명"));
+
+        // then
+        assertThat(confirm).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(confirm).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
+        assertThat(report).hasStatus(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(bakjiFeedbackService);
+    }
+
+    private static RequestPostProcessor anonymous() {
+        return request -> request;
+    }
+
+    private static String reportBody(String content) {
+        return "{\"reason\":\"CLOSED\",\"content\":\"" + content + "\"}";
+    }
+
+    private MvcTestResult postReport(RequestPostProcessor login, long spotId, String body) {
+        return mvc.post()
+                .uri(PATH + "/" + spotId + "/reports")
+                .with(login)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .exchange();
     }
 
     private MvcTestResult post(RequestPostProcessor login, String body) {
