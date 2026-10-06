@@ -7,7 +7,6 @@ import static org.assertj.core.api.Assertions.within;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
-import com.pitchmap.spot.domain.ClusterGridShape;
 import com.pitchmap.spot.domain.SpotType;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,12 +16,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -36,11 +31,8 @@ class SpotMapQueryServiceIntegrationTest {
     private static final Coordinate SEOUL_CITY_HALL = new Coordinate(37.5665, 126.978);
     private static final Coordinate TAEBAEK = new Coordinate(37.16, 128.98);
 
-    // 장소를 많이 넣을 때 쓰는 영역이다. 기본 화면(880×880px)이면 20×20칸으로 나뉘어서 칸 하나가 위도·경도 0.05도 폭이다.
+    // 장소를 많이 넣을 때 쓰는 영역이다. 칸 하나는 위도·경도 0.05도 폭이다.
     private static final Area BULK_AREA = new Area(36.0, 127.0, 37.0, 128.0);
-
-    // 44px 칸이 가로세로 20개씩 들어가는 화면 크기다.
-    private static final int DEFAULT_SCREEN_PX = 880;
 
     @Autowired
     private SpotMapQueryService spotMapQueryService;
@@ -240,7 +232,9 @@ class SpotMapQueryServiceIntegrationTest {
 
         // then
         assertThat(result.markers()).isEmpty();
-        assertThat(result.clusters()).isNotEmpty().hasSizeLessThanOrEqualTo(ClusterGridShape.MAX_CELLS);
+        assertThat(result.clusters())
+                .isNotEmpty()
+                .hasSizeLessThanOrEqualTo(SpotMapQueryService.GRID_SIZE * SpotMapQueryService.GRID_SIZE);
         assertThat(result.clusters().stream().mapToLong(SpotCluster::count).sum())
                 .isEqualTo(spotCount);
         assertThat(result.clusters()).allSatisfy(cluster -> {
@@ -250,10 +244,9 @@ class SpotMapQueryServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-03] 묶음은 칸 중심 좌표와 장소 수를 남쪽 행부터 주고, 북쪽·동쪽 경계선 위의 장소는 마지막 칸에 넣는다")
+    @DisplayName("[F-03] 묶음은 칸 안 장소의 평균 좌표와 수를 남쪽 행부터 주고, 북쪽·동쪽 경계선 위의 장소는 마지막 칸에 넣는다")
     void clustersByGridCellInRowOrderWithEdgeSpotsInLastCell() {
-        // given: 기본 화면(880×880px)이면 칸 하나가 0.05도 폭이다. 남서 칸에는 두 좌표를 섞어 넣어서 장소들의 평균(36.02, 127.02)이
-        // 칸 중심(36.025, 127.025)과 다르게 한다. 동쪽 경계선과 북쪽 경계선 위의 장소는 몫이 열 수나 행 수와 같아져도 마지막 열과 행에 든다.
+        // given: 칸 하나는 0.05도 폭이다. 남서 칸에는 두 좌표를 섞어 넣고, 동쪽 경계선과 북쪽 경계선 위에도 장소를 둔다.
         List<Coordinate> coordinates = new ArrayList<>();
         coordinates.addAll(Collections.nCopies(100, new Coordinate(36.01, 127.01)));
         coordinates.addAll(Collections.nCopies(100, new Coordinate(36.03, 127.03)));
@@ -267,75 +260,9 @@ class SpotMapQueryServiceIntegrationTest {
         // then: 칸 번호를 열부터 정렬하면 북쪽 경계 묶음이 동쪽 경계 묶음보다 먼저 나온다.
         assertThat(result.markers()).isEmpty();
         assertThat(result.clusters()).hasSize(3);
-        assertCluster(result.clusters().get(0), new Coordinate(36.025, 127.025), 200);
-        assertCluster(result.clusters().get(1), new Coordinate(36.025, 127.975), 200);
-        assertCluster(result.clusters().get(2), new Coordinate(36.975, 127.025), 101);
-    }
-
-    @ParameterizedTest(name = "{0}: {2}x{3}px -> {4}열 x {5}행")
-    @MethodSource("screensWithExpectedGrid")
-    @DisplayName("[F-03] 묶음 칸 수는 화면 크기로 정하고, 묶음 좌표는 칸 안 장소의 위치와 상관없이 칸 중심이다")
-    void splitsAreaIntoGridByScreenSize(
-            String description, Area area, int screenWidth, int screenHeight, int columns, int rows) {
-        // given: 기대하는 칸마다 칸 중심이 아닌 1/4 지점에 장소를 같은 수만큼 넣고, 전체가 500개를 넘게 한다.
-        // 서버가 칸을 더 작게 나누면 장소가 다른 칸에 들어가 중심이 어긋나고, 더 크게 나누면 이웃한 칸이 한 묶음이 된다.
-        Grid grid = new Grid(area, columns, rows);
-        int spotsPerCell = SpotMapQueryService.MAX_ITEMS / (columns * rows) + 1;
-        insertCampsites(grid.spotsInEveryCell(spotsPerCell));
-
-        // when
-        SpotAreaResult result = spotMapQueryService.findInArea(area.query(screenWidth, screenHeight));
-
-        // then: 묶음은 남쪽 행부터, 같은 행에서는 서쪽 칸부터 나온다.
-        List<Coordinate> centers = grid.centers();
-        assertThat(result.markers()).isEmpty();
-        assertThat(result.clusters()).hasSize(centers.size());
-        for (int i = 0; i < centers.size(); i++) {
-            assertCluster(result.clusters().get(i), centers.get(i), spotsPerCell);
-        }
-    }
-
-    private static Stream<Arguments> screensWithExpectedGrid() {
-        return Stream.of(
-                Arguments.of("휴대폰", BULK_AREA, 360, 740, 8, 16),
-                Arguments.of("데스크톱", BULK_AREA, 880, 820, 20, 18),
-                Arguments.of("큰 화면은 400칸 안에서 다시 나눈다", BULK_AREA, 1920, 1080, 26, 15),
-                Arguments.of("44px보다 작은 화면", BULK_AREA, 30, 30, 1, 1),
-                Arguments.of("위도 60도 영역이어도 화면 크기만 본다", new Area(59.0, 0.0, 61.0, 2.0), 360, 740, 8, 16));
-    }
-
-    // area를 columns × rows칸으로 나눈 격자다. 행은 남쪽부터, 열은 서쪽부터 센다.
-    private record Grid(Area area, int columns, int rows) {
-
-        // 칸 안에서 fraction(0~1)만큼 남서쪽에서 북동쪽으로 간 지점이다.
-        Coordinate pointIn(int row, int column, double fraction) {
-            double cellLat = (area.neLat() - area.swLat()) / rows;
-            double cellLng = (area.neLng() - area.swLng()) / columns;
-            return new Coordinate(
-                    area.swLat() + (row + fraction) * cellLat, area.swLng() + (column + fraction) * cellLng);
-        }
-
-        // 남쪽 행부터, 같은 행에서는 서쪽 칸부터 칸 중심을 늘어놓는다.
-        List<Coordinate> centers() {
-            List<Coordinate> centers = new ArrayList<>();
-            for (int row = 0; row < rows; row++) {
-                for (int column = 0; column < columns; column++) {
-                    centers.add(pointIn(row, column, 0.5));
-                }
-            }
-            return centers;
-        }
-
-        // 칸마다 칸 중심이 아닌 1/4 지점에 장소를 spotsPerCell개씩 둔다.
-        List<Coordinate> spotsInEveryCell(int spotsPerCell) {
-            List<Coordinate> coordinates = new ArrayList<>();
-            for (int row = 0; row < rows; row++) {
-                for (int column = 0; column < columns; column++) {
-                    coordinates.addAll(Collections.nCopies(spotsPerCell, pointIn(row, column, 0.25)));
-                }
-            }
-            return coordinates;
-        }
+        assertCluster(result.clusters().get(0), new Coordinate(36.02, 127.02), 200);
+        assertCluster(result.clusters().get(1), new Coordinate(36.02, 128.0), 200);
+        assertCluster(result.clusters().get(2), new Coordinate(37.0, 127.02), 101);
     }
 
     private static void assertCluster(SpotCluster cluster, Coordinate expectedCenter, long expectedCount) {
@@ -447,23 +374,8 @@ class SpotMapQueryServiceIntegrationTest {
             return query(Set.of(), false, false, false);
         }
 
-        SpotAreaQuery query(int screenWidth, int screenHeight) {
-            return new SpotAreaQuery(
-                    swLat, swLng, neLat, neLng, screenWidth, screenHeight, Set.of(), false, false, false);
-        }
-
         SpotAreaQuery query(Set<SpotType> types, boolean hasWater, boolean hasToilet, boolean excludeWarning) {
-            return new SpotAreaQuery(
-                    swLat,
-                    swLng,
-                    neLat,
-                    neLng,
-                    DEFAULT_SCREEN_PX,
-                    DEFAULT_SCREEN_PX,
-                    types,
-                    hasWater,
-                    hasToilet,
-                    excludeWarning);
+            return new SpotAreaQuery(swLat, swLng, neLat, neLng, types, hasWater, hasToilet, excludeWarning);
         }
     }
 }

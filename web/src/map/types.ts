@@ -11,11 +11,6 @@ export interface Bounds {
   ne: LatLng;
 }
 
-export interface MapSize {
-  width: number;
-  height: number;
-}
-
 export type MarkerKind = 'CAMPSITE' | 'FOREST' | 'BAKJI';
 
 export interface SpotMarkerData {
@@ -36,8 +31,6 @@ export interface ClusterData {
 export interface MapView {
   getBounds(): Bounds;
   getLevel(): number;
-  // 지도를 그린 요소의 지금 크기(CSS 픽셀)다. 서버가 묶음 칸 크기를 정할 때 쓴다.
-  getSize(): MapSize;
   // level을 넘기고 지금 확대 수준과 다르면 확대·축소를 애니메이션으로 보여준다.
   setCenter(position: LatLng, level?: number): void;
   // 지금 그려진 마커와 묶음을 모두 지우고 새로 그린다.

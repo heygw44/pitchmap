@@ -81,7 +81,7 @@ export interface SpotMarker {
   closedNow: boolean;
 }
 
-// 영역 안 장소가 너무 많으면 서버가 칸마다 장소 수와 칸 중심 좌표를 묶어서 준다.
+// 영역 안 장소가 너무 많으면 서버가 칸마다 장소 수와 칸 안 장소들의 평균 좌표를 묶어서 준다.
 export interface SpotCluster {
   lat: number;
   lng: number;
@@ -100,9 +100,6 @@ export interface SpotAreaQuery {
   neLng: number;
   // 카카오맵 확대 레벨(1~14)
   zoom: number;
-  // 지도 화면의 가로·세로 크기(CSS 픽셀, 1~10000). 서버는 묶음 칸 크기를 정하는 데만 쓴다.
-  width: number;
-  height: number;
   // 비우면 서버가 모든 유형을 준다.
   types?: SpotType[];
   hasWater?: boolean;

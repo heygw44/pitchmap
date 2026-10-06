@@ -39,10 +39,9 @@ export function useSpotsInView(map: MapView | null): SpotsInView {
       const controller = new AbortController();
       controllerRef.current = controller;
       const { sw, ne } = map.getBounds();
-      const { width, height } = map.getSize();
 
       fetchSpotsInArea(
-        { swLat: sw.lat, swLng: sw.lng, neLat: ne.lat, neLng: ne.lng, zoom: map.getLevel(), width, height },
+        { swLat: sw.lat, swLng: sw.lng, neLat: ne.lat, neLng: ne.lng, zoom: map.getLevel() },
         controller.signal,
       ).then(
         (response) => {

@@ -1,7 +1,7 @@
 import { loadKakaoMaps } from './kakaoLoader';
 import { createClusterButton, createDraftPin, createSpotPin } from './markers';
 import type { SpotPin } from './markers';
-import type { Bounds, ClusterData, LatLng, MapSize, MapView, SpotMarkerData } from './types';
+import type { Bounds, ClusterData, LatLng, MapView, SpotMarkerData } from './types';
 
 // 선택한 핀이 다른 핀과 묶음 위로 올라오게 겹침 순서를 둔다.
 const CLUSTER_Z_INDEX = 1;
@@ -80,14 +80,6 @@ export async function createMapView(
 
     getLevel() {
       return map.getLevel();
-    },
-
-    getSize(): MapSize {
-      // 화면에 아직 붙지 않은 요소는 크기가 0이다. 서버는 1px 이상만 받으므로 최소 1로 맞춘다.
-      return {
-        width: Math.max(1, Math.round(container.clientWidth)),
-        height: Math.max(1, Math.round(container.clientHeight)),
-      };
     },
 
     setCenter(position: LatLng, level?: number) {
