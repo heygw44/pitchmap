@@ -115,3 +115,18 @@ export function createClusterButton(
 
   return button;
 }
+
+// 박지를 제보할 위치를 임시로 보여 주는 핀이다. 박지 핀과 같은 모양에 점선 테두리를 둬서 아직 등록 전임을 드러낸다.
+// 위치는 제보 폼에서 글자로도 보여 주므로 스크린 리더에는 숨긴다. 핀 위를 다시 눌러도 지도 클릭으로 위치를 옮길 수 있게 클릭을 받지 않는다.
+export function createDraftPin(): HTMLElement {
+  const element = document.createElement('div');
+  element.setAttribute('aria-hidden', 'true');
+  element.className = 'pointer-events-none flex h-11 w-11 items-end justify-center';
+  element.innerHTML =
+    '<svg class="block overflow-visible" width="36" height="44" viewBox="0 0 36 44">' +
+    `<path class="fill-white stroke-white" stroke-width="${OUTLINE_WIDTH}" stroke-linejoin="round" d="${PIN_PATH}"/>` +
+    `<path class="fill-earth stroke-white" stroke-width="2" stroke-dasharray="4 3" stroke-linejoin="round" d="${PIN_PATH}"/>` +
+    iconMarkup('backpack', 'class="text-white" x="8" y="8" width="20" height="20"') +
+    '</svg>';
+  return element;
+}

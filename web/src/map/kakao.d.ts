@@ -62,11 +62,18 @@ declare namespace kakao.maps {
     getMap(): Map | null;
     setZIndex(zIndex: number): void;
     getZIndex(): number;
+    setPosition(position: LatLng): void;
+  }
+
+  interface MouseEvent {
+    latLng: LatLng;
   }
 
   namespace event {
     function addListener(target: Map, type: 'idle', handler: () => void): void;
     function removeListener(target: Map, type: 'idle', handler: () => void): void;
+    function addListener(target: Map, type: 'click', handler: (event: MouseEvent) => void): void;
+    function removeListener(target: Map, type: 'click', handler: (event: MouseEvent) => void): void;
   }
 
   // 스크립트 주소에 autoload=false를 붙여 불러왔을 때, SDK 나머지 파일을 받은 뒤 callback을 부른다.

@@ -48,6 +48,10 @@ export interface MapView {
   onIdle(listener: () => void): () => void;
   onMarkerClick(listener: (id: number) => void): () => void;
   onClusterClick(listener: (cluster: ClusterData) => void): () => void;
+  // 지도의 빈 곳을 눌렀을 때 그 위치를 알려 준다. 마커와 묶음을 누른 클릭은 오지 않는다.
+  onMapClick(listener: (position: LatLng) => void): () => void;
+  // 제보할 위치에 임시 핀 하나를 그린다. null이면 지운다.
+  showDraft(position: LatLng | null): void;
   setTerrain(on: boolean): void;
   // 지도를 담은 요소의 크기가 바뀐 뒤에 부른다.
   relayout(): void;

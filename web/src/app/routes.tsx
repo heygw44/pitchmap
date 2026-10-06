@@ -20,6 +20,7 @@ export const routes: RouteDef[] = [
       );
     },
   },
+  { path: '/bakjis/new', render: () => <MapPage mode="report" /> },
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },

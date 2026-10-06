@@ -1,4 +1,4 @@
-import type { PublicFacilities, SignalLevel, SpotType } from '../../api/types';
+import type { BakjiReportReason, GroundType, PublicFacilities, SignalLevel, SpotType } from '../../api/types';
 import type { IconName } from '../../components/iconPaths';
 
 type SpotTypeTone = 'forest' | 'earth';
@@ -46,3 +46,18 @@ const SOURCE_LABELS: Record<string, string> = {
 export function sourceLabel(code: string): string {
   return SOURCE_LABELS[code] ?? code;
 }
+
+export const GROUND_TYPE_LABELS: Record<GroundType, string> = {
+  SOIL: '흙',
+  GRASS: '풀밭',
+  GRAVEL: '자갈',
+  SAND: '모래',
+  ROCK: '바위',
+  DECK: '데크',
+};
+
+export const REPORT_REASON_LABELS: Record<BakjiReportReason, string> = {
+  ILLEGAL_AREA: '야영이 금지된 곳',
+  CLOSED: '더는 야영할 수 없는 곳',
+  FALSE_INFO: '정보가 사실과 다름',
+};
