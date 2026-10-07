@@ -148,7 +148,8 @@ public class Basecamp {
      * 호출하면 leaderId인 회원이 spotId인 장소에 여는 모집 중 베이스캠프를 만들고, 캠프 리더를 첫 멤버로 넣는다.
      *
      * <p>값이 null이거나, 제목·설명이 비었거나 너무 길거나, 종료일이 출발일보다 늦지 않으면 {@link IllegalArgumentException}을 던진다.
-     * 출발일 범위, 박 수, 캠프 리더의 자격, 장소의 경고 여부는 현재 시각과 다른 모듈의 정보가 필요해서 호출하는 쪽이 검사한다.
+     * 출발일 범위와 박 수는 {@link BasecampOpenPolicy}로, 모집 중인 베이스캠프 수 제한은 같은 정책 클래스와 저장소의 개수 조회로 호출하는 쪽이 검사한다.
+     * 캠프 리더의 자격과 장소의 경고 여부는 다른 모듈의 정보가 필요해서 역시 호출하는 쪽이 검사한다.
      */
     public static Basecamp open(long leaderId, long spotId, BasecampDetails details, Instant now) {
         if (details == null || now == null) {
