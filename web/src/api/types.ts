@@ -275,7 +275,7 @@ export interface DuplicateCandidate {
 
 export interface BakjiSubmissionResponse {
   spotId: number;
-  parkWarning: { warned: boolean; areaName?: string };
+  parkWarning: ParkWarning;
   guide: string;
   duplicateCandidates: DuplicateCandidate[];
 }

@@ -1,13 +1,11 @@
 package com.pitchmap.spot.api;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pitchmap.spot.application.PublicSpotOperatingStatus;
 import com.pitchmap.spot.application.PublicSpotSource;
 import com.pitchmap.spot.application.SpotBakjiDetail;
 import com.pitchmap.spot.application.SpotDetail;
 import com.pitchmap.spot.application.SpotFacilities;
-import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
 import com.pitchmap.spot.application.SpotRating;
 import com.pitchmap.spot.application.SpotRecentReview;
@@ -32,7 +30,7 @@ public record SpotDetailResponse(
         String address,
         Bakji bakji,
         PublicDetail publicDetail,
-        ParkWarning parkWarning,
+        ParkWarningResponse parkWarning,
         Rating rating,
         List<RecentReview> recentReviews,
         List<Object> expectedPeople,
@@ -49,7 +47,7 @@ public record SpotDetailResponse(
                 detail.address(),
                 detail.bakji() == null ? null : Bakji.from(detail.bakji()),
                 detail.publicDetail() == null ? null : PublicDetail.from(detail.publicDetail()),
-                ParkWarning.from(detail.parkWarning()),
+                ParkWarningResponse.from(detail.parkWarning()),
                 Rating.from(detail.rating()),
                 detail.recentReviews().stream().map(RecentReview::from).toList(),
                 List.of(),
@@ -127,22 +125,6 @@ public record SpotDetailResponse(
                     facilities.nearbyFacilities(),
                     facilities.nearbyFacilitiesEtc(),
                     facilities.petPolicy());
-        }
-    }
-
-    /** 경고가 아니면 warned만 내보낸다. 경고인데 공원 경계 행이 없으면 areaName, source, sourceDate도 뺀다. */
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record ParkWarning(
-            boolean warned, String areaName, String source, LocalDate sourceDate, String notice, String guide) {
-
-        static ParkWarning from(SpotParkWarning warning) {
-            return new ParkWarning(
-                    warning.warned(),
-                    warning.areaName(),
-                    warning.source(),
-                    warning.sourceDate(),
-                    warning.notice(),
-                    warning.guide());
         }
     }
 

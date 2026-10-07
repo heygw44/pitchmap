@@ -15,6 +15,7 @@ import com.pitchmap.common.web.PatchField;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -36,7 +37,10 @@ class BakjiCommandServiceIntegrationTest {
     // 지구를 반지름 6,370,986m인 구로 볼 때 1m에 해당하는 위도 차이(도)다. 같은 경도에서 위도만 다르면 거리가 이 값에 비례한다.
     private static final double DEGREES_PER_METER = Math.toDegrees(1.0 / 6_370_986.0);
 
-    private static final String WARNED_GUIDE = "공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요.";
+    private static final String WARNED_GUIDE =
+            "자연공원 안에서는 지정된 야영장 밖의 야영과 취사가 금지돼 있고, 어기면 과태료 대상입니다. 이곳에서 야영하지 말고 가까운 지정 야영장을 이용하세요.";
+    private static final String AREA_SOURCE = "KDPA";
+    private static final LocalDate AREA_SOURCE_DATE = LocalDate.of(2026, 1, 1);
     private static final String NORMAL_GUIDE = "머문 자리에 흔적을 남기지 마세요. 쓰레기는 모두 되가져가세요.";
 
     @Autowired
@@ -78,14 +82,13 @@ class BakjiCommandServiceIntegrationTest {
         assertThat(detail.hasToilet()).isFalse();
         assertThat(detail.signalLevel()).isEqualTo("WEAK");
         assertThat(detail.groundType()).isEqualTo("GRASS");
-        assertThat(submission.warned()).isFalse();
-        assertThat(submission.areaName()).isNull();
+        assertThat(submission.parkWarning()).isEqualTo(SpotParkWarning.notWarned());
         assertThat(submission.guide()).isEqualTo(NORMAL_GUIDE);
         assertThat(submission.duplicateCandidates()).isEmpty();
     }
 
     @Test
-    @DisplayName("[F-07] 공원 경계 안 좌표로 제보하면 경고와 공원 이름, 과태료 안내 문구를 돌려주고 판정 결과를 저장한다")
+    @DisplayName("[F-07] 공원 경계 안 좌표로 제보하면 경고, 공원 이름, 경계 데이터 출처·기준일, 참고용 고지, 야영 금지 안내를 돌려주고 판정 결과를 저장한다")
     void reportInsideBoundaryWarnsWithAreaName() {
         // given
         String areaName = TestSequence.unique("설악산");
@@ -97,8 +100,9 @@ class BakjiCommandServiceIntegrationTest {
                 bakjiCommandService.report(reporterId, minimalReport(INSIDE_PARK_LAT, INSIDE_PARK_LNG));
 
         // then
-        assertThat(submission.warned()).isTrue();
-        assertThat(submission.areaName()).isEqualTo(areaName);
+        assertThat(submission.parkWarning())
+                .isEqualTo(new SpotParkWarning(
+                        true, areaName, AREA_SOURCE, AREA_SOURCE_DATE, ParkWarningTexts.NOTICE, WARNED_GUIDE));
         assertThat(submission.guide()).isEqualTo(WARNED_GUIDE);
         SpotRow spot = spotRow(submission.spotId());
         assertThat(spot.parkWarning()).isTrue();
@@ -264,7 +268,7 @@ class BakjiCommandServiceIntegrationTest {
         BakjiSubmission created =
                 bakjiCommandService.report(reporterId, minimalReport(INSIDE_PARK_LAT, INSIDE_PARK_LNG));
         long spotId = created.spotId();
-        assertThat(created.warned()).isTrue();
+        assertThat(created.parkWarning().warned()).isTrue();
         Instant judgedAt = spotRow(spotId).areaCheckedAt();
         clock.setInstant(judgedAt.plusSeconds(3600));
 
@@ -278,7 +282,7 @@ class BakjiCommandServiceIntegrationTest {
                         .build());
 
         // then
-        assertThat(same.warned()).isTrue();
+        assertThat(same.parkWarning().warned()).isTrue();
         assertThat(spotRow(spotId).areaCheckedAt()).isEqualTo(judgedAt);
 
         // when: 경계 밖으로 옮긴다.
@@ -291,8 +295,7 @@ class BakjiCommandServiceIntegrationTest {
                         .build());
 
         // then
-        assertThat(moved.warned()).isFalse();
-        assertThat(moved.areaName()).isNull();
+        assertThat(moved.parkWarning()).isEqualTo(SpotParkWarning.notWarned());
         assertThat(moved.guide()).isEqualTo(NORMAL_GUIDE);
         SpotRow spot = spotRow(spotId);
         assertThat(spot.parkWarning()).isFalse();
@@ -501,9 +504,11 @@ class BakjiCommandServiceIntegrationTest {
     private long insertProtectedArea(String name, String longLatWkt) {
         jdbc.update(
                 "INSERT INTO protected_area (name, area_type, source, source_date, boundary, created_at, updated_at)"
-                        + " VALUES (?, 'NATIONAL_PARK', 'KDPA', '2026-01-01',"
+                        + " VALUES (?, 'NATIONAL_PARK', ?, ?,"
                         + " ST_GeomFromText(?, 4326, 'axis-order=long-lat'), NOW(6), NOW(6))",
                 name,
+                AREA_SOURCE,
+                AREA_SOURCE_DATE,
                 longLatWkt);
         return jdbc.queryForObject("SELECT id FROM protected_area WHERE name = ?", Long.class, name);
     }

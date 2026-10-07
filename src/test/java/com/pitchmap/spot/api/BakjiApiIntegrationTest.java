@@ -96,7 +96,8 @@ class BakjiApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-07] 인증 회원이 공원 경계 안 좌표로 제보하면 201과 함께 경고, 공원 이름, 안내 문구를 응답하고, 30m 옆 두 번째 제보는 첫 박지를 중복 후보로 받는다")
+    @DisplayName(
+            "[F-07] 인증 회원이 공원 경계 안 좌표로 제보하면 201과 함께 경고, 공원 이름, 경계 데이터 출처·기준일, 참고용 고지, 안내 문구를 응답하고, 30m 옆 두 번째 제보는 첫 박지를 중복 후보로 받는다")
     void verifiedMemberReportsInsideBoundaryAndSeesDuplicate() {
         // given
         String areaName = TestSequence.unique("설악산");
@@ -116,7 +117,20 @@ class BakjiApiIntegrationTest {
         int firstId = readSpotId(first);
         assertThat(first).bodyJson().extractingPath("$.parkWarning.warned").isEqualTo(true);
         assertThat(first).bodyJson().extractingPath("$.parkWarning.areaName").isEqualTo(areaName);
-        assertThat(first).bodyJson().extractingPath("$.guide").isEqualTo("공원 안 지정 장소 밖 야영은 과태료 대상입니다. 흔적을 남기지 마세요.");
+        assertThat(first).bodyJson().extractingPath("$.parkWarning.source").isEqualTo("KDPA");
+        assertThat(first).bodyJson().extractingPath("$.parkWarning.sourceDate").isEqualTo("2026-01-01");
+        assertThat(first)
+                .bodyJson()
+                .extractingPath("$.parkWarning.notice")
+                .isEqualTo("참고용 데이터입니다. 공식 경계는 고시 도면을 확인하세요.");
+        assertThat(first)
+                .bodyJson()
+                .extractingPath("$.guide")
+                .isEqualTo("자연공원 안에서는 지정된 야영장 밖의 야영과 취사가 금지돼 있고, 어기면 과태료 대상입니다. 이곳에서 야영하지 말고 가까운 지정 야영장을 이용하세요.");
+        assertThat(first)
+                .bodyJson()
+                .extractingPath("$.parkWarning.guide")
+                .isEqualTo("자연공원 안에서는 지정된 야영장 밖의 야영과 취사가 금지돼 있고, 어기면 과태료 대상입니다. 이곳에서 야영하지 말고 가까운 지정 야영장을 이용하세요.");
         assertThat(first)
                 .bodyJson()
                 .extractingPath("$.duplicateCandidates")

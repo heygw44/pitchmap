@@ -16,7 +16,8 @@ import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatKstTime, formatLocalDate } from '../../lib/datetime';
 import { SpotReviews } from '../review/SpotReviews';
 import { BakjiFeedback } from './BakjiFeedback';
-import { FACILITY_LABELS, SIGNAL_LEVEL_LABELS, SPOT_TYPE_META, sourceLabel } from './spotLabels';
+import { ParkWarningNotice } from './ParkWarningNotice';
+import { FACILITY_LABELS, SIGNAL_LEVEL_LABELS, SPOT_TYPE_META } from './spotLabels';
 
 type SpotDetailPanelProps = {
   spotId: number;
@@ -169,25 +170,7 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
       {(publicDetail?.closedNow || warning.warned) && (
         <div className="mt-4 flex flex-col gap-3">
           {publicDetail?.closedNow && <ClosedNotice publicDetail={publicDetail} />}
-          {/* 공원 경계 경고는 판단 근거라서 접거나 숨기지 않는다. */}
-          {warning.warned && (
-            <Notice tone="warning" title="공원 경계 안일 가능성이 있어요">
-              <div className="flex flex-col gap-2">
-                {warning.areaName && <p className="font-semibold">{warning.areaName}</p>}
-                <p>{warning.notice ?? '참고용 데이터예요. 공식 경계는 고시 도면을 확인해 주세요.'}</p>
-                <p>
-                  {warning.guide ??
-                    '자연공원 안에서는 지정된 곳 밖의 야영과 취사가 금지돼요. 흔적을 남기지 말아 주세요.'}
-                </p>
-                <Evidence
-                  items={[
-                    ...(warning.source ? [{ label: '출처', value: sourceLabel(warning.source) }] : []),
-                    ...(warning.sourceDate ? [{ label: '기준일', value: warning.sourceDate }] : []),
-                  ]}
-                />
-              </div>
-            </Notice>
-          )}
+          <ParkWarningNotice warning={warning} />
         </div>
       )}
 

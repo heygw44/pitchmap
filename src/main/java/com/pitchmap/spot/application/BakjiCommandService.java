@@ -17,6 +17,7 @@ import com.pitchmap.spot.infra.BakjiDuplicateCondition;
 import com.pitchmap.spot.infra.BakjiDuplicateMapper;
 import com.pitchmap.spot.infra.BakjiDuplicateRow;
 import com.pitchmap.spot.infra.ParkAreaJudgeMapper;
+import com.pitchmap.spot.infra.ProtectedAreaEvidenceRow;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
@@ -178,16 +179,20 @@ public class BakjiCommandService {
     // 이 트랜잭션은 다른 박지를 바꾸지 않아서 아직 DB에 반영되지 않은 변경이 조회 결과에 영향을 주지 않는다.
     private BakjiSubmission submissionOf(Spot spot) {
         boolean warned = spot.isParkWarning();
-        String areaName = warned ? findAreaName(spot) : null;
+        SpotParkWarning parkWarning = warned ? warningOf(spot) : SpotParkWarning.notWarned();
         String guide = warned ? ParkWarningTexts.WARNED_GUIDE : ParkWarningTexts.NORMAL_GUIDE;
-        return new BakjiSubmission(spot.getId(), warned, areaName, guide, findDuplicateCandidates(spot));
+        return new BakjiSubmission(spot.getId(), parkWarning, guide, findDuplicateCandidates(spot));
     }
 
-    private String findAreaName(Spot spot) {
-        if (spot.getProtectedAreaId() == null) {
-            return null;
+    // 장소 상세와 같이, 가리키는 경계 행이 없으면 근거 없이 경고와 고지·안내만 준다.
+    private SpotParkWarning warningOf(Spot spot) {
+        ProtectedAreaEvidenceRow area = spot.getProtectedAreaId() == null
+                ? null
+                : parkAreaJudgeMapper.selectAreaEvidence(spot.getProtectedAreaId());
+        if (area == null) {
+            return SpotParkWarning.warned(null, null, null);
         }
-        return parkAreaJudgeMapper.selectAreaName(spot.getProtectedAreaId());
+        return SpotParkWarning.warned(area.name(), area.source(), area.sourceDate());
     }
 
     private List<BakjiDuplicateCandidate> findDuplicateCandidates(Spot spot) {
