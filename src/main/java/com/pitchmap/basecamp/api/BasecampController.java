@@ -5,6 +5,7 @@ import com.pitchmap.basecamp.application.BasecampApplicationListService;
 import com.pitchmap.basecamp.application.BasecampApplyService;
 import com.pitchmap.basecamp.application.BasecampApprovalService;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
+import com.pitchmap.basecamp.application.BasecampMembershipService;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampSearchService;
 import com.pitchmap.common.security.LoginMember;
@@ -34,6 +35,7 @@ class BasecampController {
     private final BasecampApplicationCancelService basecampApplicationCancelService;
     private final BasecampApplicationListService basecampApplicationListService;
     private final BasecampApprovalService basecampApprovalService;
+    private final BasecampMembershipService basecampMembershipService;
 
     @Operation(
             summary = "베이스캠프 열기",
@@ -181,5 +183,41 @@ class BasecampController {
             @PathVariable long applicationId) {
         return BasecampRejectResponse.from(
                 basecampApprovalService.reject(basecampId, applicationId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 탈퇴",
+            description = "본인확인을 마친 회원(신뢰 단계 1 이상)인 멤버가 베이스캠프에서 탈퇴하고 204로 응답한다. 탈퇴한 회원은 같은 베이스캠프에 다시 신청할 수 없다. "
+                    + "확정된 뒤 출발 48시간 안에 탈퇴하면 임박 탈퇴로 기록된다. 정원이 차서 자동 마감된 베이스캠프는 빈자리가 생기면 다시 모집 중이 되고, "
+                    + "캠프 리더가 직접 마감한 베이스캠프는 마감 그대로다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 신뢰 단계가 1 미만이면 403 TRUST_LEVEL_INSUFFICIENT, "
+                    + "베이스캠프가 완료되었거나 취소되었으면 409 BASECAMP_INVALID_STATE, ACTIVE 멤버가 아니면 404 NOT_FOUND, "
+                    + "캠프 리더이면 409 BASECAMP_LEADER_CANNOT_LEAVE이다.")
+    @DeleteMapping("/api/basecamps/{basecampId}/members/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void leave(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        basecampMembershipService.leave(basecampId, loginMember.memberId());
+    }
+
+    @Operation(
+            summary = "베이스캠프 멤버 강퇴",
+            description =
+                    "캠프 리더가 멤버를 강퇴하고 204로 응답한다. 본문의 reason은 NO_CONTACT, CONDITION_MISMATCH, INAPPROPRIATE_BEHAVIOR, OTHER 중 하나여야 하고 "
+                            + "없거나 다른 값이면 400 INVALID_INPUT이다. 확정되기 전(모집 중, 마감)에만 할 수 있다. "
+                            + "강퇴된 회원은 같은 베이스캠프에 다시 신청할 수 없고, 강퇴된 회원에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. "
+                            + "정원이 차서 자동 마감된 베이스캠프는 빈자리가 생기면 다시 모집 중이 된다. "
+                            + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                            + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, "
+                            + "베이스캠프가 확정되었거나 그 뒤 상태이면 409 BASECAMP_INVALID_STATE, 대상이 ACTIVE 멤버가 아니면 404 NOT_FOUND, "
+                            + "대상이 캠프 리더이면 409 BASECAMP_LEADER_CANNOT_LEAVE이다.")
+    @PostMapping("/api/basecamps/{basecampId}/members/{memberId}/kick")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void kick(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @PathVariable long memberId,
+            @Valid @RequestBody BasecampKickRequest request) {
+        basecampMembershipService.kick(basecampId, memberId, loginMember.memberId(), request.toReason());
     }
 }

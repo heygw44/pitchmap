@@ -22,6 +22,7 @@ import com.pitchmap.basecamp.application.BasecampApprovalService;
 import com.pitchmap.basecamp.application.BasecampApproveResult;
 import com.pitchmap.basecamp.application.BasecampDetail;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
+import com.pitchmap.basecamp.application.BasecampMembershipService;
 import com.pitchmap.basecamp.application.BasecampOpenCommand;
 import com.pitchmap.basecamp.application.BasecampOpenCommand.JoinConditionCommand;
 import com.pitchmap.basecamp.application.BasecampOpenResult;
@@ -38,6 +39,7 @@ import com.pitchmap.basecamp.domain.BasecampErrorCode;
 import com.pitchmap.basecamp.domain.BasecampException;
 import com.pitchmap.basecamp.domain.BasecampRelation;
 import com.pitchmap.basecamp.domain.JoinUnmetReason;
+import com.pitchmap.basecamp.domain.KickReason;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
@@ -75,6 +77,8 @@ class BasecampControllerTest {
     private static final String APPLICATIONS = "/api/basecamps/77/applications";
     private static final String APPROVE = "/api/basecamps/77/applications/501/approve";
     private static final String REJECT = "/api/basecamps/77/applications/501/reject";
+    private static final String LEAVE = "/api/basecamps/77/members/me";
+    private static final String KICK = "/api/basecamps/77/members/31/kick";
     private static final String MY_APPLICATION = "/api/basecamps/77/applications/me";
     private static final String VALID_BODY = body("\"title\":\"북한산 백패킹\"", "\"capacity\":4");
 
@@ -101,6 +105,9 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampApprovalService basecampApprovalService;
+
+    @MockitoBean
+    private BasecampMembershipService basecampMembershipService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -794,6 +801,109 @@ class BasecampControllerTest {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         verifyNoInteractions(basecampApplicationListService);
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-21] 탈퇴하면 204이고 경로의 베이스캠프 ID와 로그인한 회원 ID를 서비스에 넘긴다")
+    void leaveReturnsNoContent() {
+        // when
+        MvcTestResult result =
+                mvc.delete().uri(LEAVE).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.NO_CONTENT);
+        verify(basecampMembershipService).leave(77L, MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-22] 강퇴하면 204이고 경로의 ID, 로그인한 회원 ID, 사유를 서비스에 넘긴다")
+    void kickReturnsNoContent() {
+        // when
+        MvcTestResult result = postKick(verified(), "{\"reason\":\"NO_CONTACT\"}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.NO_CONTENT);
+        verify(basecampMembershipService).kick(77L, 31L, MEMBER_ID, KickReason.NO_CONTACT);
+    }
+
+    @Test
+    @DisplayName("[F-13] 로그인하지 않은 사용자는 탈퇴·강퇴가 401이고, 이메일 인증 전의 회원은 403 MEMBER_NOT_VERIFIED다")
+    void membershipEndpointsRequireVerifiedLogin() {
+        // when
+        MvcTestResult leaveAnonymous = mvc.delete().uri(LEAVE).with(csrf()).exchange();
+        MvcTestResult kickAnonymous = mvc.post()
+                .uri(KICK)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"OTHER\"}")
+                .exchange();
+        MvcTestResult leaveUnverified =
+                mvc.delete().uri(LEAVE).with(unverified()).with(csrf()).exchange();
+        MvcTestResult kickUnverified = postKick(unverified(), "{\"reason\":\"OTHER\"}");
+
+        // then
+        assertThat(leaveAnonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(kickAnonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(leaveUnverified).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(kickUnverified).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(kickUnverified).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        verifyNoInteractions(basecampMembershipService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"{}", "{\"reason\":null}", "{\"reason\":\"UNKNOWN\"}", "{\"reason\":\"other\"}"})
+    @DisplayName("[F-13][BC-22] 강퇴 사유가 없거나 정해진 값이 아니면 400 INVALID_INPUT이고 fieldErrors가 있다")
+    void kickRejectsMissingOrUnknownReason(String body) {
+        // when
+        MvcTestResult result = postKick(verified(), body);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors").isNotNull();
+        verifyNoInteractions(basecampMembershipService);
+    }
+
+    @Test
+    @DisplayName("[F-13] 탈퇴·강퇴 서비스가 던진 오류는 코드와 상태 그대로 응답한다")
+    void membershipErrorsAreMapped() {
+        // given
+        doThrow(new BusinessException(CommonErrorCode.TRUST_LEVEL_INSUFFICIENT))
+                .doThrow(new BasecampException(BasecampErrorCode.BASECAMP_LEADER_CANNOT_LEAVE))
+                .when(basecampMembershipService)
+                .leave(77L, MEMBER_ID);
+        doThrow(new BusinessException(CommonErrorCode.ACCESS_DENIED))
+                .doThrow(new BasecampException(BasecampErrorCode.BASECAMP_INVALID_STATE))
+                .when(basecampMembershipService)
+                .kick(77L, 31L, MEMBER_ID, KickReason.OTHER);
+
+        // when
+        MvcTestResult lowTrust =
+                mvc.delete().uri(LEAVE).with(verified()).with(csrf()).exchange();
+        MvcTestResult leader =
+                mvc.delete().uri(LEAVE).with(verified()).with(csrf()).exchange();
+        MvcTestResult denied = postKick(verified(), "{\"reason\":\"OTHER\"}");
+        MvcTestResult invalidState = postKick(verified(), "{\"reason\":\"OTHER\"}");
+
+        // then
+        assertThat(lowTrust).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(lowTrust).bodyJson().extractingPath("$.code").isEqualTo("TRUST_LEVEL_INSUFFICIENT");
+        assertThat(leader).hasStatus(HttpStatus.CONFLICT);
+        assertThat(leader).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_LEADER_CANNOT_LEAVE");
+        assertThat(denied).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(denied).bodyJson().extractingPath("$.code").isEqualTo("ACCESS_DENIED");
+        assertThat(invalidState).hasStatus(HttpStatus.CONFLICT);
+        assertThat(invalidState).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_INVALID_STATE");
+    }
+
+    private MvcTestResult postKick(RequestPostProcessor login, String requestBody) {
+        return mvc.post()
+                .uri(KICK)
+                .with(login)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+                .exchange();
     }
 
     private static BasecampSearchItem searchItem(JoinEligibility eligibility) {
