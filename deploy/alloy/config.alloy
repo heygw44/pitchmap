@@ -1,0 +1,136 @@
+// 운영 서버의 수집 에이전트(Grafana Alloy) 설정이다. 앱·MySQL·서버 지표와 컨테이너 로그를 모아 Grafana Cloud로 보낸다.
+// 전송 주소, 사용자 번호, 토큰은 Compose가 넘기는 환경 변수에서 읽는다. 토큰은 Parameter Store에서 오고, 이 파일에는 쓰지 않는다.
+// Grafana Cloud 무료 등급은 지표 1만 시계열까지라서, 수집기마다 필요한 것만 켠다.
+
+// ---------- 지표 전송 ----------
+
+prometheus.remote_write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_PROM_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_PROM_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+
+	// 모든 지표에 서버 이름을 붙여서, 나중에 서버가 늘어도 대시보드에서 구분할 수 있게 한다.
+	external_labels = {
+		instance = "pitchmap-prod",
+	}
+}
+
+// ---------- 앱 ----------
+
+// 앱은 Compose 내부망에서 app:8080으로 닿는다. Caddy는 /actuator를 넘기지 않으므로 밖에서는 이 주소를 읽을 수 없다.
+prometheus.scrape "app" {
+	job_name        = "pitchmap-app"
+	targets         = [{"__address__" = "app:8080"}]
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ---------- MySQL ----------
+
+// 전용 계정 pitchmap_exporter는 서버 상태와 performance_schema만 읽고 앱 데이터는 읽지 못한다. 배포 스크립트가 이 계정을 만든다.
+// 기본 수집기가 연결 수와 락 대기(SHOW GLOBAL STATUS의 Innodb_row_lock_*)를 읽고, 느린 쿼리는 문장 요약 수집기로 본다.
+prometheus.exporter.mysql "db" {
+	data_source_name  = "pitchmap_exporter:" + sys.env("MYSQL_EXPORTER_PASSWORD") + "@(mysql:3306)/"
+	enable_collectors = ["perf_schema.eventsstatements"]
+
+	// 문장 요약은 SQL 형태마다 시계열이 생긴다. 무료 한도를 아끼려고 최근에 실행된 50개만 읽고, 시스템 스키마는 뺀다.
+	perf_schema.eventsstatements {
+		limit           = 50
+		exclude_schemas = ["mysql", "performance_schema", "information_schema", "sys"]
+	}
+}
+
+// 수집기가 붙이는 instance 값(접속 주소)을 서버 이름으로 바꿔 다른 지표와 맞춘다.
+discovery.relabel "mysql" {
+	targets = prometheus.exporter.mysql.db.targets
+
+	rule {
+		target_label = "instance"
+		replacement  = "pitchmap-prod"
+	}
+}
+
+prometheus.scrape "mysql" {
+	job_name        = "mysql"
+	targets         = discovery.relabel.mysql.output
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ---------- 서버 ----------
+
+// 호스트의 /proc, /sys, /를 읽기 전용으로 붙여 서버 자체의 CPU·메모리·디스크·네트워크를 읽는다.
+prometheus.exporter.unix "host" {
+	procfs_path    = "/host/proc"
+	sysfs_path     = "/host/sys"
+	rootfs_path    = "/host/root"
+	udev_data_path = "/host/root/run/udev/data"
+	set_collectors = ["cpu", "meminfo", "filesystem", "loadavg", "diskstats", "netdev", "pressure", "uname"]
+
+	filesystem {
+		fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+		mount_points_exclude = "^/(dev|proc|run|sys|snap|var/lib/docker/.+)($|/)"
+	}
+
+	netdev {
+		device_exclude = "^(veth.*|br-.*|docker.*|lo)$"
+	}
+}
+
+// 수집기는 instance에 컨테이너 호스트 이름을 넣는다. 이 값은 컨테이너를 새로 만들 때마다 바뀌므로 서버 이름으로 고정한다.
+discovery.relabel "host" {
+	targets = prometheus.exporter.unix.host.targets
+
+	rule {
+		target_label = "instance"
+		replacement  = "pitchmap-prod"
+	}
+}
+
+prometheus.scrape "host" {
+	job_name        = "node"
+	targets         = discovery.relabel.host.output
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ---------- 컨테이너 로그 ----------
+
+// Docker 소켓으로 실행 중인 컨테이너를 찾는다. 소켓은 읽기 전용으로 붙이지만, 소켓을 가진 컨테이너는 사실상 서버 root 권한을 가진다.
+discovery.docker "containers" {
+	host = "unix:///var/run/docker.sock"
+}
+
+// Compose 서비스 이름(app, mysql, caddy, alloy)을 service 라벨로 붙인다. 컨테이너 ID처럼 바뀌는 값은 라벨로 쓰지 않는다.
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+}
+
+loki.source.docker "containers" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.containers.output
+	labels     = {"instance" = "pitchmap-prod"}
+	forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_LOKI_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+}

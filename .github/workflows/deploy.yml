@@ -171,7 +171,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-northeast-2
 
-      # 서버는 이 커밋의 배포 스크립트와 Compose 파일을 공개 저장소에서 받아 실행한다.
+      # 서버는 이 커밋의 배포 스크립트, Compose 파일, Alloy 설정을 공개 저장소에서 받아 실행한다.
       # 그래서 이미지 태그가 이전 커밋이어도(수동 되돌리기) 배포 절차는 항상 최신 main을 따른다.
       - name: 서버에 배포 명령 보내기
         id: send
@@ -183,12 +183,14 @@ jobs:
           params="$(jq -n --arg raw "$raw" --arg tag "$TAG" '{
             commands: [
               "set -eu",
-              "mkdir -p /opt/pitchmap/data",
+              "mkdir -p /opt/pitchmap/data /opt/pitchmap/alloy",
               "cd /opt/pitchmap",
               "curl -fsSL --retry 3 -o deploy.sh.new \($raw)/deploy.sh",
               "curl -fsSL --retry 3 -o docker-compose.prod.yml.new \($raw)/docker-compose.prod.yml",
+              "curl -fsSL --retry 3 -o alloy/config.alloy.new \($raw)/alloy/config.alloy",
               "mv deploy.sh.new deploy.sh && chmod 700 deploy.sh",
               "mv docker-compose.prod.yml.new docker-compose.prod.yml",
+              "mv alloy/config.alloy.new alloy/config.alloy",
               "./deploy.sh \($tag)"
             ],
             executionTimeout: ["1200"]

@@ -6,3 +6,10 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+logging:
+  structured:
+    format:
+      # 운영 로그는 수집 에이전트가 Grafana Cloud로 보내서 검색한다. 그래서 필드로 나뉜 JSON(ECS 형식)으로 쓴다.
+      # 이 형식은 MDC 값을 필드로 넣으므로, 요청마다 넣는 추적 ID(traceId)로 한 요청의 로그를 모아 볼 수 있다.
+      console: ecs

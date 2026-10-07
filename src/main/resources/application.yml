@@ -70,7 +70,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # prometheus는 서버의 수집 에이전트(Alloy)가 Compose 내부망에서 읽는다. Caddy는 /actuator를 넘기지 않으므로 밖에서는 열리지 않는다.
+        include: health,prometheus
+  metrics:
+    tags:
+      application: pitchmap
+    distribution:
+      # 응답 시간 분포를 정해 둔 구간의 히스토그램으로 남긴다. Grafana는 이 구간으로 p50·p95·p99를 계산한다.
+      # 구간을 직접 정하는 이유: 기본 히스토그램은 시계열마다 구간을 수십 개 만들어서 Grafana Cloud 무료 한도(1만 시계열)를 빨리 쓴다.
+      slo:
+        http.server.requests: 50ms,100ms,200ms,500ms,1s,2s,5s
+        pitchmap.external.api.requests: 100ms,300ms,1s,3s,10s
   health:
     mail:
       # 상태 확인을 할 때마다 SMTP 서버에 접속해 보는 검사를 끈다.

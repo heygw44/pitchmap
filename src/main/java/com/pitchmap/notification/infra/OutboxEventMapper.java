@@ -37,4 +37,10 @@ public interface OutboxEventMapper {
             @Param("maxAttempts") int maxAttempts,
             @Param("retryAt") Instant retryAt,
             @Param("now") Instant now);
+
+    /**
+     * 호출하면 PENDING과 FAILED 이벤트 수, 가장 오래된 PENDING 이벤트의 기록 시각을 읽는다. 운영 지표용 조회라서 잠금을 걸지 않고,
+     * 트랜잭션 없이 불러도 된다.
+     */
+    OutboxBacklogRow selectBacklog();
 }

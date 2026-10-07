@@ -32,7 +32,10 @@ declare -rA SECRET_PARAMS=(
     [publicdata/service-key]=PUBLICDATA_SERVICE_KEY
     [mail/app-password]=MAIL_APP_PASSWORD
     [identity/ci-hmac-key]=CI_HMAC_KEY
+    [db/exporter-password]=MYSQL_EXPORTER_PASSWORD
+    [grafana/token]=GRAFANA_CLOUD_TOKEN
 )
+readonly EXPORTER_USER=pitchmap_exporter
 
 declare -A secrets=()
 declare -A server_env=()
@@ -59,7 +62,7 @@ check_architecture() {
     local arch
     arch="$(uname -m)"
     if [[ "$arch" != "aarch64" ]]; then
-        log "서버 아키텍처가 $arch다. 이미지는 arm64로만 빌드한다"
+        log "서버 아키텍처가 ${arch}다. 이미지는 arm64로만 빌드한다"
         exit 1
     fi
 }
@@ -129,7 +132,7 @@ check_image_architecture() {
             return 1
         fi
         if [[ "$arch" != "arm64" ]]; then
-            log "$image 의 아키텍처가 $arch다"
+            log "$image 의 아키텍처가 ${arch}다"
             return 1
         fi
     done
@@ -164,6 +167,24 @@ start() {
     write_env "$tag" && compose up -d --remove-orphans && wait_healthy
 }
 
+# Alloy의 MySQL 수집기가 쓰는 계정을 만들고 비밀번호를 Parameter Store 값에 맞춘다. 배포할 때마다 실행해도 결과가 같다.
+# 권한은 서버 상태(PROCESS, REPLICATION CLIENT)와 performance_schema 읽기뿐이라 앱 데이터는 읽지 못한다.
+# root 비밀번호는 명령 인자가 아니라 MYSQL_PWD 환경 변수로, SQL은 표준 입력으로 넘겨서 프로세스 목록에 남지 않게 한다.
+# 실패해도 서비스는 정상이고 MySQL 지표만 빠지므로, 배포를 실패로 만들지 않고 로그만 남긴다.
+ensure_exporter_user() {
+    if MYSQL_PWD="${secrets[DB_ROOT_PASSWORD]}" compose exec -T -e MYSQL_PWD mysql mysql -uroot --batch > /dev/null <<SQL
+CREATE USER IF NOT EXISTS '$EXPORTER_USER'@'%' IDENTIFIED BY '${secrets[MYSQL_EXPORTER_PASSWORD]}' WITH MAX_USER_CONNECTIONS 3;
+ALTER USER '$EXPORTER_USER'@'%' IDENTIFIED BY '${secrets[MYSQL_EXPORTER_PASSWORD]}' WITH MAX_USER_CONNECTIONS 3;
+GRANT PROCESS, REPLICATION CLIENT ON *.* TO '$EXPORTER_USER'@'%';
+GRANT SELECT ON performance_schema.* TO '$EXPORTER_USER'@'%';
+SQL
+    then
+        log "MySQL 수집용 계정 확인 완료"
+    else
+        log "MySQL 수집용 계정을 맞추지 못했다. 서비스는 정상이고 MySQL 지표만 빠진다"
+    fi
+}
+
 main() {
     local tag="${1:-}"
     if [[ ! "$tag" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
@@ -188,6 +209,7 @@ main() {
 
     if start "$tag"; then
         echo "$tag" > "$LAST_TAG_FILE"
+        ensure_exporter_user
         # 사흘 넘게 쓰지 않은 이미지를 지워 디스크를 확보한다. 되돌릴 이미지가 지워져도 GHCR에서 다시 받는다.
         docker image prune -af --filter "until=72h" > /dev/null
         log "배포 성공: $tag"

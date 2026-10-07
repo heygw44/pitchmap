@@ -87,7 +87,11 @@ public class SecurityConfig {
     private static final AuthorizationManager<RequestAuthorizationContext> EMAIL_VERIFIED =
             new EmailVerifiedAuthorizationManager();
 
-    private static final String[] INFRASTRUCTURE_PATTERNS = {"/actuator/health", "/swagger-ui/**", "/v3/api-docs/**"};
+    // /actuator/prometheus는 서버의 수집 에이전트가 로그인 없이 읽는다. 운영에서는 Caddy가 /actuator를 넘기지 않고
+    // 앱 포트도 서버 안(127.0.0.1)에만 열려 있어서, 밖에서는 이 주소에 닿을 수 없다.
+    private static final String[] INFRASTRUCTURE_PATTERNS = {
+        "/actuator/health", "/actuator/prometheus", "/swagger-ui/**", "/v3/api-docs/**"
+    };
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository)

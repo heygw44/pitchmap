@@ -45,6 +45,7 @@ public class EmailVerificationService {
     private final MemberActivationMapper memberActivationMapper;
     private final OutboxEventRecorder outboxEventRecorder;
     private final OutboxEventJpaRepository outboxEventRepository;
+    private final MemberMetrics memberMetrics;
     private final Clock clock;
 
     // SecureRandom은 스레드에 안전하다. 코드는 추측할 수 없어야 하므로 Random을 쓰지 않는다.
@@ -168,6 +169,7 @@ public class EmailVerificationService {
             throw new MemberException(MemberErrorCode.EMAIL_ALREADY_VERIFIED);
         }
         log.info("email verified memberId={}", memberId);
+        memberMetrics.recordEmailVerified();
     }
 
     private ResendHistory loadResendHistory(long memberId, String requestIp, Instant now) {

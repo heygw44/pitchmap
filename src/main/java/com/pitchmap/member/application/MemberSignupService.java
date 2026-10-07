@@ -25,6 +25,7 @@ public class MemberSignupService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final OutboxEventRecorder outboxEventRecorder;
+    private final MemberMetrics memberMetrics;
 
     @Transactional
     public SignupResult signUp(SignupCommand command) {
@@ -42,6 +43,7 @@ public class MemberSignupService {
                 EmailVerificationEvents.AGGREGATE_TYPE,
                 saved.getId(),
                 new EmailVerificationEvents.Payload(command.requestIp()));
+        memberMetrics.recordSignup();
         return new SignupResult(saved.getId(), saved.getStatus());
     }
 

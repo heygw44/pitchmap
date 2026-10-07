@@ -1,0 +1,349 @@
+{
+  "title": "pitchmap",
+  "interval": 60,
+  "rules": [
+    {
+      "uid": "pitchmap-api-error-rate",
+      "title": "API 5xx 오류율 5% 이상",
+      "condition": "C",
+      "for": "0s",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "최근 5분간 5xx 응답 비율이 5%를 넘었다. 대시보드 API 행과 앱 ERROR 로그를 본다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "(sum(rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m])), 1e-9)",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0.05
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-outbox-backlog",
+      "title": "아웃박스 이벤트 10분 이상 적체",
+      "condition": "C",
+      "for": "0s",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "가장 오래된 미발행 이벤트가 10분 넘게 남아 있다. 발행기가 멈췄거나 메일 발송이 계속 실패한다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "max(pitchmap_outbox_oldest_pending_age_seconds{job=\"pitchmap-app\"})",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    600
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-external-api-quota",
+      "title": "외부 API 하루 한도 80% 도달",
+      "condition": "C",
+      "for": "0s",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "{{ $labels.api }} 호출이 최근 24시간 동안 하루 한도의 80%를 넘었다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "sum by (api) (increase(pitchmap_external_api_requests_seconds_count{job=\"pitchmap-app\"}[24h])) / on (api) (label_replace(vector(1000), \"api\", \"gocamping\", \"\", \"\") or label_replace(vector(10000), \"api\", \"kma\", \"\", \"\") or label_replace(vector(10000), \"api\", \"kasi\", \"\", \"\"))",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0.8
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-scheduled-job-failure",
+      "title": "스케줄 작업 실패",
+      "condition": "C",
+      "for": "0s",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "스케줄 작업 {{ $labels.job }}이 최근 1시간 안에 실패했다. 앱 ERROR 로그를 본다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 3600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "sum by (job) (increase(pitchmap_scheduled_job_failures_total{job=\"pitchmap-app\"}[1h]))",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-disk-usage",
+      "title": "디스크 사용률 80% 이상",
+      "condition": "C",
+      "for": "5m",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "서버 루트 디스크 사용률이 80%를 넘었다. 오래된 이미지 정리(docker image prune)와 로그 크기를 본다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "1 - node_filesystem_avail_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\",mountpoint=\"/\"}",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0.8
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-memory-usage",
+      "title": "메모리 사용률 90% 이상 지속",
+      "condition": "C",
+      "for": "10m",
+      "noDataState": "OK",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "서버 메모리 사용률이 10분 넘게 90%를 넘었다. 컨테이너별 메모리와 스왑 사용량을 본다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "1 - node_memory_MemAvailable_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"} / node_memory_MemTotal_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"}",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0.9
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uid": "pitchmap-app-down",
+      "title": "앱 상태 확인 실패",
+      "condition": "C",
+      "for": "2m",
+      "noDataState": "Alerting",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "수집 에이전트가 2분 넘게 앱 지표를 읽지 못했다. 지표가 아예 들어오지 않아도(서버나 수집 에이전트가 멈춤) 이 알림이 온다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "min(up{job=\"pitchmap-app\"})",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "lt",
+                  "params": [
+                    1
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
