@@ -18,6 +18,7 @@ import { useDelayedFlag } from '../../components/useDelayedFlag';
 import type { LatLng } from '../../map/types';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
+import { ParkWarningNotice } from './ParkWarningNotice';
 import { GROUND_TYPE_LABELS, SIGNAL_LEVEL_LABELS } from './spotLabels';
 
 type BakjiReportPanelProps = {
@@ -334,16 +335,8 @@ function SubmittedView({ result }: { result: BakjiSubmissionResponse }) {
     <div role="status" className="flex flex-col gap-4">
       <h2 className="font-serif text-xl font-semibold text-ink">제보를 등록했어요</h2>
 
-      {/* 공원 경계 경고는 판단 근거라서 접거나 숨기지 않는다. */}
       {parkWarning.warned ? (
-        <Notice tone="warning" title="공원 경계 안일 가능성이 있어요">
-          <div className="flex flex-col gap-2">
-            {parkWarning.areaName && <p className="font-semibold">{parkWarning.areaName}</p>}
-            {/* 제보 응답에는 참고용 고지가 없어서, 상세 화면이 서버 고지 대신 쓰는 문장과 같은 문장을 둔다. */}
-            <p>참고용 데이터예요. 공식 경계는 고시 도면을 확인해 주세요.</p>
-            <p>{guide}</p>
-          </div>
-        </Notice>
+        <ParkWarningNotice warning={parkWarning} />
       ) : (
         <Notice tone="info" title="안내">
           <p>{guide}</p>

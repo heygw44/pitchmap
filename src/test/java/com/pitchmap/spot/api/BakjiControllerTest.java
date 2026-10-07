@@ -23,7 +23,9 @@ import com.pitchmap.spot.application.BakjiProblemReportCommand;
 import com.pitchmap.spot.application.BakjiReportCommand;
 import com.pitchmap.spot.application.BakjiSubmission;
 import com.pitchmap.spot.application.BakjiUpdateCommand;
+import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.domain.SpotErrorCode;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,7 @@ class BakjiControllerTest {
 
     private static final String PATH = "/api/bakjis";
     private static final long MEMBER_ID = 7L;
+    private static final SpotParkWarning NOT_WARNED = new SpotParkWarning(false, null, null, null, null, null);
     private static final String VALID_BODY =
             "{\"name\":\"능선 끝 평지\",\"lat\":37.6,\"lng\":128.7,\"hasWater\":true,\"hasToilet\":false}";
 
@@ -59,12 +62,15 @@ class BakjiControllerTest {
     private BakjiFeedbackService bakjiFeedbackService;
 
     @Test
-    @DisplayName("[F-07] 경고 박지를 제보하면 201과 함께 경고, 공원 이름, 안내 문구, 중복 후보를 응답한다")
+    @DisplayName("[F-07] 경고 박지를 제보하면 201과 함께 경고, 공원 이름, 경계 데이터 출처·기준일, 참고용 고지, 안내 문구, 중복 후보를 응답한다")
     void warnedReportReturnsCreatedWithAreaName() {
         // given
         when(bakjiCommandService.report(eq(MEMBER_ID), any()))
                 .thenReturn(new BakjiSubmission(
-                        205L, true, "설악산국립공원", "경고 문구", List.of(new BakjiDuplicateCandidate(101L, "능선 끝 평지", 32))));
+                        205L,
+                        new SpotParkWarning(true, "설악산국립공원", "KDPA", LocalDate.of(2026, 1, 1), "참고용 고지", "경고 문구"),
+                        "경고 문구",
+                        List.of(new BakjiDuplicateCandidate(101L, "능선 끝 평지", 32))));
 
         // when
         MvcTestResult result = post(verified(), VALID_BODY);
@@ -74,7 +80,14 @@ class BakjiControllerTest {
         assertThat(result).bodyJson().isStrictlyEqualTo("""
                 {
                   "spotId": 205,
-                  "parkWarning": { "warned": true, "areaName": "설악산국립공원" },
+                  "parkWarning": {
+                    "warned": true,
+                    "areaName": "설악산국립공원",
+                    "source": "KDPA",
+                    "sourceDate": "2026-01-01",
+                    "notice": "참고용 고지",
+                    "guide": "경고 문구"
+                  },
                   "guide": "경고 문구",
                   "duplicateCandidates": [{ "spotId": 101, "name": "능선 끝 평지", "distanceM": 32 }]
                 }
@@ -82,11 +95,11 @@ class BakjiControllerTest {
     }
 
     @Test
-    @DisplayName("[F-07] 경고가 아닌 박지를 제보하면 parkWarning에 warned만 있고 areaName 필드는 없다")
+    @DisplayName("[F-07] 경고가 아닌 박지를 제보하면 parkWarning에 warned만 있고 공원 이름·출처·기준일·고지·안내 필드는 없다")
     void notWarnedReportOmitsAreaName() {
         // given
         when(bakjiCommandService.report(eq(MEMBER_ID), any()))
-                .thenReturn(new BakjiSubmission(205L, false, null, "일반 문구", List.of()));
+                .thenReturn(new BakjiSubmission(205L, NOT_WARNED, "일반 문구", List.of()));
 
         // when
         MvcTestResult result = post(verified(), VALID_BODY);
@@ -108,7 +121,7 @@ class BakjiControllerTest {
     void reportPassesRequestToService() {
         // given
         when(bakjiCommandService.report(anyLong(), any()))
-                .thenReturn(new BakjiSubmission(205L, false, null, "g", List.of()));
+                .thenReturn(new BakjiSubmission(205L, NOT_WARNED, "g", List.of()));
 
         // when
         post(
@@ -195,7 +208,7 @@ class BakjiControllerTest {
     void updateDistinguishesAbsentAndNullFields() {
         // given
         when(bakjiCommandService.update(eq(MEMBER_ID), eq(205L), any()))
-                .thenReturn(new BakjiSubmission(205L, false, null, "일반 문구", List.of()));
+                .thenReturn(new BakjiSubmission(205L, NOT_WARNED, "일반 문구", List.of()));
 
         // when
         MvcTestResult result = patch(verified(), 205L, "{\"name\":\"새 이름\",\"description\":null}");
