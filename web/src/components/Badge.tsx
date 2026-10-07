@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { IconName } from './iconPaths';
 import { Icon } from './icons';
 
-type BadgeTone = 'neutral' | 'forest' | 'sea' | 'earth' | 'warning' | 'danger' | 'closed';
+export type BadgeTone = 'neutral' | 'forest' | 'sea' | 'earth' | 'warning' | 'danger' | 'closed';
 
 type BadgeProps = {
   tone: BadgeTone;
