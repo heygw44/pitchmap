@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import com.pitchmap.trust.domain.VerifiedIdentity;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.CannotAcquireLockException;
 
 class IdentityVerificationServiceTest {
 
@@ -91,6 +93,51 @@ class IdentityVerificationServiceTest {
         verify(repository, never()).saveAndFlush(any());
     }
 
+    @Test
+    @DisplayName("[ID-04] 저장하다 DB 교착 상태로 롤백되면 한 번 다시 실행하고, 다시 실행한 사전 조회가 찾은 중복을 IDENTITY_CI_DUPLICATED로 거부한다")
+    void retriesOnceAfterDeadlockAndRejectsDuplicate() {
+        // given: 첫 실행은 다른 요청과 교착 상태로 롤백되고, 다시 실행하면 먼저 저장된 같은 CI가 보인다.
+        IdentityVerificationApplier applier = mock(IdentityVerificationApplier.class);
+        when(applier.apply(MEMBER_ID, command(1995)))
+                .thenThrow(new CannotAcquireLockException("Deadlock found when trying to get lock"))
+                .thenThrow(new BusinessException(TrustErrorCode.IDENTITY_CI_DUPLICATED));
+
+        // when, then
+        assertThatThrownBy(() -> new IdentityVerificationService(applier).verify(MEMBER_ID, command(1995)))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(TrustErrorCode.IDENTITY_CI_DUPLICATED));
+        verify(applier, times(2)).apply(MEMBER_ID, command(1995));
+    }
+
+    @Test
+    @DisplayName("[ID-04] 다시 실행해도 잠금을 얻지 못하면 더 시도하지 않고 그 예외를 던진다")
+    void givesUpAfterSecondLockFailure() {
+        // given
+        IdentityVerificationApplier applier = mock(IdentityVerificationApplier.class);
+        when(applier.apply(MEMBER_ID, command(1995)))
+                .thenThrow(new CannotAcquireLockException("Deadlock found when trying to get lock"));
+
+        // when, then
+        assertThatThrownBy(() -> new IdentityVerificationService(applier).verify(MEMBER_ID, command(1995)))
+                .isInstanceOf(CannotAcquireLockException.class);
+        verify(applier, times(2)).apply(MEMBER_ID, command(1995));
+    }
+
+    @Test
+    @DisplayName("[ID-04] 교착 상태가 아닌 오류는 다시 실행하지 않는다")
+    void doesNotRetryOtherFailures() {
+        // given
+        IdentityVerificationApplier applier = mock(IdentityVerificationApplier.class);
+        when(applier.apply(MEMBER_ID, command(1995)))
+                .thenThrow(new BusinessException(TrustErrorCode.IDENTITY_ALREADY_VERIFIED));
+
+        // when, then
+        assertThatThrownBy(() -> new IdentityVerificationService(applier).verify(MEMBER_ID, command(1995)))
+                .isInstanceOf(BusinessException.class);
+        verify(applier, times(1)).apply(MEMBER_ID, command(1995));
+    }
+
     private void stubSuccess(int birthYear) {
         when(provider.verify(any())).thenReturn(new VerifiedIdentity("ci-raw", birthYear, Gender.FEMALE));
         when(provider.type()).thenReturn(IdentityProviderType.FAKE);
@@ -100,8 +147,8 @@ class IdentityVerificationServiceTest {
 
     private IdentityVerificationService serviceAt(String instant) {
         MutableClock clock = MutableClock.at(Instant.parse(instant));
-        return new IdentityVerificationService(
-                repository, provider, hasher, new TrustSummaryService(repository, clock), clock);
+        return new IdentityVerificationService(new IdentityVerificationApplier(
+                repository, provider, hasher, new TrustSummaryService(repository, clock), clock));
     }
 
     private static IdentityVerifyCommand command(int birthYear) {

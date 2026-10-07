@@ -14,9 +14,9 @@
         WHERE ST_Contains(pa.boundary, ST_SRID(POINT(#{lng}, #{lat}), 4326))
     </select>
 
-    <!-- 박지 제보 응답이 경고한 공원의 이름을 보여 주려고 경계 하나의 이름만 읽는다. -->
-    <select id="selectAreaName" resultType="java.lang.String">
-        SELECT name
+    <!-- 박지 제보 응답이 경고의 근거를 보여 주려고 경계 하나의 이름, 출처, 기준일만 읽는다. 경계 다각형은 크니 읽지 않는다. -->
+    <select id="selectAreaEvidence" resultType="com.pitchmap.spot.infra.ProtectedAreaEvidenceRow">
+        SELECT name, source, source_date
         FROM protected_area
         WHERE id = #{id}
     </select>

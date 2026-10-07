@@ -13,7 +13,7 @@ public record BakjiSubmissionResponse(
     static BakjiSubmissionResponse from(BakjiSubmission submission) {
         return new BakjiSubmissionResponse(
                 submission.spotId(),
-                new ParkWarningResponse(submission.warned(), submission.areaName()),
+                ParkWarningResponse.from(submission.parkWarning()),
                 submission.guide(),
                 submission.duplicateCandidates().stream()
                         .map(DuplicateCandidateResponse::from)

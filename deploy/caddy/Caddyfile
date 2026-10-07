@@ -16,6 +16,11 @@
 		# Vite는 파일 이름에 내용 해시를 붙인다. 그래서 assets 아래 파일은 브라우저가 오래 저장해도 된다.
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# 나머지(index.html과, 화면 경로가 대신 받는 index.html)는 브라우저가 매번 서버에 바뀌었는지 묻게 한다.
+		# Cache-Control이 없으면 브라우저가 Last-Modified를 근거로 index.html을 스스로 캐시해서, 배포한 뒤에도 예전 번들을 계속 쓴다.
+		# header는 try_files가 경로를 바꾸기 전의 요청 경로로 매칭하므로, /spots/1 같은 화면 경로에도 붙는다.
+		@notAssets not path /assets/*
+		header @notAssets Cache-Control "no-cache"
 		# 화면 경로(/spots/1 등)는 파일이 없으므로 index.html을 주고, 라우팅은 프론트엔드가 한다.
 		try_files {path} /index.html
 		file_server
