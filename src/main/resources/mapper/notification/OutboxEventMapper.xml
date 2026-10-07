@@ -58,4 +58,12 @@
           AND status = 'PENDING'
     </update>
 
+    <!-- (status, id) 인덱스로 PENDING·FAILED 구간만 읽는다. 행이 없어도 집계 결과 한 행이 나오도록 COALESCE로 0을 채운다. -->
+    <select id="selectBacklog" resultType="com.pitchmap.notification.infra.OutboxBacklogRow">
+        SELECT COALESCE(SUM(status = 'PENDING'), 0) AS pending_count,
+               COALESCE(SUM(status = 'FAILED'), 0) AS failed_count,
+               MIN(CASE WHEN status = 'PENDING' THEN created_at END) AS oldest_pending_created_at
+        FROM outbox_event
+        WHERE status IN ('PENDING', 'FAILED')
+    </select>
 </mapper>

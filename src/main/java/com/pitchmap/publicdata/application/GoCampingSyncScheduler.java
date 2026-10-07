@@ -1,6 +1,6 @@
 package com.pitchmap.publicdata.application;
 
-import lombok.RequiredArgsConstructor;
+import com.pitchmap.common.scheduling.ScheduledJobMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 // cron을 UTC가 아닌 한국 시간으로 해석해야 하므로 zone을 명시한다.
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(
         prefix = "pitchmap.publicdata.gocamping.sync",
         name = "enabled",
@@ -20,7 +19,16 @@ import org.springframework.stereotype.Component;
         matchIfMissing = true)
 public class GoCampingSyncScheduler {
 
+    private static final String JOB_NAME = "gocamping-sync";
+
     private final GoCampingSyncService goCampingSyncService;
+    private final ScheduledJobMetrics scheduledJobMetrics;
+
+    public GoCampingSyncScheduler(GoCampingSyncService goCampingSyncService, ScheduledJobMetrics scheduledJobMetrics) {
+        this.goCampingSyncService = goCampingSyncService;
+        this.scheduledJobMetrics = scheduledJobMetrics;
+        scheduledJobMetrics.register(JOB_NAME);
+    }
 
     @Scheduled(cron = "${pitchmap.publicdata.gocamping.sync.cron:0 0 3 * * *}", zone = "Asia/Seoul")
     public void sync() {
@@ -31,6 +39,7 @@ public class GoCampingSyncScheduler {
             // 다음 실행이 그 페이지부터 이어서 처리한다. 예외를 스케줄러 기본 처리기에 맡기면 어느 작업이 실패했는지 로그만 봐서는
             // 알기 어렵다. 그래서 작업 이름이 드러나는 ERROR 로그를 직접 남긴다. 예외를 삼키는 곳은 호출 경로의 맨 끝인 여기뿐이다.
             log.error("gocamping sync failed", e);
+            scheduledJobMetrics.recordFailure(JOB_NAME);
         }
     }
 }

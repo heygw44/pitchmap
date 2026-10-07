@@ -1,0 +1,1452 @@
+{
+  "uid": "pitchmap-overview",
+  "title": "피치맵 운영",
+  "tags": [
+    "pitchmap"
+  ],
+  "timezone": "Asia/Seoul",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "editable": true,
+  "panels": [
+    {
+      "type": "row",
+      "title": "API",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "처리량 (요청/초)",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m]))",
+          "legendFormat": "전체",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m]))",
+          "legendFormat": "{{status}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx 오류율",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m])), 1e-9)",
+          "legendFormat": "오류율",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "알림 기준: 5분간 5% 이상"
+    },
+    {
+      "type": "timeseries",
+      "title": "응답 시간 p50·p95·p99",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m])))",
+          "legendFormat": "p50",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m])))",
+          "legendFormat": "p95",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[5m])))",
+          "legendFormat": "p99",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "구간 50ms·100ms·200ms·500ms·1s·2s·5s 히스토그램으로 계산한 값이라 구간 사이는 근사값이다"
+    },
+    {
+      "type": "table",
+      "title": "엔드포인트별 p95와 처리량 (최근 1시간)",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, method, uri) (rate(http_server_requests_seconds_bucket{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[1h])))",
+          "legendFormat": "p95",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"pitchmap-app\",uri!~\"/actuator.*\"}[1h]))",
+          "legendFormat": "rps",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "transformations": [
+        {
+          "id": "merge"
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "p95 (초)",
+              "Value #B": "요청/초"
+            },
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "DB",
+      "id": 6,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "커넥션풀 (HikariCP)",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(hikaricp_connections_active{job=\"pitchmap-app\"})",
+          "legendFormat": "사용 중",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(hikaricp_connections_idle{job=\"pitchmap-app\"})",
+          "legendFormat": "유휴",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(hikaricp_connections_pending{job=\"pitchmap-app\"})",
+          "legendFormat": "대기",
+          "range": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "max(hikaricp_connections_max{job=\"pitchmap-app\"})",
+          "legendFormat": "최대",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "커넥션 획득 시간 p95·최대",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "max(hikaricp_connections_acquire_seconds_max{job=\"pitchmap-app\"})",
+          "legendFormat": "최대",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(rate(hikaricp_connections_acquire_seconds_sum{job=\"pitchmap-app\"}[5m])) / clamp_min(sum(rate(hikaricp_connections_acquire_seconds_count{job=\"pitchmap-app\"}[5m])), 1e-9)",
+          "legendFormat": "평균",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL 연결·느린 쿼리·락 대기",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "mysql_global_status_threads_connected{job=\"integrations/mysql\"}",
+          "legendFormat": "연결 수",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "rate(mysql_global_status_slow_queries{job=\"integrations/mysql\"}[5m]) * 60",
+          "legendFormat": "느린 쿼리/분",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "rate(mysql_global_status_innodb_row_lock_waits{job=\"integrations/mysql\"}[5m]) * 60",
+          "legendFormat": "행 락 대기/분",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "실행 시간이 긴 SQL 상위 10 (최근 1시간)",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "topk(10, sum by (schema, digest_text) (rate(mysql_perf_schema_events_statements_seconds_total{job=\"integrations/mysql\"}[1h])))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "description": "performance_schema 문장 요약. 값은 초당 누적 실행 시간이다"
+    },
+    {
+      "type": "row",
+      "title": "JVM",
+      "id": 11,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "힙 사용량",
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 36
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(jvm_memory_used_bytes{job=\"pitchmap-app\",area=\"heap\"})",
+          "legendFormat": "사용",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(jvm_memory_max_bytes{job=\"pitchmap-app\",area=\"heap\"})",
+          "legendFormat": "최대",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "스레드 수",
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 36
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "jvm_threads_live_threads{job=\"pitchmap-app\"}",
+          "legendFormat": "살아 있는 스레드",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC 멈춤 시간 (초/분)",
+      "id": 14,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 36
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_sum{job=\"pitchmap-app\"}[5m])) * 60",
+          "legendFormat": "{{gc}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "외부 API",
+      "id": 15,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "최근 24시간 호출 수 / 하루 한도",
+      "id": 16,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (api) (increase(pitchmap_external_api_requests_seconds_count{job=\"pitchmap-app\"}[24h])) / on (api) (label_replace(vector(1000), \"api\", \"gocamping\", \"\", \"\") or label_replace(vector(10000), \"api\", \"kma\", \"\", \"\") or label_replace(vector(10000), \"api\", \"kasi\", \"\", \"\"))",
+          "legendFormat": "{{api}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic"
+      },
+      "description": "하루 한도: 고캠핑 1,000건, 기상청·천문연 각 10,000건. 알림 기준 80%"
+    },
+    {
+      "type": "timeseries",
+      "title": "실패 수 (분당)",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (api) (rate(pitchmap_external_api_requests_seconds_count{job=\"pitchmap-app\",outcome=\"failure\"}[5m])) * 60",
+          "legendFormat": "{{api}} 실패",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (api) (rate(pitchmap_external_api_fallbacks_total{job=\"pitchmap-app\"}[5m])) * 60",
+          "legendFormat": "{{api}} 값 없이 응답",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "응답 지연 p95",
+      "id": 18,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, api) (rate(pitchmap_external_api_requests_seconds_bucket{job=\"pitchmap-app\"}[5m])))",
+          "legendFormat": "{{api}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "비동기 처리",
+      "id": 19,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "아웃박스 이벤트",
+      "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 54
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "pitchmap_outbox_events{job=\"pitchmap-app\",status=\"pending\"}",
+          "legendFormat": "미발행",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "pitchmap_outbox_events{job=\"pitchmap-app\",status=\"failed\"}",
+          "legendFormat": "실패(재시도 한도 초과)",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "가장 오래된 미발행 이벤트의 나이",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 54
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "pitchmap_outbox_oldest_pending_age_seconds{job=\"pitchmap-app\"}",
+          "legendFormat": "나이",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "알림 기준: 10분 이상"
+    },
+    {
+      "type": "stat",
+      "title": "스케줄 작업 실패 (최근 24시간)",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 54
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum by (job) (increase(pitchmap_scheduled_job_failures_total{job=\"pitchmap-app\"}[24h]))",
+          "legendFormat": "{{job}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      }
+    },
+    {
+      "type": "row",
+      "title": "비즈니스",
+      "id": 23,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 62
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "가입·이메일 인증 (하루)",
+      "id": 24,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 63
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(increase(pitchmap_member_signups_total{job=\"pitchmap-app\"}[1d]))",
+          "legendFormat": "가입",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(increase(pitchmap_member_email_verifications_total{job=\"pitchmap-app\"}[1d]))",
+          "legendFormat": "인증 완료",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "아직 만들지 않은 기능(베이스캠프, 행사, 신고)의 지표는 기능을 만들 때 추가한다"
+    },
+    {
+      "type": "stat",
+      "title": "인증 완료율 (최근 7일)",
+      "id": 25,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 63
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "sum(increase(pitchmap_member_email_verifications_total{job=\"pitchmap-app\"}[7d])) / clamp_min(sum(increase(pitchmap_member_signups_total{job=\"pitchmap-app\"}[7d])), 1)",
+          "legendFormat": "",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "서버",
+      "id": 26,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU 사용률",
+      "id": 27,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "1 - avg(rate(node_cpu_seconds_total{instance=\"pitchmap-prod\",job=\"integrations/unix\",mode=\"idle\"}[5m]))",
+          "legendFormat": "CPU",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "메모리 사용률",
+      "id": 28,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "1 - node_memory_MemAvailable_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"} / node_memory_MemTotal_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"}",
+          "legendFormat": "메모리",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "1 - node_memory_SwapFree_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"} / clamp_min(node_memory_SwapTotal_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"}, 1)",
+          "legendFormat": "스왑",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "알림 기준: 10분간 90% 이상"
+    },
+    {
+      "type": "timeseries",
+      "title": "디스크 사용률 (/)",
+      "id": 29,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "1 - node_filesystem_avail_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\",mountpoint=\"/\"}",
+          "legendFormat": "/",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "알림 기준: 80% 이상"
+    },
+    {
+      "type": "timeseries",
+      "title": "부하 평균",
+      "id": 30,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "node_load1{instance=\"pitchmap-prod\",job=\"integrations/unix\"}",
+          "legendFormat": "1분",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "node_load5{instance=\"pitchmap-prod\",job=\"integrations/unix\"}",
+          "legendFormat": "5분",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "로그",
+      "id": 31,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "앱 ERROR·WARN 로그",
+      "id": 32,
+      "datasource": {
+        "type": "loki",
+        "uid": "__LOKI_UID__"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "__LOKI_UID__"
+          },
+          "expr": "{instance=\"pitchmap-prod\", service=\"app\"} | json | log_level=~\"ERROR|WARN\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}
