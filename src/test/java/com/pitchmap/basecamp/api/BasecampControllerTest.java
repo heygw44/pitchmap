@@ -4,11 +4,17 @@ import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
+import com.pitchmap.basecamp.application.BasecampApplicationCancelService;
+import com.pitchmap.basecamp.application.BasecampApplyCommand;
+import com.pitchmap.basecamp.application.BasecampApplyResult;
+import com.pitchmap.basecamp.application.BasecampApplyService;
 import com.pitchmap.basecamp.application.BasecampDetail;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
 import com.pitchmap.basecamp.application.BasecampOpenCommand;
@@ -58,6 +64,8 @@ class BasecampControllerTest {
 
     private static final long MEMBER_ID = 7L;
     private static final String BASECAMPS = "/api/basecamps";
+    private static final String APPLICATIONS = "/api/basecamps/77/applications";
+    private static final String MY_APPLICATION = "/api/basecamps/77/applications/me";
     private static final String VALID_BODY = body("\"title\":\"북한산 백패킹\"", "\"capacity\":4");
 
     @Autowired
@@ -71,6 +79,12 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampDetailQueryService basecampDetailQueryService;
+
+    @MockitoBean
+    private BasecampApplyService basecampApplyService;
+
+    @MockitoBean
+    private BasecampApplicationCancelService basecampApplicationCancelService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -482,6 +496,177 @@ class BasecampControllerTest {
         assertThat(notNumber).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
     }
 
+    @Test
+    @DisplayName("[F-13][BC-06] 합류를 신청하면 201과 applicationId·status를 응답하고, 경로의 베이스캠프 ID와 로그인한 회원 ID, 메시지를 서비스에 넘긴다")
+    void applyReturnsCreated() {
+        // given
+        when(basecampApplyService.apply(any())).thenReturn(new BasecampApplyResult(901L, "PENDING"));
+
+        // when
+        MvcTestResult result = postApply(verified(), "{\"message\":\"같이 가고 싶어요\"}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().isStrictlyEqualTo("{ \"applicationId\": 901, \"status\": \"PENDING\" }");
+        verify(basecampApplyService).apply(new BasecampApplyCommand(77L, MEMBER_ID, "같이 가고 싶어요"));
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-06] 요청 본문이 없거나 message가 없어도 201이고, 메시지는 null로 넘긴다")
+    void applyAcceptsMissingBodyAndMessage() {
+        // given
+        when(basecampApplyService.apply(any())).thenReturn(new BasecampApplyResult(901L, "PENDING"));
+
+        // when
+        MvcTestResult withoutBody =
+                mvc.post().uri(APPLICATIONS).with(verified()).with(csrf()).exchange();
+        MvcTestResult withoutMessage = postApply(verified(), "{}");
+
+        // then
+        assertThat(withoutBody).hasStatus(HttpStatus.CREATED);
+        assertThat(withoutMessage).hasStatus(HttpStatus.CREATED);
+        verify(basecampApplyService, times(2)).apply(new BasecampApplyCommand(77L, MEMBER_ID, null));
+    }
+
+    @Test
+    @DisplayName("[F-13] 신청 메시지가 500자이면 받고, 501자이면 message 필드 오류로 400 INVALID_INPUT을 응답한다")
+    void applyMessageLengthBoundary() {
+        // given
+        when(basecampApplyService.apply(any())).thenReturn(new BasecampApplyResult(901L, "PENDING"));
+
+        // when
+        MvcTestResult atLimit = postApply(verified(), "{\"message\":\"" + "가".repeat(500) + "\"}");
+        MvcTestResult overLimit = postApply(verified(), "{\"message\":\"" + "가".repeat(501) + "\"}");
+
+        // then
+        assertThat(atLimit).hasStatus(HttpStatus.CREATED);
+        assertThat(overLimit).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(overLimit).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(overLimit)
+                .bodyJson()
+                .extractingPath("$.fieldErrors[0].field")
+                .isEqualTo("message");
+        verify(basecampApplyService).apply(any());
+    }
+
+    @Test
+    @DisplayName("[F-13] 로그인하지 않은 사용자가 신청하면 401, 이메일 인증 전의 회원이 신청하면 403 MEMBER_NOT_VERIFIED이고 서비스를 부르지 않는다")
+    void applyRequiresVerifiedLogin() {
+        // when
+        MvcTestResult anonymous = mvc.post()
+                .uri(APPLICATIONS)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .exchange();
+        MvcTestResult unverifiedMember = postApply(unverified(), "{}");
+
+        // then
+        assertThat(anonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(anonymous).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
+        assertThat(unverifiedMember).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(unverifiedMember).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        verifyNoInteractions(basecampApplyService);
+    }
+
+    @Test
+    @DisplayName("[F-13] CSRF 토큰 없이 신청하거나 취소하면 403을 응답하고 서비스를 부르지 않는다")
+    void applyAndCancelRequireCsrf() {
+        // when
+        MvcTestResult apply = mvc.post()
+                .uri(APPLICATIONS)
+                .with(verified())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .exchange();
+        MvcTestResult cancel = mvc.delete().uri(MY_APPLICATION).with(verified()).exchange();
+
+        // then
+        assertThat(apply).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(cancel).hasStatus(HttpStatus.FORBIDDEN);
+        verifyNoInteractions(basecampApplyService, basecampApplicationCancelService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("applyErrors")
+    @DisplayName("[F-13] 신청 서비스가 던진 오류는 코드와 상태 그대로 응답한다")
+    void applyErrorsAreMapped(BusinessException error, HttpStatus status) {
+        // given
+        when(basecampApplyService.apply(any())).thenThrow(error);
+
+        // when
+        MvcTestResult result = postApply(verified(), "{}");
+
+        // then
+        assertThat(result).hasStatus(status);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.code")
+                .isEqualTo(error.getErrorCode().name());
+    }
+
+    static Stream<Arguments> applyErrors() {
+        return Stream.of(
+                Arguments.of(new BusinessException(CommonErrorCode.TRUST_LEVEL_INSUFFICIENT), HttpStatus.FORBIDDEN),
+                Arguments.of(new BusinessException(CommonErrorCode.NOT_FOUND), HttpStatus.NOT_FOUND),
+                Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_INVALID_STATE), HttpStatus.CONFLICT),
+                Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_ALREADY_APPLIED), HttpStatus.CONFLICT),
+                Arguments.of(
+                        new BasecampException(BasecampErrorCode.BASECAMP_REAPPLY_NOT_ALLOWED), HttpStatus.CONFLICT),
+                Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_CONDITION_NOT_MET), HttpStatus.FORBIDDEN),
+                Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_DATE_CONFLICT), HttpStatus.CONFLICT),
+                Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_PENDING_LIMIT), HttpStatus.CONFLICT));
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-06] 신청을 취소하면 204이고, 경로의 베이스캠프 ID와 로그인한 회원 ID를 서비스에 넘긴다")
+    void cancelApplicationReturnsNoContent() {
+        // when
+        MvcTestResult result =
+                mvc.delete().uri(MY_APPLICATION).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.NO_CONTENT);
+        verify(basecampApplicationCancelService).cancel(77L, MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("[F-13] 로그인하지 않은 사용자가 취소하면 401, 이메일 인증 전의 회원이 취소하면 403 MEMBER_NOT_VERIFIED다")
+    void cancelRequiresVerifiedLogin() {
+        // when
+        MvcTestResult anonymous = mvc.delete().uri(MY_APPLICATION).with(csrf()).exchange();
+        MvcTestResult unverifiedMember =
+                mvc.delete().uri(MY_APPLICATION).with(unverified()).with(csrf()).exchange();
+
+        // then
+        assertThat(anonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(unverifiedMember).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(unverifiedMember).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        verifyNoInteractions(basecampApplicationCancelService);
+    }
+
+    @Test
+    @DisplayName("[F-13] 취소 서비스가 던진 NOT_FOUND와 BASECAMP_INVALID_STATE는 코드와 상태 그대로 응답한다")
+    void cancelErrorsAreMapped() {
+        // given
+        doThrow(new BusinessException(CommonErrorCode.NOT_FOUND))
+                .doThrow(new BasecampException(BasecampErrorCode.BASECAMP_INVALID_STATE))
+                .when(basecampApplicationCancelService)
+                .cancel(77L, MEMBER_ID);
+
+        // when
+        MvcTestResult notFound =
+                mvc.delete().uri(MY_APPLICATION).with(verified()).with(csrf()).exchange();
+        MvcTestResult invalidState =
+                mvc.delete().uri(MY_APPLICATION).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(notFound).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(notFound).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+        assertThat(invalidState).hasStatus(HttpStatus.CONFLICT);
+        assertThat(invalidState).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_INVALID_STATE");
+    }
+
     private static BasecampSearchItem searchItem(JoinEligibility eligibility) {
         return new BasecampSearchItem(
                 77L,
@@ -522,6 +707,16 @@ class BasecampControllerTest {
 
     private static String body(String... overrides) {
         return "{\"spotId\":101,\"description\":\"함께 가요\"," + dates() + "," + String.join(",", overrides) + "}";
+    }
+
+    private MvcTestResult postApply(RequestPostProcessor login, String requestBody) {
+        return mvc.post()
+                .uri(APPLICATIONS)
+                .with(login)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+                .exchange();
     }
 
     private MvcTestResult post(RequestPostProcessor login, String requestBody) {

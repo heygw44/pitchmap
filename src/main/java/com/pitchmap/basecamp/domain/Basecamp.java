@@ -47,6 +47,9 @@ public class Basecamp {
     /** 확정하려면 캠프 리더를 포함해 최소 이 인원이 있어야 한다. */
     public static final int MIN_CONFIRM_HEADCOUNT = 2;
 
+    /** 한 베이스캠프에서 결정을 기다리는 신청은 이 건수까지만 받는다. */
+    public static final int MAX_PENDING_APPLICATIONS = 20;
+
     /** 출발 시각 이 기간 전부터 하는 탈퇴를 임박 탈퇴로 본다. */
     public static final Duration EARLY_LEAVE_WINDOW = Duration.ofHours(48);
 
@@ -273,18 +276,32 @@ public class Basecamp {
     }
 
     /**
-     * 호출하면 applicantId인 회원의 합류 신청을 만들어 돌려준다.
+     * 호출하면 applicantId인 회원이 지금 이 베이스캠프에 합류 신청을 할 수 있는지 상태를 바꾸지 않고 검사한다.
      *
-     * <p>이미 대기 중이거나 멤버이면 {@link BasecampErrorCode#BASECAMP_ALREADY_APPLIED}이고, 거절·탈퇴·강퇴된 적이 있으면
-     * {@link BasecampErrorCode#BASECAMP_REAPPLY_NOT_ALLOWED}이다. 스스로 취소했던 신청은 새 행을 만들지 않고 같은 행을 대기로 되돌린다.
-     * 신청 자격, 합류 조건, 날짜 겹침, 대기 신청 수 제한은 다른 모듈의 정보가 필요해서 호출하는 쪽이 검사한다.
+     * <p>모집 중이 아니면 {@link BasecampErrorCode#BASECAMP_INVALID_STATE}이다. 이미 대기 중이거나 멤버이면
+     * {@link BasecampErrorCode#BASECAMP_ALREADY_APPLIED}이고, 거절·탈퇴·강퇴된 적이 있으면
+     * {@link BasecampErrorCode#BASECAMP_REAPPLY_NOT_ALLOWED}이다.
      */
-    public BasecampApplication apply(long applicantId, String message, Instant now) {
+    public void checkApplicable(long applicantId) {
         requireStatus(RECRUITING_ONLY);
         requireNotBlockedByMembership(applicantId);
+        findApplicationOf(applicantId).ifPresent(Basecamp::requireResubmittable);
+    }
+
+    /**
+     * 호출하면 applicantId인 회원의 합류 신청을 만들어 돌려준다.
+     *
+     * <p>{@link #checkApplicable(long)}에서 거부하는 경우는 같은 오류 코드로 거부한다. 스스로 취소했던 신청은 새 행을 만들지 않고
+     * 같은 행을 대기로 되돌린다. 대기 중인 신청이 이미 {@value #MAX_PENDING_APPLICATIONS}건이면
+     * {@link BasecampErrorCode#BASECAMP_PENDING_LIMIT}이다. 신청 자격, 합류 조건, 날짜 겹침은 다른 모듈의 정보가 필요해서 호출하는 쪽이 검사한다.
+     */
+    public BasecampApplication apply(long applicantId, String message, Instant now) {
+        checkApplicable(applicantId);
+        requireUnderPendingLimit();
         Optional<BasecampApplication> existing = findApplicationOf(applicantId);
         if (existing.isPresent()) {
-            return resubmit(existing.get(), message, now);
+            existing.get().resubmit(message, now);
+            return existing.get();
         }
         BasecampApplication application = BasecampApplication.submit(this, applicantId, message, now);
         applications.add(application);
@@ -432,14 +449,22 @@ public class Basecamp {
         applications.stream().filter(BasecampApplication::isPending).forEach(application -> application.expire(now));
     }
 
-    private BasecampApplication resubmit(BasecampApplication existing, String message, Instant now) {
+    // 스스로 취소한 신청만 다시 낼 수 있다. 다른 상태는 이유에 맞는 오류로 거부한다.
+    private static void requireResubmittable(BasecampApplication existing) {
         switch (existing.getStatus()) {
-            case CANCELED -> existing.resubmit(message, now);
+            case CANCELED -> {}
             case REJECTED -> throw new BasecampException(BasecampErrorCode.BASECAMP_REAPPLY_NOT_ALLOWED);
             case PENDING, APPROVED -> throw new BasecampException(BasecampErrorCode.BASECAMP_ALREADY_APPLIED);
             case EXPIRED -> throw new BasecampException(BasecampErrorCode.BASECAMP_INVALID_STATE);
         }
-        return existing;
+    }
+
+    private void requireUnderPendingLimit() {
+        long pending =
+                applications.stream().filter(BasecampApplication::isPending).count();
+        if (pending >= MAX_PENDING_APPLICATIONS) {
+            throw new BasecampException(BasecampErrorCode.BASECAMP_PENDING_LIMIT);
+        }
     }
 
     private void requireNotBlockedByMembership(long applicantId) {
