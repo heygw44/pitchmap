@@ -374,7 +374,13 @@ function AccountChip() {
 
   return (
     <div className="pointer-events-auto inline-flex min-w-0 items-center rounded-control border border-contour bg-card pl-3">
-      <span className="max-w-32 truncate text-sm text-ink">{session.me.nickname}</span>
+      <Link
+        to="/me"
+        aria-label={`내 정보: ${session.me.nickname}`}
+        className="max-w-32 min-h-11 content-center truncate text-sm text-ink underline-offset-2 hover:underline"
+      >
+        {session.me.nickname}
+      </Link>
       {session.me.identityVerified ? (
         <span className="ml-2">
           <Badge tone="sea" icon="check">

@@ -1,4 +1,6 @@
 import { LoginPage } from '../features/member/LoginPage';
+import { MemberProfilePage } from '../features/member/MemberProfilePage';
+import { MyPage } from '../features/member/MyPage';
 import { SignupPage } from '../features/member/SignupPage';
 import { VerifyEmailPage } from '../features/member/VerifyEmailPage';
 import { IdentityVerificationPage } from '../features/trust/IdentityVerificationPage';
@@ -26,4 +28,18 @@ export const routes: RouteDef[] = [
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },
   { path: '/identity-verification', render: () => <IdentityVerificationPage /> },
+  { path: '/me', render: () => <MyPage /> },
+  {
+    path: '/members/:memberId',
+    // 회원 ID도 양의 정수만 있다. 그 밖의 값은 서버에 묻지 않고 없는 페이지로 보여 준다.
+    render: (params) => {
+      const memberId = toPositiveId(params.memberId);
+      return memberId === null ? <NotFoundPage /> : <MemberProfilePage key={memberId} memberId={memberId} />;
+    },
+  },
 ];
+
+function toPositiveId(raw: string | undefined): number | null {
+  const value = Number(raw ?? '');
+  return /^\d+$/.test(raw ?? '') && Number.isSafeInteger(value) && value > 0 ? value : null;
+}

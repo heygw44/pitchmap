@@ -14,6 +14,7 @@ import { Notice } from '../../components/Notice';
 import { Skeleton } from '../../components/Skeleton';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatKstTime, formatLocalDate } from '../../lib/datetime';
+import { SpotReviews } from '../review/SpotReviews';
 import { BakjiFeedback } from './BakjiFeedback';
 import { FACILITY_LABELS, SIGNAL_LEVEL_LABELS, SPOT_TYPE_META, sourceLabel } from './spotLabels';
 
@@ -197,16 +198,7 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
       )}
       {publicDetail && <PublicSection publicDetail={publicDetail} />}
 
-      <section className={SECTION_CLASS} aria-labelledby="spot-rating-title">
-        <h3 id="spot-rating-title" className={SECTION_TITLE_CLASS}>
-          후기
-        </h3>
-        <p className="mt-2 text-base text-ink tabular-nums">
-          {detail.rating.average === null
-            ? '아직 후기가 없어요'
-            : `평점 ${detail.rating.average.toFixed(1)} · 후기 ${detail.rating.count}개`}
-        </p>
-      </section>
+      <SpotReviews key={detail.spotId} spotId={detail.spotId} initialRating={detail.rating} />
 
       <WeatherSection weather={detail.weather} />
     </article>

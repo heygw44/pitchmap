@@ -243,8 +243,8 @@ export interface SpotDetail {
   publicDetail: PublicDetail | null;
   parkWarning: ParkWarning;
   rating: SpotRating;
-  // 항목 모양은 장소 후기, 베이스캠프 기능에서 정한다. 지금 서버는 빈 배열을 준다.
-  recentReviews: unknown[];
+  // 작성 시각이 늦은 순서로 최대 3개다.
+  recentReviews: SpotReview[];
   expectedPeople: ExpectedPeople[];
   recruitingBasecamps: unknown[];
   // 날씨 연동 전이거나 외부 API가 실패하면 null이다.
@@ -289,4 +289,88 @@ export type BakjiReportReason = 'ILLEGAL_AREA' | 'CLOSED' | 'FALSE_INFO';
 export interface BakjiProblemReportRequest {
   reason: BakjiReportReason;
   content?: string;
+}
+
+// 목록 공통 형식. 서버는 전체 개수를 주지 않고 다음 페이지가 있는지만 알려 준다.
+export interface Page<T> {
+  content: T[];
+  page: number;
+  size: number;
+  hasNext: boolean;
+}
+
+// 장소 후기
+
+export interface SpotReviewAuthor {
+  memberId: number;
+  nickname: string;
+}
+
+export interface SpotReview {
+  reviewId: number;
+  author: SpotReviewAuthor;
+  // 한국 날짜(YYYY-MM-DD)
+  visitedDate: string;
+  rating: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface SpotReviewCreateRequest {
+  visitedDate: string;
+  rating: number;
+  content: string;
+}
+
+export interface SpotReviewUpdateRequest {
+  rating: number;
+  content: string;
+}
+
+// 내 정보 수정. 보내지 않은 필드는 서버가 그대로 두고, 자기 신고 값에 null을 보내면 지운다.
+export interface MeUpdateRequest {
+  nickname?: string;
+  selfAgeGroup?: SelfAgeGroup | null;
+  selfGender?: SelfGender | null;
+}
+
+// 신뢰 단계
+
+export interface TrustProgress {
+  // 받은 동행 후기가 없으면 rejoinRate.current는 null이다.
+  current: number | null;
+  required: number;
+}
+
+export interface NextTrustLevel {
+  level: number;
+  completedCompanions: TrustProgress;
+  rejoinRate: TrustProgress;
+  noRecentSanction: boolean;
+}
+
+export interface MyTrust {
+  trustLevel: number;
+  identityVerified: boolean;
+  // 단계 2 회원의 응답에는 이 필드가 없다.
+  nextLevel?: NextTrustLevel;
+}
+
+// 회원 프로필. 비로그인 요청에는 memberId와 nickname만 오고, 나머지 필드는 응답에서 빠진다.
+export interface CompanionReviewSummary {
+  // 받은 동행 후기가 없으면 null이다.
+  rejoinRate: number | null;
+  topTags: string[];
+}
+
+export interface MemberProfile {
+  memberId: number;
+  nickname: string;
+  ageGroup?: SelfAgeGroup | null;
+  ageGroupVerified?: boolean;
+  gender?: SelfGender | null;
+  genderVerified?: boolean;
+  trustLevel?: number;
+  completedCompanions?: number;
+  companionReviewSummary?: CompanionReviewSummary;
 }
