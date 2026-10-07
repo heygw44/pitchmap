@@ -3,7 +3,6 @@ package com.pitchmap.basecamp.application;
 import com.pitchmap.basecamp.domain.JoinCondition;
 import com.pitchmap.basecamp.domain.JoinEligibilityPolicy;
 import com.pitchmap.basecamp.domain.JoinEligibilityPolicy.Applicant;
-import com.pitchmap.basecamp.domain.JoinGender;
 import com.pitchmap.basecamp.domain.PriorRelation;
 import com.pitchmap.basecamp.infra.BasecampSearchCondition;
 import com.pitchmap.basecamp.infra.BasecampSearchMapper;
@@ -11,7 +10,6 @@ import com.pitchmap.basecamp.infra.BasecampSearchRow;
 import com.pitchmap.basecamp.infra.ConfirmedScheduleRow;
 import com.pitchmap.basecamp.infra.ViewerHistoryRow;
 import com.pitchmap.spot.application.SpotSearchBox;
-import com.pitchmap.trust.application.TrustDetail;
 import com.pitchmap.trust.application.TrustSummaryService;
 import java.util.HashMap;
 import java.util.List;
@@ -84,7 +82,7 @@ public class BasecampSearchService {
         if (pageRows.isEmpty()) {
             return null;
         }
-        Applicant applicant = toApplicant(trustSummaryService.detail(viewerId));
+        Applicant applicant = JoinApplicants.from(trustSummaryService.detail(viewerId));
         List<Long> basecampIds =
                 pageRows.stream().map(BasecampSearchRow::basecampId).toList();
         Map<Long, PriorRelation> priorRelations = new HashMap<>();
@@ -93,24 +91,6 @@ public class BasecampSearchService {
                     history.basecampId(), PriorRelation.of(history.memberStatus(), history.applicationStatus()));
         }
         return new EligibilityJudge(applicant, priorRelations, basecampSearchMapper.selectConfirmedSchedules(viewerId));
-    }
-
-    // 신뢰 모듈의 연령대는 이름 문자열로 오고, 그 모듈의 enum을 참조할 수 없다. 그래서 합류 조건이 쓰는 십 단위 숫자로 여기서 바꾼다.
-    private static Applicant toApplicant(TrustDetail trust) {
-        Integer ageGroup = trust.verifiedAgeGroup() == null ? null : toAgeGroupNumber(trust.verifiedAgeGroup());
-        JoinGender gender = trust.verifiedGender() == null ? null : JoinGender.valueOf(trust.verifiedGender());
-        return new Applicant(trust.trustLevel(), ageGroup, gender);
-    }
-
-    private static int toAgeGroupNumber(String ageGroup) {
-        return switch (ageGroup) {
-            case "TWENTIES" -> 20;
-            case "THIRTIES" -> 30;
-            case "FORTIES" -> 40;
-            case "FIFTIES" -> 50;
-            case "SIXTIES_PLUS" -> 60;
-            default -> throw new IllegalStateException("알 수 없는 연령대입니다: " + ageGroup);
-        };
     }
 
     private static BasecampSearchItem toItem(BasecampSearchRow row, EligibilityJudge judge) {

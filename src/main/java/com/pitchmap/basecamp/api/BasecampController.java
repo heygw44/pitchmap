@@ -1,5 +1,7 @@
 package com.pitchmap.basecamp.api;
 
+import com.pitchmap.basecamp.application.BasecampApplicationCancelService;
+import com.pitchmap.basecamp.application.BasecampApplyService;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampSearchService;
@@ -10,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +28,8 @@ class BasecampController {
     private final BasecampOpenService basecampOpenService;
     private final BasecampSearchService basecampSearchService;
     private final BasecampDetailQueryService basecampDetailQueryService;
+    private final BasecampApplyService basecampApplyService;
+    private final BasecampApplicationCancelService basecampApplicationCancelService;
 
     @Operation(
             summary = "베이스캠프 열기",
@@ -86,5 +91,40 @@ class BasecampController {
     BasecampDetailResponse find(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
         Long viewerId = loginMember == null ? null : loginMember.memberId();
         return BasecampDetailResponse.from(basecampDetailQueryService.find(viewerId, basecampId), viewerId != null);
+    }
+
+    @Operation(
+            summary = "베이스캠프 합류 신청",
+            description = "본인확인을 마친 회원(신뢰 단계 1 이상)이 모집 중인 베이스캠프에 합류를 신청하고, 201과 함께 applicationId와 status(PENDING)를 준다. "
+                    + "요청 본문과 message는 생략할 수 있고, message는 500자 이하여야 한다(넘으면 400 INVALID_INPUT). "
+                    + "스스로 취소했던 신청은 같은 applicationId로 다시 PENDING이 된다. 캠프 리더에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 신뢰 단계가 1 미만이면 403 TRUST_LEVEL_INSUFFICIENT, "
+                    + "모집 중이 아니면 409 BASECAMP_INVALID_STATE, 이미 대기 중이거나 멤버(캠프 리더 포함)이면 409 BASECAMP_ALREADY_APPLIED, "
+                    + "거절·탈퇴·강퇴된 적이 있으면 409 BASECAMP_REAPPLY_NOT_ALLOWED, "
+                    + "합류 조건(최소 신뢰 단계 2, 본인확인한 연령대, 본인확인한 성별)을 충족하지 못하면 403 BASECAMP_CONDITION_NOT_MET, "
+                    + "같은 기간에 확정된 다른 베이스캠프의 멤버이면 409 BASECAMP_DATE_CONFLICT, "
+                    + "대기 신청이 이미 20건이면 409 BASECAMP_PENDING_LIMIT이다.")
+    @PostMapping("/api/basecamps/{basecampId}/applications")
+    @ResponseStatus(HttpStatus.CREATED)
+    BasecampApplyResponse apply(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @Valid @RequestBody(required = false) BasecampApplyRequest request) {
+        BasecampApplyRequest body = request == null ? BasecampApplyRequest.empty() : request;
+        return BasecampApplyResponse.from(
+                basecampApplyService.apply(body.toCommand(basecampId, loginMember.memberId())));
+    }
+
+    @Operation(
+            summary = "베이스캠프 합류 신청 취소",
+            description = "본인확인을 마친 회원(신뢰 단계 1 이상)이 대기 중인 자기 합류 신청을 취소하고 204로 응답한다. "
+                    + "모집 중이거나 마감된 베이스캠프에서만 할 수 있다. 취소한 신청은 같은 베이스캠프에 다시 낼 수 있다. "
+                    + "베이스캠프가 없거나 내 신청이 없으면 404 NOT_FOUND, 신뢰 단계가 1 미만이면 403 TRUST_LEVEL_INSUFFICIENT, "
+                    + "베이스캠프가 모집 중이거나 마감된 상태가 아니거나 신청이 대기 중이 아니면 409 BASECAMP_INVALID_STATE로 응답한다.")
+    @DeleteMapping("/api/basecamps/{basecampId}/applications/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void cancelApplication(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        basecampApplicationCancelService.cancel(basecampId, loginMember.memberId());
     }
 }

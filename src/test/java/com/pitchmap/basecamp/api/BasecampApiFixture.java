@@ -68,8 +68,8 @@ final class BasecampApiFixture {
         return session;
     }
 
-    // 이메일 인증을 마치고 성인으로 본인확인까지 해서 신뢰 단계 1인 세션을 만든다. 회원마다 식별 문자열을 다르게 줘야 같은 사람으로 보지 않는다.
-    Cookie identityVerifiedSession(Member member, String gender) {
+    // 로그인하고 이메일 인증까지 마친 신뢰 단계 0인 세션을 만든다.
+    Cookie verifiedSession(Member member) {
         Cookie session = login(member);
         String code = emailVerificationService
                 .issueFor(member.getId(), LOCAL_IP)
@@ -83,6 +83,12 @@ final class BasecampApiFixture {
                 .content("{\"code\":\"%s\"}".formatted(code))
                 .exchange();
         assertThat(verified).hasStatus(HttpStatus.OK);
+        return session;
+    }
+
+    // 이메일 인증을 마치고 성인으로 본인확인까지 해서 신뢰 단계 1인 세션을 만든다. 회원마다 식별 문자열을 다르게 줘야 같은 사람으로 보지 않는다.
+    Cookie identityVerifiedSession(Member member, String gender) {
+        Cookie session = verifiedSession(member);
         identitySequence++;
         MvcTestResult result = mvc.post()
                 .uri("/api/me/identity-verification")
