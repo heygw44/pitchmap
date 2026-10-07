@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.basecamp.infra.BasecampApplicationMapper">
+
+    <!-- 신청 시각이 같으면 ID 순서로 정렬해서, 페이지를 넘겨도 같은 신청이 두 번 나오거나 빠지지 않게 한다. -->
+    <select id="selectByStatus" resultType="com.pitchmap.basecamp.infra.BasecampApplicationRow">
+        SELECT a.id AS application_id,
+               a.applicant_id AS applicant_id,
+               a.status AS status,
+               a.message AS message,
+               a.created_at AS applied_at
+        FROM basecamp_application a
+        WHERE a.basecamp_id = #{basecampId}
+          AND a.status = #{status}
+        ORDER BY a.created_at, a.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

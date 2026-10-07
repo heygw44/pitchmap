@@ -12,21 +12,28 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 import com.pitchmap.basecamp.application.BasecampApplicationCancelService;
+import com.pitchmap.basecamp.application.BasecampApplicationListQuery;
+import com.pitchmap.basecamp.application.BasecampApplicationListService;
+import com.pitchmap.basecamp.application.BasecampApplicationPage;
 import com.pitchmap.basecamp.application.BasecampApplyCommand;
 import com.pitchmap.basecamp.application.BasecampApplyResult;
 import com.pitchmap.basecamp.application.BasecampApplyService;
+import com.pitchmap.basecamp.application.BasecampApprovalService;
+import com.pitchmap.basecamp.application.BasecampApproveResult;
 import com.pitchmap.basecamp.application.BasecampDetail;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
 import com.pitchmap.basecamp.application.BasecampOpenCommand;
 import com.pitchmap.basecamp.application.BasecampOpenCommand.JoinConditionCommand;
 import com.pitchmap.basecamp.application.BasecampOpenResult;
 import com.pitchmap.basecamp.application.BasecampOpenService;
+import com.pitchmap.basecamp.application.BasecampRejectResult;
 import com.pitchmap.basecamp.application.BasecampSearchItem;
 import com.pitchmap.basecamp.application.BasecampSearchPage;
 import com.pitchmap.basecamp.application.BasecampSearchQuery;
 import com.pitchmap.basecamp.application.BasecampSearchService;
 import com.pitchmap.basecamp.application.JoinConditionSummary;
 import com.pitchmap.basecamp.application.JoinEligibility;
+import com.pitchmap.basecamp.domain.BasecampApplicationStatus;
 import com.pitchmap.basecamp.domain.BasecampErrorCode;
 import com.pitchmap.basecamp.domain.BasecampException;
 import com.pitchmap.basecamp.domain.BasecampRelation;
@@ -45,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -65,6 +73,8 @@ class BasecampControllerTest {
     private static final long MEMBER_ID = 7L;
     private static final String BASECAMPS = "/api/basecamps";
     private static final String APPLICATIONS = "/api/basecamps/77/applications";
+    private static final String APPROVE = "/api/basecamps/77/applications/501/approve";
+    private static final String REJECT = "/api/basecamps/77/applications/501/reject";
     private static final String MY_APPLICATION = "/api/basecamps/77/applications/me";
     private static final String VALID_BODY = body("\"title\":\"북한산 백패킹\"", "\"capacity\":4");
 
@@ -85,6 +95,12 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampApplicationCancelService basecampApplicationCancelService;
+
+    @MockitoBean
+    private BasecampApplicationListService basecampApplicationListService;
+
+    @MockitoBean
+    private BasecampApprovalService basecampApprovalService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -665,6 +681,119 @@ class BasecampControllerTest {
         assertThat(notFound).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
         assertThat(invalidState).hasStatus(HttpStatus.CONFLICT);
         assertThat(invalidState).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_INVALID_STATE");
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-08] 승인하면 200이고 인원과 베이스캠프 상태를 응답하며, 경로의 ID와 로그인한 회원 ID를 서비스에 넘긴다")
+    void approveReturnsHeadcountAndStatus() {
+        // given
+        when(basecampApprovalService.approve(77L, 501L, MEMBER_ID)).thenReturn(new BasecampApproveResult(4, "CLOSED"));
+
+        // when
+        MvcTestResult result =
+                mvc.post().uri(APPROVE).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("{ \"headcount\": 4, \"status\": \"CLOSED\" }");
+    }
+
+    @Test
+    @DisplayName("[F-13][BC-08] 거절하면 200이고 applicationId와 REJECTED를 응답한다")
+    void rejectReturnsApplicationStatus() {
+        // given
+        when(basecampApprovalService.reject(77L, 501L, MEMBER_ID))
+                .thenReturn(new BasecampRejectResult(501L, "REJECTED"));
+
+        // when
+        MvcTestResult result =
+                mvc.post().uri(REJECT).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("{ \"applicationId\": 501, \"status\": \"REJECTED\" }");
+    }
+
+    @Test
+    @DisplayName("[F-13] 로그인하지 않은 사용자가 승인·거절·신청 목록을 부르면 401이고, 이메일 인증 전의 회원은 403 MEMBER_NOT_VERIFIED다")
+    void decisionEndpointsRequireVerifiedLogin() {
+        // when
+        MvcTestResult approveAnonymous = mvc.post().uri(APPROVE).with(csrf()).exchange();
+        MvcTestResult rejectAnonymous = mvc.post().uri(REJECT).with(csrf()).exchange();
+        MvcTestResult listAnonymous = mvc.get().uri(APPLICATIONS).exchange();
+        MvcTestResult approveUnverified =
+                mvc.post().uri(APPROVE).with(unverified()).with(csrf()).exchange();
+        MvcTestResult listUnverified =
+                mvc.get().uri(APPLICATIONS).with(unverified()).exchange();
+
+        // then
+        assertThat(approveAnonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(rejectAnonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(listAnonymous).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(approveUnverified).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(listUnverified).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(listUnverified).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        verifyNoInteractions(basecampApprovalService, basecampApplicationListService);
+    }
+
+    @Test
+    @DisplayName("[F-13] 승인·거절 서비스가 던진 ACCESS_DENIED, NOT_FOUND, BASECAMP_FULL은 코드와 상태 그대로 응답한다")
+    void decisionErrorsAreMapped() {
+        // given
+        when(basecampApprovalService.approve(77L, 501L, MEMBER_ID))
+                .thenThrow(new BusinessException(CommonErrorCode.ACCESS_DENIED))
+                .thenThrow(new BasecampException(BasecampErrorCode.BASECAMP_FULL));
+        when(basecampApprovalService.reject(77L, 501L, MEMBER_ID))
+                .thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+
+        // when
+        MvcTestResult denied =
+                mvc.post().uri(APPROVE).with(verified()).with(csrf()).exchange();
+        MvcTestResult full =
+                mvc.post().uri(APPROVE).with(verified()).with(csrf()).exchange();
+        MvcTestResult notFound =
+                mvc.post().uri(REJECT).with(verified()).with(csrf()).exchange();
+
+        // then
+        assertThat(denied).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(denied).bodyJson().extractingPath("$.code").isEqualTo("ACCESS_DENIED");
+        assertThat(full).hasStatus(HttpStatus.CONFLICT);
+        assertThat(full).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_FULL");
+        assertThat(notFound).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(notFound).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("[F-13] 신청 목록의 status를 생략하면 PENDING, page는 0, size는 20으로 서비스를 부른다")
+    void listApplicationsUsesDefaults() {
+        // given
+        when(basecampApplicationListService.list(eq(77L), eq(MEMBER_ID), any()))
+                .thenReturn(new BasecampApplicationPage(List.of(), 0, 20, false));
+
+        // when
+        MvcTestResult result = mvc.get().uri(APPLICATIONS).with(verified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result)
+                .bodyJson()
+                .isStrictlyEqualTo("{ \"content\": [], \"page\": 0, \"size\": 20, \"hasNext\": false }");
+        verify(basecampApplicationListService)
+                .list(77L, MEMBER_ID, new BasecampApplicationListQuery(BasecampApplicationStatus.PENDING, 0, 20));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"status=UNKNOWN", "status=pending", "size=0", "size=51", "page=-1"})
+    @DisplayName("[F-13] 신청 목록의 status가 허용 값이 아니거나 page·size가 범위를 벗어나면 400 INVALID_INPUT이다")
+    void listApplicationsRejectsInvalidParameters(String query) {
+        // when
+        MvcTestResult result =
+                mvc.get().uri(APPLICATIONS + "?" + query).with(verified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        verifyNoInteractions(basecampApplicationListService);
     }
 
     private static BasecampSearchItem searchItem(JoinEligibility eligibility) {

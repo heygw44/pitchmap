@@ -1,7 +1,9 @@
 package com.pitchmap.basecamp.api;
 
 import com.pitchmap.basecamp.application.BasecampApplicationCancelService;
+import com.pitchmap.basecamp.application.BasecampApplicationListService;
 import com.pitchmap.basecamp.application.BasecampApplyService;
+import com.pitchmap.basecamp.application.BasecampApprovalService;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampSearchService;
@@ -30,6 +32,8 @@ class BasecampController {
     private final BasecampDetailQueryService basecampDetailQueryService;
     private final BasecampApplyService basecampApplyService;
     private final BasecampApplicationCancelService basecampApplicationCancelService;
+    private final BasecampApplicationListService basecampApplicationListService;
+    private final BasecampApprovalService basecampApprovalService;
 
     @Operation(
             summary = "베이스캠프 열기",
@@ -126,5 +130,56 @@ class BasecampController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void cancelApplication(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
         basecampApplicationCancelService.cancel(basecampId, loginMember.memberId());
+    }
+
+    @Operation(
+            summary = "베이스캠프 합류 신청 목록",
+            description =
+                    "캠프 리더가 자기 베이스캠프에 들어온 합류 신청을 신청이 오래된 순서로 돌려준다(신청 시각이 같으면 신청 ID 순서). "
+                            + "status를 생략하면 결정을 기다리는 PENDING 신청만 주고, PENDING, APPROVED, REJECTED, CANCELED, EXPIRED 중 하나를 보내면 그 상태만 준다. "
+                            + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. 응답에는 전체 개수가 없고 다음 페이지가 있는지만 hasNext로 알려 준다. "
+                            + "항목마다 applicationId, status, message, appliedAt과 신청자 프로필(memberId, nickname, ageGroup, ageGroupVerified, gender, "
+                            + "genderVerified, trustLevel, completedCompanions)이 있다. 이메일과 출생연도는 응답하지 않는다. "
+                            + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, status가 허용 값이 아니거나 page·size가 범위를 벗어나면 400 INVALID_INPUT이다.")
+    @GetMapping("/api/basecamps/{basecampId}/applications")
+    BasecampApplicationPageResponse listApplications(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @Valid @ParameterObject @ModelAttribute BasecampApplicationListRequest request) {
+        return BasecampApplicationPageResponse.from(
+                basecampApplicationListService.list(basecampId, loginMember.memberId(), request.toQuery()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 합류 신청 승인",
+            description = "캠프 리더가 대기 중인 합류 신청을 승인하고, 200과 함께 승인한 뒤의 인원(headcount)과 베이스캠프 상태(status)를 준다. "
+                    + "신청자는 멤버가 되고, 승인해서 정원이 차면 베이스캠프는 자동으로 마감되어 status가 CLOSED다. 신청자에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답하며, 거부되면 신청은 대기 중으로 남는다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 이 베이스캠프의 신청이 아니면 404 NOT_FOUND, "
+                    + "모집 중이 아니거나 신청이 대기 중이 아니면 409 BASECAMP_INVALID_STATE, 정원이 이미 차 있으면 409 BASECAMP_FULL, "
+                    + "신청자가 지금 합류 조건(최소 신뢰 단계, 본인확인한 연령대, 본인확인한 성별)을 충족하지 못하면 403 BASECAMP_CONDITION_NOT_MET, "
+                    + "신청자가 같은 기간에 확정된 다른 베이스캠프의 멤버이면 409 BASECAMP_DATE_CONFLICT이다.")
+    @PostMapping("/api/basecamps/{basecampId}/applications/{applicationId}/approve")
+    BasecampApproveResponse approveApplication(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @PathVariable long applicationId) {
+        return BasecampApproveResponse.from(
+                basecampApprovalService.approve(basecampId, applicationId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 합류 신청 거절",
+            description = "캠프 리더가 대기 중인 합류 신청을 거절하고, 200과 함께 applicationId와 status(REJECTED)를 준다. "
+                    + "거절된 회원은 같은 베이스캠프에 다시 신청할 수 없다(409 BASECAMP_REAPPLY_NOT_ALLOWED). 신청자에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 이 베이스캠프의 신청이 아니면 404 NOT_FOUND, "
+                    + "모집 중이 아니거나 신청이 대기 중이 아니면 409 BASECAMP_INVALID_STATE로 응답한다.")
+    @PostMapping("/api/basecamps/{basecampId}/applications/{applicationId}/reject")
+    BasecampRejectResponse rejectApplication(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @PathVariable long applicationId) {
+        return BasecampRejectResponse.from(
+                basecampApprovalService.reject(basecampId, applicationId, loginMember.memberId()));
     }
 }
