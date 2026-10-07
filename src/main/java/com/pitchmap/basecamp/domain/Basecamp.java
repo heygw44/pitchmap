@@ -185,6 +185,26 @@ public class Basecamp {
     }
 
     /**
+     * memberId인 회원이 이 베이스캠프와 맺은 관계를 돌려준다. memberId가 null이면 비로그인 요청자라서 NONE이다.
+     *
+     * <p>ACTIVE 멤버는 캠프 리더이면 LEADER, 아니면 MEMBER다. 멤버가 아니면서 대기 중인 신청이 있으면 APPLICANT이고, 탈퇴·강퇴·거절·취소·만료처럼
+     * 지금은 멤버도 대기 신청자도 아닌 회원은 NONE이다.
+     */
+    public BasecampRelation relationOf(Long memberId) {
+        if (memberId == null) {
+            return BasecampRelation.NONE;
+        }
+        Optional<BasecampMember> activeMember = findMember(memberId).filter(BasecampMember::isActive);
+        if (activeMember.isPresent()) {
+            return activeMember.get().isLeader() ? BasecampRelation.LEADER : BasecampRelation.MEMBER;
+        }
+        boolean pending = findApplicationOf(memberId)
+                .filter(BasecampApplication::isPending)
+                .isPresent();
+        return pending ? BasecampRelation.APPLICANT : BasecampRelation.NONE;
+    }
+
+    /**
      * memberId인 회원에게 연락 수단을 보여 줘도 되면 true다.
      *
      * <p>확정된 동안은 ACTIVE 멤버에게만 보인다. 완료된 뒤에는 완료 시각부터 {@link #CONTACT_VISIBLE_AFTER_COMPLETION}이 지날 때까지 보인다.

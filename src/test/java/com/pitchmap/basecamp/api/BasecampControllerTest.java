@@ -9,12 +9,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
+import com.pitchmap.basecamp.application.BasecampDetail;
+import com.pitchmap.basecamp.application.BasecampDetailQueryService;
 import com.pitchmap.basecamp.application.BasecampOpenCommand;
 import com.pitchmap.basecamp.application.BasecampOpenCommand.JoinConditionCommand;
 import com.pitchmap.basecamp.application.BasecampOpenResult;
 import com.pitchmap.basecamp.application.BasecampOpenService;
+import com.pitchmap.basecamp.application.BasecampSearchItem;
+import com.pitchmap.basecamp.application.BasecampSearchPage;
+import com.pitchmap.basecamp.application.BasecampSearchQuery;
+import com.pitchmap.basecamp.application.BasecampSearchService;
+import com.pitchmap.basecamp.application.JoinConditionSummary;
+import com.pitchmap.basecamp.application.JoinEligibility;
 import com.pitchmap.basecamp.domain.BasecampErrorCode;
 import com.pitchmap.basecamp.domain.BasecampException;
+import com.pitchmap.basecamp.domain.BasecampRelation;
+import com.pitchmap.basecamp.domain.JoinUnmetReason;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
@@ -55,6 +65,12 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampOpenService basecampOpenService;
+
+    @MockitoBean
+    private BasecampSearchService basecampSearchService;
+
+    @MockitoBean
+    private BasecampDetailQueryService basecampDetailQueryService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -242,6 +258,262 @@ class BasecampControllerTest {
                 Arguments.of(new BasecampException(BasecampErrorCode.BASECAMP_WARNING_SPOT), HttpStatus.BAD_REQUEST),
                 Arguments.of(
                         new BasecampException(BasecampErrorCode.BASECAMP_CAPACITY_INVALID), HttpStatus.BAD_REQUEST));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidSearchParameters")
+    @DisplayName("[F-12] 검색 파라미터가 어긋나면 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
+    void searchRejectsInvalidParameters(String description, String query) {
+        // when
+        MvcTestResult result = mvc.get().uri(BASECAMPS + "?" + query).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        verifyNoInteractions(basecampSearchService);
+    }
+
+    static Stream<Arguments> invalidSearchParameters() {
+        String area = "swLat=37.0&swLng=127.0&neLat=38.0&neLng=128.0";
+        String radius = "lat=37.25&lng=127.25&radiusKm=10";
+        return Stream.of(
+                Arguments.of("지역 없음", "page=0"),
+                Arguments.of("영역 일부만", "swLat=37.0&swLng=127.0"),
+                Arguments.of("반경 일부만", "lat=37.25&lng=127.25"),
+                Arguments.of("영역과 반경 모두", area + "&" + radius),
+                Arguments.of("영역과 반경 일부", area + "&radiusKm=10"),
+                Arguments.of("반경 50km 초과", "lat=37.25&lng=127.25&radiusKm=50.1"),
+                Arguments.of("반경 0", "lat=37.25&lng=127.25&radiusKm=0"),
+                Arguments.of("위도 범위 밖", "lat=91&lng=127.25&radiusKm=10"),
+                Arguments.of("남서쪽 위도가 북동쪽 이상", "swLat=38.0&swLng=127.0&neLat=37.0&neLng=128.0"),
+                Arguments.of("남서쪽 경도가 북동쪽 이상", "swLat=37.0&swLng=128.0&neLat=38.0&neLng=127.0"),
+                Arguments.of("출발일 범위 역순", radius + "&fromDate=2026-10-25&toDate=2026-10-20"),
+                Arguments.of("날짜 형식 오류", radius + "&fromDate=20261020"),
+                Arguments.of("페이지 크기 51", radius + "&size=51"),
+                Arguments.of("페이지 크기 0", radius + "&size=0"),
+                Arguments.of("페이지 번호 음수", radius + "&page=-1"));
+    }
+
+    @Test
+    @DisplayName("[F-12] 반경 50km와 출발일 범위를 보내면 받아서 기본값(page 0, size 20)과 함께 서비스에 넘긴다")
+    void searchPassesRadiusQueryWithDefaults() {
+        // given
+        when(basecampSearchService.search(any(), any())).thenReturn(new BasecampSearchPage(List.of(), 0, 20, false));
+
+        // when
+        MvcTestResult result = mvc.get()
+                .uri(BASECAMPS
+                        + "?lat=37.25&lng=127.25&radiusKm=50&fromDate=2026-10-20&toDate=2026-10-25&hasVacancy=true")
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        ArgumentCaptor<BasecampSearchQuery> captor = ArgumentCaptor.forClass(BasecampSearchQuery.class);
+        verify(basecampSearchService).search(eq(null), captor.capture());
+        assertThat(captor.getValue())
+                .isEqualTo(new BasecampSearchQuery(
+                        new BasecampSearchQuery.Radius(37.25, 127.25, 50.0),
+                        LocalDate.of(2026, 10, 20),
+                        LocalDate.of(2026, 10, 25),
+                        true,
+                        0,
+                        20));
+    }
+
+    @Test
+    @DisplayName("[F-12] 지도 영역을 보내면 영역 조건으로 서비스에 넘기고, 로그인한 회원의 ID를 함께 넘긴다")
+    void searchPassesAreaQueryWithViewerId() {
+        // given
+        when(basecampSearchService.search(any(), any())).thenReturn(new BasecampSearchPage(List.of(), 1, 50, false));
+
+        // when
+        MvcTestResult result = mvc.get()
+                .uri(BASECAMPS + "?swLat=37.0&swLng=127.0&neLat=38.0&neLng=128.0&page=1&size=50")
+                .with(verified())
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        ArgumentCaptor<BasecampSearchQuery> captor = ArgumentCaptor.forClass(BasecampSearchQuery.class);
+        verify(basecampSearchService).search(eq(MEMBER_ID), captor.capture());
+        assertThat(captor.getValue())
+                .isEqualTo(new BasecampSearchQuery(
+                        new BasecampSearchQuery.Area(37.0, 127.0, 38.0, 128.0), null, null, false, 1, 50));
+    }
+
+    @Test
+    @DisplayName("[F-12][NFR-11] 비로그인 검색 응답에는 canApply와 unmetReasons 필드가 없다")
+    void anonymousSearchOmitsEligibilityFields() {
+        // given
+        when(basecampSearchService.search(any(), any()))
+                .thenReturn(new BasecampSearchPage(List.of(searchItem(null)), 0, 20, true));
+
+        // when
+        MvcTestResult result =
+                mvc.get().uri(BASECAMPS + "?lat=37.25&lng=127.25&radiusKm=10").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.hasNext").isEqualTo(true);
+        assertThat(result).bodyJson().extractingPath("$.content[0].basecampId").isEqualTo(77);
+        assertThat(result).bodyJson().extractingPath("$.content[0].spot.type").isEqualTo("BAKJI");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[0].joinCondition.sameGenderOnly")
+                .isEqualTo(false);
+        assertThat(result).bodyJson().doesNotHavePath("$.content[0].canApply");
+        assertThat(result).bodyJson().doesNotHavePath("$.content[0].unmetReasons");
+    }
+
+    @Test
+    @DisplayName("[F-12] 로그인한 검색 응답에는 canApply와 unmetReasons가 있다")
+    void loggedInSearchIncludesEligibilityFields() {
+        // given
+        JoinEligibility unmet =
+                new JoinEligibility(false, List.of(JoinUnmetReason.TRUST_LEVEL, JoinUnmetReason.GENDER));
+        JoinEligibility ok = new JoinEligibility(true, List.of());
+        when(basecampSearchService.search(any(), any()))
+                .thenReturn(new BasecampSearchPage(List.of(searchItem(unmet), searchItem(ok)), 0, 20, false));
+
+        // when
+        MvcTestResult result = mvc.get()
+                .uri(BASECAMPS + "?lat=37.25&lng=127.25&radiusKm=10")
+                .with(unverified())
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.content[0].canApply").isEqualTo(false);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[0].unmetReasons")
+                .isEqualTo(List.of("TRUST_LEVEL", "GENDER"));
+        assertThat(result).bodyJson().extractingPath("$.content[1].canApply").isEqualTo(true);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[1].unmetReasons")
+                .isEqualTo(List.of());
+    }
+
+    @Test
+    @DisplayName("[F-12][NFR-11] 비로그인 상세 응답은 멤버를 닉네임과 역할만 담고 myRelation이 NONE이며, 연락 수단·신뢰 정보 필드가 없다")
+    void anonymousDetailShowsOnlyNicknames() {
+        // given
+        when(basecampDetailQueryService.find(any(), eq(77L))).thenReturn(detail(BasecampRelation.NONE, null));
+
+        // when
+        MvcTestResult result = mvc.get().uri(BASECAMPS + "/77").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        verify(basecampDetailQueryService).find(eq(null), eq(77L));
+        assertThat(result).bodyJson().extractingPath("$.myRelation").isEqualTo("NONE");
+        assertThat(result).bodyJson().extractingPath("$.description").isEqualTo("함께 가요");
+        assertThat(result).bodyJson().extractingPath("$.leader.nickname").isEqualTo("새벽능선");
+        assertThat(result).bodyJson().extractingPath("$.members[1].role").isEqualTo("MEMBER");
+        assertThat(result).bodyJson().extractingPath("$.safetyNotice").isNotNull();
+        assertThat(result).bodyJson().doesNotHavePath("$.leader.trustLevel");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].ageGroup");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].gender");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].trustLevel");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].completedCompanions");
+        assertThat(result).bodyJson().doesNotHavePath("$.contactInfo");
+    }
+
+    @Test
+    @DisplayName("[F-12][NFR-11] 로그인한 상세 응답은 멤버의 프로필 요약을 담고, 연락 수단이 없으면 contactInfo 필드를 뺀다")
+    void loggedInDetailShowsProfileAndOmitsMissingContact() {
+        // given
+        when(basecampDetailQueryService.find(any(), eq(77L))).thenReturn(detail(BasecampRelation.NONE, null));
+
+        // when
+        MvcTestResult result =
+                mvc.get().uri(BASECAMPS + "/77").with(unverified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        verify(basecampDetailQueryService).find(eq(MEMBER_ID), eq(77L));
+        assertThat(result).bodyJson().extractingPath("$.leader.trustLevel").isEqualTo(2);
+        assertThat(result).bodyJson().extractingPath("$.members[0].ageGroup").isEqualTo("THIRTIES");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.members[0].ageGroupVerified")
+                .isEqualTo(true);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.members[0].completedCompanions")
+                .isEqualTo(5);
+        assertThat(result).bodyJson().doesNotHavePath("$.contactInfo");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].email");
+        assertThat(result).bodyJson().doesNotHavePath("$.members[0].birthYear");
+    }
+
+    @Test
+    @DisplayName("[F-12][BC-23] 서비스가 연락 수단을 주면 로그인한 상세 응답에 contactInfo가 있다")
+    void loggedInDetailIncludesContactWhenServiceGivesIt() {
+        // given
+        when(basecampDetailQueryService.find(any(), eq(77L)))
+                .thenReturn(detail(BasecampRelation.MEMBER, "https://open.kakao.com/o/abc"));
+
+        // when
+        MvcTestResult result = mvc.get().uri(BASECAMPS + "/77").with(verified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.myRelation").isEqualTo("MEMBER");
+        assertThat(result).bodyJson().extractingPath("$.contactInfo").isEqualTo("https://open.kakao.com/o/abc");
+    }
+
+    @Test
+    @DisplayName("[F-12] 없는 베이스캠프를 조회하면 404 NOT_FOUND이고, 숫자가 아닌 ID는 400 INVALID_INPUT이다")
+    void detailNotFoundAndInvalidId() {
+        // given
+        when(basecampDetailQueryService.find(any(), eq(404L)))
+                .thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+
+        // when
+        MvcTestResult missing = mvc.get().uri(BASECAMPS + "/404").exchange();
+        MvcTestResult notNumber = mvc.get().uri(BASECAMPS + "/abc").exchange();
+
+        // then
+        assertThat(missing).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(missing).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+        assertThat(notNumber).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(notNumber).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+    }
+
+    private static BasecampSearchItem searchItem(JoinEligibility eligibility) {
+        return new BasecampSearchItem(
+                77L,
+                "굴업도 주말 1박",
+                new BasecampSearchItem.SpotSummary(101L, "개머리언덕", "BAKJI", 37.25, 127.25),
+                LocalDate.of(2026, 11, 7),
+                LocalDate.of(2026, 11, 8),
+                4,
+                3,
+                "RECRUITING",
+                new JoinConditionSummary(null, null, null, false),
+                eligibility);
+    }
+
+    private static BasecampDetail detail(BasecampRelation relation, String contactInfo) {
+        return new BasecampDetail(
+                77L,
+                "굴업도 주말 1박",
+                "함께 가요",
+                new BasecampDetail.SpotSummary(101L, "개머리언덕", "BAKJI"),
+                LocalDate.of(2026, 11, 7),
+                LocalDate.of(2026, 11, 8),
+                4,
+                2,
+                "CONFIRMED",
+                new JoinConditionSummary(1, null, null, false),
+                new BasecampDetail.DetailMember(31L, "새벽능선", "LEADER", "THIRTIES", true, "FEMALE", true, 2, 5),
+                List.of(
+                        new BasecampDetail.DetailMember(31L, "새벽능선", "LEADER", "THIRTIES", true, "FEMALE", true, 2, 5),
+                        new BasecampDetail.DetailMember(32L, "달빛야영", "MEMBER", null, false, null, false, 1, 0)),
+                relation,
+                contactInfo);
     }
 
     private static String dates() {
