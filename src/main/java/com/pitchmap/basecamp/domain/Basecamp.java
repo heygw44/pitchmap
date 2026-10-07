@@ -316,25 +316,48 @@ public class Basecamp {
         application.cancel(now);
     }
 
-    /** 호출하면 신청을 승인하고 멤버로 넣는다. 정원이 가득 차 있으면 {@link BasecampErrorCode#BASECAMP_FULL}이고, 승인해서 가득 차면 자동 마감한다. */
-    public void approve(long applicationId, Instant now) {
-        requireStatus(RECRUITING_ONLY);
+    /**
+     * 호출하면 applicationId인 신청을 승인할 수 있는지 검사하고, 승인할 수 있으면 그 대기 신청을 돌려준다.
+     *
+     * <p>다음 순서로 검사한다. 이 베이스캠프의 신청이 아니면 NOT_FOUND이고, 모집 중이 아니거나 신청이 대기 중이 아니면
+     * {@link BasecampErrorCode#BASECAMP_INVALID_STATE}이다. 정원이 이미 차 있으면 {@link BasecampErrorCode#BASECAMP_FULL}이다.
+     * 신청자의 합류 조건과 날짜 겹침은 다른 모듈의 정보가 필요해서 호출하는 쪽이 검사한다.
+     */
+    public BasecampApplication checkApprovable(long applicationId) {
         BasecampApplication application = requireApplication(applicationId);
+        requireStatus(RECRUITING_ONLY);
         requirePending(application);
         if (isFull()) {
             throw new BasecampException(BasecampErrorCode.BASECAMP_FULL);
         }
+        return application;
+    }
+
+    /**
+     * 호출하면 신청을 승인하고 멤버로 넣는다. 승인해서 정원이 가득 차면 자동 마감한다.
+     *
+     * <p>승인할 수 없는 경우는 {@link #checkApprovable(long)}와 같은 오류 코드로 거부한다. 승인한 신청을 돌려준다.
+     */
+    public BasecampApplication approve(long applicationId, Instant now) {
+        BasecampApplication application = checkApprovable(applicationId);
         application.approve(now);
         members.add(BasecampMember.member(this, application.getApplicantId(), now));
         closeIfFull(now);
+        return application;
     }
 
-    /** 호출하면 대기 중인 신청을 거절한다. 거절된 회원은 같은 베이스캠프에 다시 신청할 수 없다. */
-    public void reject(long applicationId, Instant now) {
-        requireStatus(RECRUITING_ONLY);
+    /**
+     * 호출하면 대기 중인 신청을 거절한다. 거절된 회원은 같은 베이스캠프에 다시 신청할 수 없다.
+     *
+     * <p>이 베이스캠프의 신청이 아니면 NOT_FOUND이고, 모집 중이 아니거나 신청이 대기 중이 아니면
+     * {@link BasecampErrorCode#BASECAMP_INVALID_STATE}이다. 거절한 신청을 돌려준다.
+     */
+    public BasecampApplication reject(long applicationId, Instant now) {
         BasecampApplication application = requireApplication(applicationId);
+        requireStatus(RECRUITING_ONLY);
         requirePending(application);
         application.reject(now);
+        return application;
     }
 
     /**

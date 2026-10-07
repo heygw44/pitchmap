@@ -2,21 +2,13 @@ package com.pitchmap.basecamp.application;
 
 import com.pitchmap.basecamp.domain.Basecamp;
 import com.pitchmap.basecamp.domain.BasecampApplication;
-import com.pitchmap.basecamp.domain.BasecampErrorCode;
-import com.pitchmap.basecamp.domain.BasecampException;
 import com.pitchmap.basecamp.domain.BasecampRepository;
 import com.pitchmap.basecamp.domain.JoinEligibilityPolicy;
 import com.pitchmap.basecamp.domain.JoinEligibilityPolicy.Applicant;
-import com.pitchmap.basecamp.domain.JoinUnmetReason;
-import com.pitchmap.basecamp.domain.PriorRelation;
-import com.pitchmap.basecamp.infra.BasecampSearchMapper;
-import com.pitchmap.basecamp.infra.ConfirmedScheduleRow;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.outbox.OutboxEventRecorder;
-import com.pitchmap.trust.application.TrustSummaryService;
 import java.time.Clock;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BasecampApplyService {
 
     private final BasecampRepository basecampRepository;
-    private final BasecampSearchMapper basecampSearchMapper;
-    private final TrustSummaryService trustSummaryService;
+    private final JoinEligibilityChecker joinEligibilityChecker;
     private final OutboxEventRecorder outboxEventRecorder;
     private final Clock clock;
 
@@ -59,10 +50,10 @@ public class BasecampApplyService {
         Basecamp basecamp = basecampRepository
                 .findByIdForUpdate(command.basecampId())
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        Applicant applicant = JoinApplicants.from(trustSummaryService.detail(command.memberId()));
+        Applicant applicant = joinEligibilityChecker.applicantOf(command.memberId());
         requireBaseTrustLevel(applicant);
         basecamp.checkApplicable(command.memberId());
-        requireJoinConditionAndSchedule(basecamp, applicant, command.memberId());
+        joinEligibilityChecker.requireEligible(basecamp, applicant, command.memberId());
 
         BasecampApplication application = submit(basecamp, command);
         // 베이스캠프는 이미 영속 상태라 flush만 하면 새 신청이 저장되고 ID가 채워진다.
@@ -81,34 +72,6 @@ public class BasecampApplyService {
         if (applicant.trustLevel() < JoinEligibilityPolicy.BASE_TRUST_LEVEL) {
             throw new BusinessException(CommonErrorCode.TRUST_LEVEL_INSUFFICIENT);
         }
-    }
-
-    // 이전 관계는 checkApplicable이 이미 검사했으므로 NONE으로 넘기고, 남은 이유 가운데 첫 번째로 거부한다.
-    private void requireJoinConditionAndSchedule(Basecamp basecamp, Applicant applicant, long memberId) {
-        boolean dateConflict = hasDateConflict(basecamp, memberId);
-        List<JoinUnmetReason> reasons = JoinEligibilityPolicy.unmetReasons(
-                basecamp.getJoinCondition(), applicant, dateConflict, PriorRelation.NONE);
-        if (!reasons.isEmpty()) {
-            throw toException(reasons.get(0));
-        }
-    }
-
-    // 확정된 일정과 하루라도 겹치면 충돌이다. 이 베이스캠프 자신은 비교에서 뺀다.
-    private boolean hasDateConflict(Basecamp basecamp, long memberId) {
-        List<ConfirmedScheduleRow> schedules = basecampSearchMapper.selectConfirmedSchedules(memberId);
-        return schedules.stream()
-                .filter(schedule -> schedule.basecampId() != basecamp.getId())
-                .anyMatch(schedule -> JoinEligibilityPolicy.overlaps(
-                        basecamp.getStartDate(), basecamp.getEndDate(), schedule.startDate(), schedule.endDate()));
-    }
-
-    private static BasecampException toException(JoinUnmetReason reason) {
-        return switch (reason) {
-            case TRUST_LEVEL, AGE_GROUP, GENDER -> new BasecampException(BasecampErrorCode.BASECAMP_CONDITION_NOT_MET);
-            case DATE_CONFLICT -> new BasecampException(BasecampErrorCode.BASECAMP_DATE_CONFLICT);
-            case ALREADY_JOINED -> new BasecampException(BasecampErrorCode.BASECAMP_ALREADY_APPLIED);
-            case REAPPLY_NOT_ALLOWED -> new BasecampException(BasecampErrorCode.BASECAMP_REAPPLY_NOT_ALLOWED);
-        };
     }
 
     // 메시지 길이처럼 도메인이 IllegalArgumentException으로 알리는 요청 값 오류는 INVALID_INPUT으로 바꾼다.
