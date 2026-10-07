@@ -1403,7 +1403,7 @@
     },
     {
       "type": "row",
-      "title": "로그",
+      "title": "백업",
       "id": 31,
       "collapsed": false,
       "gridPos": {
@@ -1415,9 +1415,159 @@
       "panels": []
     },
     {
+      "type": "stat",
+      "title": "마지막 성공 뒤 지난 시간",
+      "id": 32,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 81
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "time() - max(pitchmap_backup_last_success_timestamp_seconds{instance=\"pitchmap-prod\",job=\"integrations/unix\"})",
+          "legendFormat": "",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 93600
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      },
+      "description": "알림 기준: 26시간 초과. 매일 새벽 4시 30분(한국 시간)에 백업한다"
+    },
+    {
+      "type": "stat",
+      "title": "마지막 백업 크기 (압축)",
+      "id": 33,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 81
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "max(pitchmap_backup_last_size_bytes{instance=\"pitchmap-prod\",job=\"integrations/unix\"})",
+          "legendFormat": "",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "마지막 백업에 걸린 시간",
+      "id": 34,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "__PROM_UID__"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 81
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "__PROM_UID__"
+          },
+          "expr": "max(pitchmap_backup_last_duration_seconds{instance=\"pitchmap-prod\",job=\"integrations/unix\"})",
+          "legendFormat": "",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "type": "row",
+      "title": "로그",
+      "id": 35,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 86
+      },
+      "panels": []
+    },
+    {
       "type": "logs",
       "title": "앱 ERROR·WARN 로그",
-      "id": 32,
+      "id": 36,
       "datasource": {
         "type": "loki",
         "uid": "__LOKI_UID__"
@@ -1426,7 +1576,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 87
       },
       "targets": [
         {

@@ -36,6 +36,9 @@ declare -rA SECRET_PARAMS=(
     [grafana/token]=GRAFANA_CLOUD_TOKEN
 )
 readonly EXPORTER_USER=pitchmap_exporter
+readonly BACKUP_DIR="$DEPLOY_DIR/backup"
+readonly BACKUP_METRICS_FILE="$DEPLOY_DIR/metrics/backup.prom"
+readonly SYSTEMD_DIR=/etc/systemd/system
 
 declare -A secrets=()
 declare -A server_env=()
@@ -185,6 +188,27 @@ SQL
     fi
 }
 
+# 매일 DB를 백업하는 systemd 타이머를 설치하거나 갱신한다. 파일은 배포 워크플로가 이 커밋의 deploy/backup/에서 받아 둔다.
+# 백업 결과 지표가 아직 없으면(처음 설치) 백업을 바로 한 번 실행해서, 다음 날 새벽까지 '백업 없음' 알림이 울리지 않게 한다.
+# 실패해도 서비스는 정상이므로 배포를 실패로 만들지 않고 로그만 남긴다. 백업이 멈추면 Grafana 알림이 따로 알린다.
+install_backup_timer() {
+    if [[ -z "${server_env[BACKUP_BUCKET]:-}" ]]; then
+        log "server.env에 BACKUP_BUCKET이 없어 백업 타이머를 설치하지 않는다"
+        return
+    fi
+    if ! install -m 644 "$BACKUP_DIR/pitchmap-backup.service" "$BACKUP_DIR/pitchmap-backup.timer" "$SYSTEMD_DIR/" \
+        || ! systemctl daemon-reload \
+        || ! systemctl enable --now pitchmap-backup.timer > /dev/null 2>&1; then
+        log "백업 타이머를 설치하지 못했다"
+        return
+    fi
+    log "백업 타이머 확인 완료: $(systemctl show pitchmap-backup.timer -p NextElapseUSecRealtime --value)"
+    if [[ ! -f "$BACKUP_METRICS_FILE" ]]; then
+        systemctl start --no-block pitchmap-backup.service
+        log "첫 백업을 시작했다. 결과는 journalctl -u pitchmap-backup 으로 본다"
+    fi
+}
+
 main() {
     local tag="${1:-}"
     if [[ ! "$tag" =~ ^[A-Za-z0-9._-]{1,128}$ ]]; then
@@ -210,6 +234,7 @@ main() {
     if start "$tag"; then
         echo "$tag" > "$LAST_TAG_FILE"
         ensure_exporter_user
+        install_backup_timer
         # 사흘 넘게 쓰지 않은 이미지를 지워 디스크를 확보한다. 되돌릴 이미지가 지워져도 GHCR에서 다시 받는다.
         docker image prune -af --filter "until=72h" > /dev/null
         log "배포 성공: $tag"

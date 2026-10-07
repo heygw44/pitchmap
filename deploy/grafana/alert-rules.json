@@ -297,6 +297,55 @@
       ]
     },
     {
+      "uid": "pitchmap-backup-stale",
+      "title": "DB 백업 26시간 넘게 없음",
+      "condition": "C",
+      "for": "0s",
+      "noDataState": "Alerting",
+      "execErrState": "Error",
+      "labels": {
+        "service": "pitchmap"
+      },
+      "annotations": {
+        "summary": "마지막으로 성공한 DB 백업이 26시간보다 오래됐다. 서버에서 journalctl -u pitchmap-backup 으로 원인을 본다. 백업 지표가 아예 없어도 이 알림이 온다."
+      },
+      "data": [
+        {
+          "refId": "A",
+          "relativeTimeRange": {
+            "from": 600,
+            "to": 0
+          },
+          "datasourceUid": "__PROM_UID__",
+          "model": {
+            "refId": "A",
+            "expr": "time() - max(pitchmap_backup_last_success_timestamp_seconds{instance=\"pitchmap-prod\",job=\"integrations/unix\"})",
+            "instant": true,
+            "range": false
+          }
+        },
+        {
+          "refId": "C",
+          "datasourceUid": "__expr__",
+          "model": {
+            "refId": "C",
+            "type": "threshold",
+            "expression": "A",
+            "conditions": [
+              {
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    93600
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "uid": "pitchmap-app-down",
       "title": "앱 상태 확인 실패",
       "condition": "C",

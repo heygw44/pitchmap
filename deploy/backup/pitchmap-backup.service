@@ -1,0 +1,14 @@
+# 운영 DB 백업을 한 번 실행한다. pitchmap-backup.timer가 매일 이 서비스를 실행하고, 배포 스크립트가 이 파일을 설치한다.
+# 로그는 journalctl -u pitchmap-backup 으로 본다.
+[Unit]
+Description=pitchmap MySQL backup to S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pitchmap/backup/backup.sh
+# 백업이 서비스 응답을 밀어내지 않도록 CPU와 디스크 우선순위를 낮춘다.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

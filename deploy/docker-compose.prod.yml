@@ -96,6 +96,8 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/host/root:ro
+      # DB 백업 스크립트가 남기는 지표 파일(backup.prom)을 읽는다.
+      - ./metrics:/host/textfile:ro
       # 컨테이너를 찾고 로그를 읽으려고 Docker 소켓을 붙인다. 이 소켓을 가진 컨테이너는 사실상 서버 root 권한을 가진다.
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
