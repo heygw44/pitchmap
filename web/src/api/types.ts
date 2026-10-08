@@ -611,3 +611,158 @@ export interface SealedReceivedCompanionReview {
 }
 
 export type ReceivedCompanionReview = RevealedReceivedCompanionReview | SealedReceivedCompanionReview;
+
+// 알림
+
+// 서버가 알림 종류를 정한 순서다. 이메일 수신 설정 화면도 이 순서로 보여 준다.
+export type NotificationType =
+  | 'BASECAMP_APPLIED'
+  | 'BASECAMP_APPROVED'
+  | 'BASECAMP_REJECTED'
+  | 'BASECAMP_KICKED'
+  | 'BASECAMP_CONFIRMED'
+  | 'BASECAMP_CANCELED'
+  | 'BASECAMP_COMPLETED'
+  | 'BASECAMP_MEMBER_CHANGED'
+  | 'MEMBER_REPORT_RESOLVED'
+  | 'SANCTION_CONFIRMED';
+
+export interface NotificationItem {
+  notificationId: number;
+  type: NotificationType;
+  title: string;
+  body: string;
+  // 연결할 화면이 없으면 null이다. 값이 있으면 앱 안의 경로다.
+  link: string | null;
+  // 아직 읽지 않았으면 null이다.
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationSetting {
+  type: NotificationType;
+  emailEnabled: boolean;
+}
+
+// 회원·후기 신고와 관리자 처리
+
+export type ReportKind = 'MEMBER' | 'REVIEW';
+
+export type ReportType =
+  | 'NO_SHOW'
+  | 'MONEY_REQUEST'
+  | 'HARASSMENT_OR_THREAT'
+  | 'OFFENSIVE_BEHAVIOR'
+  | 'FAKE_PROFILE'
+  | 'ILLEGAL_CAMPING_INDUCEMENT'
+  | 'INAPPROPRIATE_REVIEW';
+
+export type ReportStatus = 'RECEIVED' | 'IN_REVIEW' | 'ACTIONED' | 'DISMISSED';
+
+export type SanctionType = 'WARNING' | 'SUSPEND_7D' | 'SUSPEND_30D' | 'PERMANENT' | 'TEMPORARY_72H';
+
+export type SanctionStatus = 'ACTIVE' | 'LIFTED' | 'EXPIRED';
+
+export interface MemberReportCreateRequest {
+  targetMemberId: number;
+  basecampId: number;
+  kind: ReportKind;
+  // 후기 신고(REVIEW)일 때만 보낸다.
+  companionReviewId?: number;
+  type: ReportType;
+  content: string;
+}
+
+export interface MemberReportCreateResponse {
+  reportId: number;
+  status: ReportStatus;
+}
+
+// 관리자 화면
+
+export interface AdminMemberRef {
+  memberId: number;
+  nickname: string;
+}
+
+export interface AdminReportSummary {
+  reportId: number;
+  kind: ReportKind;
+  type: ReportType;
+  urgent: boolean;
+  status: ReportStatus;
+  reporter: AdminMemberRef;
+  target: AdminMemberRef;
+  basecampId: number;
+  createdAt: string;
+}
+
+export interface AdminReportBasecamp {
+  basecampId: number;
+  title: string;
+  status: BasecampStatus;
+  startDate: string;
+}
+
+export interface AdminReportReview {
+  comment: string;
+  tags: string[];
+  rejoinWanted: boolean;
+  hidden: boolean;
+}
+
+export interface AdminSanctionHistoryItem {
+  sanctionId: number;
+  type: SanctionType;
+  // 단계가 없는 제재(임시 정지 등)는 null이다.
+  level: number | null;
+  status: SanctionStatus;
+  reason: string;
+  startsAt: string;
+  endsAt: string | null;
+  liftedAt: string | null;
+}
+
+// 후기 신고일 때만 companionReview가 있다. 처리 전에는 resultNote, handledBy, handledAt이 null이다.
+export interface AdminReportDetail extends AdminReportSummary {
+  content: string;
+  resultNote: string | null;
+  handledBy: number | null;
+  handledAt: string | null;
+  basecamp: AdminReportBasecamp | null;
+  companionReview: AdminReportReview | null;
+  sanctionHistory: AdminSanctionHistoryItem[];
+}
+
+// 관리자가 새로 내릴 수 있는 제재 종류다. 임시 정지는 서버가 신고 접수 때 만든다.
+export type ConfirmableSanctionType = Exclude<SanctionType, 'TEMPORARY_72H'>;
+
+export interface AdminReportActionRequest {
+  sanction: { type: ConfirmableSanctionType; reason: string } | null;
+  hideReview: boolean;
+  note?: string;
+}
+
+export interface AdminReportActionResponse {
+  reportId: number;
+  status: ReportStatus;
+  sanctionId: number | null;
+}
+
+export type AdminSpotStatus = 'PENDING_REVIEW' | 'HIDDEN';
+
+export interface AdminSpotSummary {
+  spotId: number;
+  type: SpotType;
+  name: string;
+  status: string;
+  lat: number;
+  lng: number;
+  parkWarning: boolean;
+  // 공공데이터 장소는 null이다.
+  reporter: { memberId: number; nickname: string } | null;
+  reportCount: number;
+  reasonCounts: Record<BakjiReportReason, number>;
+  recentReports: { reason: BakjiReportReason; content: string | null; createdAt: string }[];
+  statusChangedAt: string;
+}

@@ -17,6 +17,7 @@ import { BasecampListPanel } from '../basecamp/BasecampListPanel';
 import { BasecampOpenPanel } from '../basecamp/BasecampOpenPanel';
 import { useBasecampsInView } from '../basecamp/useBasecampsInView';
 import type { BasecampFilters, BasecampsInView } from '../basecamp/useBasecampsInView';
+import { useUnreadCount, useUnreadCountSync } from '../notification/unreadCount';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import { BakjiReportPanel } from './BakjiReportPanel';
@@ -273,7 +274,10 @@ export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: Map
                 피치맵
               </Link>
             </h1>
-            <AccountChip />
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <NotificationLink />
+              <AccountChip />
+            </div>
           </div>
           <div className="flex flex-wrap items-start justify-between gap-2">
             {reporting || opening ? <span /> : <ModeToggle basecampMode={basecampMode} />}
@@ -427,6 +431,35 @@ function ReportButton() {
     >
       <Icon name="backpack" size={20} />
       박지 제보
+    </Link>
+  );
+}
+
+// 로그인한 회원에게만 보인다. 안 읽은 알림이 있으면 개수를 배지로 보여 준다.
+function NotificationLink() {
+  const session = useSession();
+  const active = session.status === 'authenticated' && session.me !== null;
+  useUnreadCountSync(active);
+  const count = useUnreadCount();
+
+  if (!active) return null;
+
+  return (
+    <Link
+      to="/me/notifications"
+      aria-label={count > 0 ? `알림, 안 읽음 ${count}개` : '알림'}
+      className={`${CHIP_CLASS} relative text-ink hover:bg-paper-deep`}
+    >
+      <Icon name="bell" size={20} />
+      <span className="hidden text-sm sm:inline">알림</span>
+      {count > 0 && (
+        <span
+          aria-hidden="true"
+          className="rounded-control bg-forest px-1.5 font-mono text-xs font-semibold tabular-nums text-white"
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
     </Link>
   );
 }
