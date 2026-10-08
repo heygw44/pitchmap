@@ -9,7 +9,9 @@
     <!-- 받은 후기는 공개된 것만 센다. 공개 전 후기를 세면 비율이 바뀌는 것만으로 후기 내용이 드러나기 때문이다.
          공개 조건은 CompanionReviewMapper.selectPublicByReviewee와 같다: 완료 시각이 revealCutoff(지금 - 14일)보다 앞서거나
          반대 방향 후기가 있다. 기한 정각에는 아직 쓸 수 있으므로 같은 시각은 지난 것이 아니다.
-         임박 탈퇴는 earlyLeaveSince(지금 - 180일) 정각을 포함한다.
+         임박 탈퇴는 recentSince(지금 - 180일) 정각을 포함한다.
+         최근 제재는 recentSince 정각에 시작한 것도 포함한다. 서버가 먼저 내린 임시 정지(TEMPORARY_72H)는 관리자가
+         확인하기 전이라 확정 제재가 아니므로 넣지 않고, 해제된 제재도 넣지 않는다. 경고는 넣는다.
          "다시 동행" 수는 SUM이 DECIMAL을 돌려줘서 record의 long 필드와 맞지 않으므로 COUNT(CASE ...)로 센다. -->
     <select id="selectCompanionRecord" resultType="com.pitchmap.trust.infra.TrustRecordRow">
         SELECT (SELECT COUNT(*)
@@ -37,7 +39,13 @@
                (SELECT COUNT(*)
                 FROM basecamp_member bm
                 WHERE bm.member_id = #{memberId} AND bm.early_leave = TRUE
-                  AND bm.left_at &gt;= #{earlyLeaveSince}) AS recent_early_leaves
+                  AND bm.left_at &gt;= #{recentSince}) AS recent_early_leaves,
+               EXISTS (SELECT 1
+                       FROM sanction s
+                       WHERE s.member_id = #{memberId}
+                         AND s.type &lt;&gt; 'TEMPORARY_72H'
+                         AND s.status &lt;&gt; 'LIFTED'
+                         AND s.starts_at &gt;= #{recentSince}) AS recent_sanction
     </select>
 
     <!-- 태그 횟수도 받은 후기 집계와 같은 공개 조건을 쓴다. 후기마다 같은 태그는 한 번만 붙으므로 행 수가 곧 후기 수다. -->

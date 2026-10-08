@@ -6,5 +6,10 @@ public enum SanctionType {
     SUSPEND_7D,
     SUSPEND_30D,
     PERMANENT,
-    TEMPORARY_72H
+    TEMPORARY_72H;
+
+    /** 회원의 이용을 막는 종류이면 true다. 경고만 이용을 막지 않는다. */
+    public boolean isSuspension() {
+        return this != WARNING;
+    }
 }

@@ -85,16 +85,16 @@ public class TrustSummaryService {
         return new TrustSummary(true, level);
     }
 
-    // 제재 기록은 제재 기능에서 생긴다. 그 전까지는 모든 회원이 최근 확정 제재가 없는 것으로 계산한다.
     private CompanionRecord companionRecordOf(long memberId, Instant now) {
-        TrustRecordRow row = trustRecordMapper.selectCompanionRecord(
-                memberId, CompanionReviewPolicy.revealCutoff(now), now.minus(CompanionRecord.RECENT_PERIOD));
+        Instant recentSince = now.minus(CompanionRecord.RECENT_PERIOD);
+        TrustRecordRow row =
+                trustRecordMapper.selectCompanionRecord(memberId, CompanionReviewPolicy.revealCutoff(now), recentSince);
         return new CompanionRecord(
                 Math.toIntExact(row.completedCompanions()),
                 Math.toIntExact(row.receivedReviews()),
                 Math.toIntExact(row.rejoinWanted()),
                 Math.toIntExact(row.recentEarlyLeaves()),
-                false);
+                row.recentSanction());
     }
 
     private List<String> topTagsOf(long memberId, Instant now) {

@@ -133,6 +133,38 @@ public class Member {
     }
 
     /**
+     * 호출하면 회원을 종료 시각 없이 정지한다(영구 정지). 이미 정지 중이면 종료 시각을 지운다. 탈퇴한 회원은 그대로 둔다.
+     */
+    public void suspendPermanently(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("수정 시각이 null입니다.");
+        }
+        if (status == MemberStatus.WITHDRAWN) {
+            return;
+        }
+        this.status = MemberStatus.SUSPENDED;
+        this.suspendedUntil = null;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 정지 종료 시각이 now와 같거나 지났을 때 정지를 풀고 true를 돌려준다. 이메일 인증을 마친 회원은 ACTIVE로, 마치지 못한 회원은
+     * UNVERIFIED로 돌아간다. 정지 중이 아니거나, 종료 시각이 없는 영구 정지이거나, 아직 끝나지 않았으면 아무것도 바꾸지 않고 false를 돌려준다.
+     */
+    public boolean releaseSuspensionIfExpired(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("현재 시각이 null입니다.");
+        }
+        if (status != MemberStatus.SUSPENDED || suspendedUntil == null || suspendedUntil.isAfter(now)) {
+            return false;
+        }
+        this.status = emailVerifiedAt != null ? MemberStatus.ACTIVE : MemberStatus.UNVERIFIED;
+        this.suspendedUntil = null;
+        this.updatedAt = now;
+        return true;
+    }
+
+    /**
      * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 규칙을 어기면 입력 오류 예외를 던지고 아무것도 바꾸지 않는다.
      */
     public void changeNickname(String nickname, Instant now) {

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.member.infra.MemberSuspensionMapper">
+
+    <!-- member.suspended_until은 그 회원에게 적용 중인 정지 중 가장 늦은 종료 시각이다. 그래서 이 시각이 지났으면 적용 중인 정지가 없다.
+         바뀐 열은 도메인 엔티티의 Member.releaseSuspensionIfExpired가 바꾸는 열과 같아야 한다. -->
+    <update id="releaseExpired">
+        UPDATE member
+        SET status = CASE WHEN email_verified_at IS NULL THEN 'UNVERIFIED' ELSE 'ACTIVE' END,
+            suspended_until = NULL,
+            updated_at = #{now}
+        WHERE status = 'SUSPENDED'
+          AND suspended_until IS NOT NULL
+          AND suspended_until &lt;= #{now}
+    </update>
+</mapper>

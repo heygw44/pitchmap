@@ -383,6 +383,38 @@ public class Basecamp {
         reopenIfAutoClosed(now);
     }
 
+    /**
+     * 호출하면 이용 정지 제재를 받은 memberId인 회원을 이 베이스캠프에서 정리하고 무엇을 했는지 돌려준다. 모집 중, 마감, 확정 상태에서만 바꾼다.
+     * <ul>
+     *   <li>캠프 리더이면 {@link CancelReason#LEADER_SANCTIONED}로 베이스캠프를 취소한다. 결정되지 않은 신청은 함께 만료된다.
+     *   <li>멤버이면 탈퇴 처리한다. 본인의 뜻이 아닌 제외라서 임박 탈퇴로 세지 않고, 자동 마감한 베이스캠프는 빈자리가 생기면 다시 연다.
+     *   <li>대기 중인 신청자이면 신청을 취소한다.
+     *   <li>이미 빠졌거나 베이스캠프가 끝났으면 아무것도 바꾸지 않는다. 그래서 같은 회원에게 두 번 불러도 결과가 같다.
+     * </ul>
+     */
+    public SanctionRemoval removeSanctionedMember(long memberId, Instant now) {
+        if (!NOT_FINISHED.contains(status)) {
+            return SanctionRemoval.NOTHING;
+        }
+        if (isLeader(memberId)) {
+            markCanceled(CancelReason.LEADER_SANCTIONED, now);
+            return SanctionRemoval.LEADER_CANCELED;
+        }
+        Optional<BasecampMember> activeMember = findMember(memberId).filter(BasecampMember::isActive);
+        if (activeMember.isPresent()) {
+            activeMember.get().removeBySanction(now);
+            reopenIfAutoClosed(now);
+            return SanctionRemoval.MEMBER_LEFT;
+        }
+        Optional<BasecampApplication> pending = findApplicationOf(memberId).filter(BasecampApplication::isPending);
+        if (pending.isPresent()) {
+            pending.get().cancel(now);
+            touch(now);
+            return SanctionRemoval.APPLICATION_CANCELED;
+        }
+        return SanctionRemoval.NOTHING;
+    }
+
     /** 호출하면 캠프 리더가 memberId인 멤버를 강퇴한다. 확정 전에만 할 수 있고 사유가 꼭 있어야 한다. 캠프 리더는 강퇴할 수 없다. */
     public void kick(long memberId, KickReason reason, Instant now) {
         if (reason == null) {
