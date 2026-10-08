@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.notification.infra.NotificationMailMapper">
+
+    <!-- 설정 행이 없는 종류는 LEFT JOIN 결과가 NULL이므로 COALESCE로 기본값을 채운다. 기본값은 앱이 정하고 파라미터로 받는다.
+         회원 조건은 둘 다 필요하다. 상태만 보면 인증을 한 번도 마치지 않은 정지 회원이 들어오고, 인증 여부만 보면 탈퇴 등으로 상태가 맞지 않는 회원이 들어온다.
+         dedup_key 유니크 인덱스로 알림을 찾고, 회원과 설정은 기본 키로 찾는다. -->
+    <select id="selectMailTargets" resultType="com.pitchmap.notification.infra.NotificationMailRow">
+        SELECT n.id AS notification_id,
+               m.email AS email,
+               n.title AS title,
+               n.body AS body,
+               n.link AS link
+        FROM notification n
+        JOIN member m ON m.id = n.member_id
+        LEFT JOIN notification_setting s ON s.member_id = n.member_id AND s.type = n.type
+        WHERE n.dedup_key IN
+        <foreach collection="dedupKeys" item="dedupKey" open="(" separator="," close=")">
+            #{dedupKey}
+        </foreach>
+          AND n.email_sent_at IS NULL
+          AND COALESCE(s.email_enabled, #{defaultEmailEnabled})
+          AND m.status IN ('ACTIVE', 'SUSPENDED')
+          AND m.email IS NOT NULL
+          AND m.email_verified_at IS NOT NULL
+        ORDER BY n.id
+    </select>
+</mapper>

@@ -25,4 +25,7 @@ public interface NotificationRepository {
 
     /** 호출하면 그 회원의 안 읽은 알림을 모두 now에 읽은 것으로 바꾸고, 바뀐 건수를 돌려준다. */
     int markAllRead(long memberId, Instant now);
+
+    /** 호출하면 아직 메일을 보내지 않은 그 알림만 메일을 보낸 시각을 now로 기록하고 바뀐 건수를 돌려준다. 이미 기록됐으면 0이다. */
+    int markEmailSent(long id, Instant now);
 }

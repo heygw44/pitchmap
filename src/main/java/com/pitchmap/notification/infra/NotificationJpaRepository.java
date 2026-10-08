@@ -46,4 +46,10 @@ public interface NotificationJpaRepository extends JpaRepository<Notification, L
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Notification n SET n.readAt = :now WHERE n.memberId = :memberId AND n.readAt IS NULL")
     int markAllRead(@Param("memberId") long memberId, @Param("now") Instant now);
+
+    // 이미 보낸 알림은 건드리지 않도록 조건을 UPDATE에 둔다. 영속성 컨텍스트의 예전 값을 계속 쓰지 않도록 실행 뒤에 비운다.
+    @Override
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Notification n SET n.emailSentAt = :now WHERE n.id = :id AND n.emailSentAt IS NULL")
+    int markEmailSent(@Param("id") long id, @Param("now") Instant now);
 }

@@ -9,12 +9,14 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class MemberReportResolvedNotificationHandler extends NotificationEventHandler<NotificationPayloads.ReportResolved> {
 
-    MemberReportResolvedNotificationHandler(JsonMapper jsonMapper, NotificationWriter notificationWriter) {
+    MemberReportResolvedNotificationHandler(
+            JsonMapper jsonMapper, NotificationWriter notificationWriter, NotificationMailer notificationMailer) {
         super(
                 NotificationEventTypes.MEMBER_REPORT_RESOLVED,
                 NotificationPayloads.ReportResolved.class,
                 jsonMapper,
-                notificationWriter);
+                notificationWriter,
+                notificationMailer);
     }
 
     @Override
