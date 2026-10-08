@@ -19,6 +19,10 @@ pitchmap:
     reset-throttle-cleanup:
       # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
       enabled: false
+  idempotency:
+    cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
   basecamp:
     auto-transition:
       # 자동 처리를 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
