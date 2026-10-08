@@ -26,13 +26,14 @@ const INITIAL_STATE: AreaState = { markers: [], clusters: [], status: 'idle', er
 // 지도 이동이 멈출 때마다 지금 보이는 영역의 장소를 받는다.
 // 빠르게 여러 번 움직이면 앞선 요청을 취소해서 마지막 영역의 응답만 화면에 남긴다.
 // 서버가 묶음으로 주면 그대로 그리고, 클라이언트에서 다시 묶지 않는다.
-export function useSpotsInView(map: MapView | null): SpotsInView {
+// enabled가 false이면 아무것도 보내지 않고 지도의 마커도 건드리지 않는다. 베이스캠프를 찾는 화면이 마커를 맡는 동안 끈다.
+export function useSpotsInView(map: MapView | null, enabled = true): SpotsInView {
   const [state, setState] = useState<AreaState>(INITIAL_STATE);
   const controllerRef = useRef<AbortController | null>(null);
   const loadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !enabled) return;
     // 요청만 보낸다. 상태는 응답이 온 뒤에만 바꾼다.
     const request = () => {
       controllerRef.current?.abort();
@@ -88,11 +89,11 @@ export function useSpotsInView(map: MapView | null): SpotsInView {
       loadRef.current = () => {};
       setState(INITIAL_STATE);
     };
-  }, [map]);
+  }, [map, enabled]);
 
   const retry = useCallback(() => loadRef.current(), []);
 
   // 지도가 준비된 뒤 첫 응답 전에는 idle로 남아 있으므로 불러오는 중으로 돌려준다.
-  const status: AreaStatus = map && state.status === 'idle' ? 'loading' : state.status;
+  const status: AreaStatus = map && enabled && state.status === 'idle' ? 'loading' : state.status;
   return { ...state, status, retry };
 }

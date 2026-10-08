@@ -5,6 +5,7 @@ import com.pitchmap.basecamp.domain.BasecampMember;
 import com.pitchmap.basecamp.domain.BasecampMemberRole;
 import com.pitchmap.basecamp.domain.BasecampRelation;
 import com.pitchmap.basecamp.domain.BasecampRepository;
+import com.pitchmap.basecamp.domain.BasecampStatus;
 import com.pitchmap.basecamp.domain.JoinCondition;
 import com.pitchmap.basecamp.infra.BasecampSearchMapper;
 import com.pitchmap.basecamp.infra.SpotSummaryRow;
@@ -31,11 +32,14 @@ public class BasecampDetailQueryService {
     private final BasecampRepository basecampRepository;
     private final BasecampSearchMapper basecampSearchMapper;
     private final MemberProfileQueryService memberProfileQueryService;
+    private final JoinEligibilityChecker joinEligibilityChecker;
     private final Clock clock;
 
     /**
      * 호출하면 basecampId인 베이스캠프의 상세를 돌려준다. viewerId가 null이면 비로그인 요청자라서 관계는 NONE이고 연락 수단은 없다.
      * 베이스캠프가 없으면 NOT_FOUND로 실패한다.
+     *
+     * <p>신청 자격(eligibility)은 로그인한 요청자가 모집 중인 베이스캠프를 볼 때만 채운다. 판정 규칙은 검색과 같다.
      *
      * <p>연락 수단은 확정된 뒤부터 완료 후 일주일까지 ACTIVE 멤버(캠프 리더 포함)에게만 채우고, 등록된 값이 없으면 그때도 null이다.
      */
@@ -65,7 +69,8 @@ public class BasecampDetailQueryService {
                 leader,
                 members,
                 relation,
-                visibleContactInfo(basecamp, viewerId));
+                visibleContactInfo(basecamp, viewerId),
+                eligibilityOf(basecamp, viewerId));
     }
 
     // 캠프 리더가 탈퇴하거나 제재로 빠진 뒤 취소된 베이스캠프는 ACTIVE 멤버 목록에 리더가 없다.
@@ -103,6 +108,13 @@ public class BasecampDetailQueryService {
                 profile.genderVerified(),
                 profile.trustLevel(),
                 profile.completedCompanions());
+    }
+
+    private JoinEligibility eligibilityOf(Basecamp basecamp, Long viewerId) {
+        if (viewerId == null || basecamp.getStatus() != BasecampStatus.RECRUITING) {
+            return null;
+        }
+        return joinEligibilityChecker.judge(basecamp, viewerId);
     }
 
     private String visibleContactInfo(Basecamp basecamp, Long viewerId) {

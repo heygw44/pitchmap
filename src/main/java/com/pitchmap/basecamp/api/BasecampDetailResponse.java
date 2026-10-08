@@ -40,7 +40,13 @@ public sealed interface BasecampDetailResponse {
                 members,
                 detail.myRelation(),
                 detail.contactInfo(),
-                SAFETY_NOTICE);
+                SAFETY_NOTICE,
+                detail.eligibility() == null ? null : detail.eligibility().canApply(),
+                detail.eligibility() == null
+                        ? null
+                        : detail.eligibility().unmetReasons().stream()
+                                .map(Enum::name)
+                                .toList());
     }
 
     private static Anonymous anonymous(BasecampDetail detail, SpotResponse spot) {
@@ -84,7 +90,7 @@ public sealed interface BasecampDetailResponse {
 
     /**
      * 로그인한 요청자가 보는 상세다. contactInfo는 요청자가 확정된 베이스캠프의 멤버이고 등록된 값이 있을 때만 응답에 나타나고,
-     * 아니면 필드 자체가 없다.
+     * 아니면 필드 자체가 없다. canApply와 unmetReasons는 모집 중인 베이스캠프일 때만 나타난다.
      */
     record Member(
             long basecampId,
@@ -101,7 +107,9 @@ public sealed interface BasecampDetailResponse {
             List<MemberEntry> members,
             BasecampRelation myRelation,
             @JsonInclude(JsonInclude.Include.NON_NULL) String contactInfo,
-            String safetyNotice)
+            String safetyNotice,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Boolean canApply,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<String> unmetReasons)
             implements BasecampDetailResponse {}
 
     record SpotResponse(long spotId, String name, String type) {}

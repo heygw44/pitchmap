@@ -46,6 +46,20 @@ class JoinEligibilityChecker {
         }
     }
 
+    /**
+     * 호출하면 viewerId인 회원이 basecamp에 신청할 수 있는지와, 없다면 모든 이유를 순서대로 돌려준다. 이미 멤버이거나 대기 중인 신청이 있으면
+     * ALREADY_JOINED, 거절·탈퇴·강퇴된 적이 있으면 REAPPLY_NOT_ALLOWED가 이유에 들어간다.
+     */
+    JoinEligibility judge(Basecamp basecamp, long viewerId) {
+        Applicant applicant = applicantOf(viewerId);
+        PriorRelation prior = basecampSearchMapper.selectViewerHistory(viewerId, List.of(basecamp.getId())).stream()
+                .findFirst()
+                .map(history -> PriorRelation.of(history.memberStatus(), history.applicationStatus()))
+                .orElse(PriorRelation.NONE);
+        return JoinEligibility.of(JoinEligibilityPolicy.unmetReasons(
+                basecamp.getJoinCondition(), applicant, hasDateConflict(basecamp, viewerId), prior));
+    }
+
     // 확정된 일정과 하루라도 겹치면 충돌이다. 이 베이스캠프 자신은 비교에서 뺀다.
     private boolean hasDateConflict(Basecamp basecamp, long memberId) {
         List<ConfirmedScheduleRow> schedules = basecampSearchMapper.selectConfirmedSchedules(memberId);

@@ -49,6 +49,7 @@ export function createSpotPin(data: SpotMarkerData, onActivate: (id: number) => 
   const labelParts = [data.name, style.label];
   if (data.warning) labelParts.push('공원 경계 경고');
   if (data.closed) labelParts.push('휴장');
+  if (data.count !== undefined) labelParts.push(`모집 중 베이스캠프 ${data.count}개`);
   button.setAttribute('aria-label', labelParts.join(', '));
 
   // 경고 핀은 몸통에 황토 테두리를 두르고, 그 밖을 흰 윤곽선이 한 번 더 감싼다.
@@ -75,7 +76,14 @@ export function createSpotPin(data: SpotMarkerData, onActivate: (id: number) => 
       iconMarkup('closed', 'width="14" height="14"') +
       '</span>';
   }
+  // 베이스캠프 수는 몸통 오른쪽 아래에 걸친다. 휴장 배지는 오른쪽 위라서 겹치지 않는다.
+  if (data.count !== undefined) {
+    markup +=
+      '<span data-pin-count class="pointer-events-none absolute bottom-2 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-ink px-1 font-mono text-xs tabular-nums text-white"></span>';
+  }
   button.innerHTML = markup;
+  const countBadge = button.querySelector('[data-pin-count]');
+  if (countBadge && data.count !== undefined) countBadge.textContent = String(data.count);
 
   const outline = button.querySelector('[data-pin-outline]');
 

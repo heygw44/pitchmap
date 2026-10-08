@@ -181,6 +181,30 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
       )}
       {publicDetail && <PublicSection publicDetail={publicDetail} />}
 
+      <section className={SECTION_CLASS} aria-labelledby="spot-basecamp-title">
+        <h3 id="spot-basecamp-title" className={SECTION_TITLE_CLASS}>
+          베이스캠프
+        </h3>
+        <div className="mt-2">
+          {warning.warned ? (
+            <Button
+              variant="secondary"
+              disabled
+              disabledReason="공원 경계 경고가 있는 박지에서는 베이스캠프를 열 수 없어요."
+            >
+              이 장소로 베이스캠프 열기
+            </Button>
+          ) : (
+            <Link
+              to={`/basecamps/new?spotId=${detail.spotId}`}
+              className="inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep"
+            >
+              이 장소로 베이스캠프 열기
+            </Link>
+          )}
+        </div>
+      </section>
+
       <SpotReviews key={detail.spotId} spotId={detail.spotId} initialRating={detail.rating} />
 
       <WeatherSection weather={detail.weather} />

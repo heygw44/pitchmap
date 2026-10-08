@@ -12,6 +12,11 @@ import { createMapView } from '../../map/KakaoMap';
 import { MapLoadError } from '../../map/kakaoLoader';
 import type { MapLoadErrorReason } from '../../map/kakaoLoader';
 import type { LatLng, MapView } from '../../map/types';
+import { BasecampDetailPanel } from '../basecamp/BasecampDetailPanel';
+import { BasecampListPanel } from '../basecamp/BasecampListPanel';
+import { BasecampOpenPanel } from '../basecamp/BasecampOpenPanel';
+import { useBasecampsInView } from '../basecamp/useBasecampsInView';
+import type { BasecampFilters, BasecampsInView } from '../basecamp/useBasecampsInView';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import { BakjiReportPanel } from './BakjiReportPanel';
@@ -38,37 +43,54 @@ const CHIP_CLASS =
 
 type MapPageProps = {
   spotId?: number;
-  // report는 지도를 눌러 박지 위치를 찍는 제보 화면이다.
-  mode?: 'browse' | 'report';
+  // basecampId는 mode가 basecamps일 때 베이스캠프 상세를 연다.
+  basecampId?: number;
+  // basecampOpen에서 베이스캠프를 열 장소다.
+  openSpotId?: number;
+  // report는 지도를 눌러 박지 위치를 찍는 제보 화면이고, basecamps는 베이스캠프 목록과 상세,
+  // basecampOpen은 장소에서 베이스캠프를 여는 화면이다.
+  mode?: 'browse' | 'report' | 'basecamps' | 'basecampOpen';
 };
 
-export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
+const NO_FILTERS: BasecampFilters = { fromDate: '', toDate: '', hasVacancy: false };
+
+export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: MapPageProps) {
   const reporting = mode === 'report';
+  const basecampMode = mode === 'basecamps';
+  const opening = mode === 'basecampOpen';
+  // 시트에 목록이 아니라 상세·폼이 열려 있는지다.
+  const contentOpen = spotId !== undefined || reporting || basecampId !== undefined || opening;
+  const session = useSession();
   const hostRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapView | null>(null);
   const [mapFailure, setMapFailure] = useState<MapFailure | null>(null);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [terrainOn, setTerrainOn] = useState(false);
-  const [snap, setSnap] = useState<SheetSnap>(spotId === undefined && !reporting ? 'peek' : 'half');
-  const [snapSpotId, setSnapSpotId] = useState(spotId);
-  const [snapReporting, setSnapReporting] = useState(reporting);
+  const [snap, setSnap] = useState<SheetSnap>(contentOpen ? 'half' : 'peek');
+  const [snapOpen, setSnapOpen] = useState(contentOpen);
   const [draft, setDraft] = useState<LatLng | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const area = useSpotsInView(map);
+  const [filters, setFilters] = useState<BasecampFilters>(NO_FILTERS);
+  // 지도에서 장소 마커를 눌러 고른 장소다. 베이스캠프 목록을 그 장소로 거른다.
+  const [spotFilterId, setSpotFilterId] = useState<number | null>(null);
+  const rangeInvalid = filters.fromDate !== '' && filters.toDate !== '' && filters.fromDate > filters.toDate;
+  // 베이스캠프를 찾는 동안에는 지도의 마커를 베이스캠프가 맡고, 장소 조회는 쉰다.
+  const area = useSpotsInView(map, !basecampMode);
+  const basecamps = useBasecampsInView(
+    map,
+    basecampMode && session.status !== 'loading' && !rangeInvalid,
+    filters,
+    session.me?.memberId ?? null,
+  );
 
   // 제보 화면을 벗어나면 이전 제보의 완료 상태를 버린다. 그래야 다시 들어왔을 때 지도를 눌러 위치를 찍을 수 있다.
   if (!reporting && submitted) setSubmitted(false);
 
-  // 장소를 고르거나 제보 화면에 들어오면 내용이 보이도록 시트를 절반으로 열고, 목록으로 돌아오면 접는다.
+  // 상세나 폼이 열리면 내용이 보이도록 시트를 절반으로 열고, 목록으로 돌아오면 접는다.
   // 렌더 중에 이전 값과 비교해서 바꾸므로, 화면이 한 번 그려진 뒤 다시 그리는 일이 없다.
-  if (snapSpotId !== spotId || snapReporting !== reporting) {
-    setSnapSpotId(spotId);
-    setSnapReporting(reporting);
-    const wasOpen = snapSpotId !== undefined || snapReporting;
-    const isOpen = spotId !== undefined || reporting;
-    if (wasOpen !== isOpen) {
-      setSnap(isOpen ? 'half' : 'peek');
-    }
+  if (snapOpen !== contentOpen) {
+    setSnapOpen(contentOpen);
+    setSnap(contentOpen ? 'half' : 'peek');
   }
 
   // 지도는 시도할 때마다 새 요소에 만든다. 개발 모드에서 효과가 두 번 실행돼도 지도가 한 요소에 겹쳐 생기지 않게 하기 위해서다.
@@ -118,7 +140,14 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
     if (!map) return;
     // 제보 중에는 핀을 눌러도 화면을 옮기지 않는다. 위치를 찍다가 실수로 상세로 나가지 않게 하기 위해서다.
     const offMarker = map.onMarkerClick((id) => {
-      if (!reporting) navigate(`/spots/${id}`);
+      if (reporting) return;
+      if (basecampMode) {
+        // 베이스캠프 화면에서는 마커가 장소의 베이스캠프 목록을 거르는 스위치다. 같은 마커를 다시 누르면 푼다.
+        setSpotFilterId((previous) => (previous === id ? null : id));
+        if (basecampId !== undefined) navigate('/basecamps');
+        return;
+      }
+      navigate(`/spots/${id}`);
     });
     const offCluster = map.onClusterClick((cluster) => {
       map.setCenter(cluster.position, Math.max(1, map.getLevel() - CLUSTER_ZOOM_STEP));
@@ -127,7 +156,7 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
       offMarker();
       offCluster();
     };
-  }, [map, reporting]);
+  }, [map, reporting, basecampMode, basecampId]);
 
   // 제보 화면에서만 지도를 눌러 박지 위치를 찍는다. 화면을 벗어나면 임시 핀을 지우고 찍은 위치도 버린다.
   useEffect(() => {
@@ -145,8 +174,8 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
   }, [map, draft]);
 
   useEffect(() => {
-    map?.setSelected(spotId ?? null);
-  }, [map, spotId]);
+    map?.setSelected(basecampMode ? spotFilterId : opening ? (openSpotId ?? null) : (spotId ?? null));
+  }, [map, spotId, basecampMode, spotFilterId, opening, openSpotId]);
 
   useEffect(() => {
     map?.setTerrain(terrainOn);
@@ -154,8 +183,19 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
 
   // 상세 화면에서는 장소 이름을 불러온 뒤 상세 패널이 제목을 바꾼다.
   useEffect(() => {
-    if (spotId === undefined) document.title = reporting ? '박지 제보 · 피치맵' : '피치맵';
-  }, [spotId, reporting]);
+    if (spotId !== undefined || basecampId !== undefined) return;
+    if (reporting) document.title = '박지 제보 · 피치맵';
+    else if (opening) document.title = '베이스캠프 열기 · 피치맵';
+    else if (basecampMode) document.title = '베이스캠프 · 피치맵';
+    else document.title = '피치맵';
+  }, [spotId, basecampId, reporting, opening, basecampMode]);
+
+  let sheetLabel = '장소 목록';
+  if (reporting) sheetLabel = '박지 제보';
+  else if (opening) sheetLabel = '베이스캠프 열기';
+  else if (basecampId !== undefined) sheetLabel = '베이스캠프 상세';
+  else if (basecampMode) sheetLabel = '베이스캠프 목록';
+  else if (spotId !== undefined) sheetLabel = '장소 상세';
 
   function retryMap() {
     setMapFailure(null);
@@ -167,10 +207,23 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
       <Sheet
         snap={snap}
         onSnapChange={setSnap}
-        label={reporting ? '박지 제보' : spotId === undefined ? '장소 목록' : '장소 상세'}
-        header={spotId === undefined && !reporting ? <ListHeader area={area} /> : undefined}
+        label={sheetLabel}
+        header={contentOpen ? undefined : basecampMode ? <BasecampListHeader result={basecamps} /> : <ListHeader area={area} />}
       >
-        {reporting ? (
+        {opening && openSpotId !== undefined ? (
+          <BasecampOpenPanel key={openSpotId} spotId={openSpotId} onBack={() => navigate(`/spots/${openSpotId}`)} />
+        ) : basecampId !== undefined ? (
+          <BasecampDetailPanel key={basecampId} basecampId={basecampId} onBack={() => navigate('/basecamps')} />
+        ) : basecampMode ? (
+          <BasecampListPanel
+            result={basecamps}
+            filters={filters}
+            onFiltersChange={setFilters}
+            spotFilterId={spotFilterId}
+            onClearSpotFilter={() => setSpotFilterId(null)}
+            waitingForMap={map === null && mapFailure === null}
+          />
+        ) : reporting ? (
           <BakjiReportPanel
             draft={draft}
             onCancel={() => navigate('/')}
@@ -222,24 +275,27 @@ export function MapPage({ spotId, mode = 'browse' }: MapPageProps) {
             </h1>
             <AccountChip />
           </div>
-          {map && (
-            <div className="flex flex-wrap justify-end gap-2">
-              {!reporting && <ReportButton />}
-              <button
-                type="button"
-                aria-pressed={terrainOn}
-                onClick={() => setTerrainOn((value) => !value)}
-                className={
-                  terrainOn
-                    ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
-                    : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
-                }
-              >
-                <Icon name="terrain" size={20} />
-                지형
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            {reporting || opening ? <span /> : <ModeToggle basecampMode={basecampMode} />}
+            {map && (
+              <div className="flex flex-wrap justify-end gap-2">
+                {!reporting && !basecampMode && !opening && <ReportButton />}
+                <button
+                  type="button"
+                  aria-pressed={terrainOn}
+                  onClick={() => setTerrainOn((value) => !value)}
+                  className={
+                    terrainOn
+                      ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
+                      : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
+                  }
+                >
+                  <Icon name="terrain" size={20} />
+                  지형
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -258,6 +314,43 @@ function ListHeader({ area }: { area: SpotsInView }) {
     <h2 className="font-serif text-lg text-ink">
       이 지역 장소{counted && <span className="tabular-nums"> {totalCount(area)}곳</span>}
     </h2>
+  );
+}
+
+function BasecampListHeader({ result }: { result: BasecampsInView }) {
+  const counted = result.status === 'ready' || result.items.length > 0;
+  return (
+    <h2 className="font-serif text-lg text-ink">
+      이 지역 베이스캠프
+      {counted && (
+        <span className="tabular-nums">
+          {' '}
+          {result.items.length}
+          {result.hasNext ? '개 이상' : '개'}
+        </span>
+      )}
+    </h2>
+  );
+}
+
+// 지도 위에서 장소를 찾을지 베이스캠프를 찾을지 고른다. 두 화면은 주소가 달라서 링크로 옮긴다.
+function ModeToggle({ basecampMode }: { basecampMode: boolean }) {
+  const baseClass = 'pointer-events-auto inline-flex min-h-11 items-center px-3 text-base font-semibold';
+  const activeClass = `${baseClass} bg-forest-soft text-forest-deep`;
+  const idleClass = `${baseClass} bg-card text-ink hover:bg-paper-deep`;
+  return (
+    <nav aria-label="찾기 종류" className="pointer-events-auto flex overflow-hidden rounded-control border border-contour">
+      <Link to="/" aria-current={basecampMode ? undefined : 'page'} className={basecampMode ? idleClass : activeClass}>
+        장소
+      </Link>
+      <Link
+        to="/basecamps"
+        aria-current={basecampMode ? 'page' : undefined}
+        className={basecampMode ? activeClass : idleClass}
+      >
+        베이스캠프
+      </Link>
+    </nav>
   );
 }
 

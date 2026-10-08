@@ -24,6 +24,23 @@ export const routes: RouteDef[] = [
     },
   },
   { path: '/bakjis/new', render: () => <MapPage mode="report" /> },
+  { path: '/basecamps', render: () => <MapPage mode="basecamps" /> },
+  {
+    path: '/basecamps/new',
+    // 장소 ID는 주소의 spotId에서 읽는다. 양의 정수가 아니면 서버에 묻지 않고 없는 페이지로 보여 준다.
+    render: () => {
+      const spotId = toPositiveId(new URLSearchParams(window.location.search).get('spotId') ?? undefined);
+      return spotId === null ? <NotFoundPage /> : <MapPage mode="basecampOpen" openSpotId={spotId} />;
+    },
+  },
+  {
+    path: '/basecamps/:basecampId',
+    // 베이스캠프 ID도 양의 정수만 있다. 위의 '/basecamps/new'가 먼저 맞아야 하므로 이 경로는 그 뒤에 둔다.
+    render: (params) => {
+      const basecampId = toPositiveId(params.basecampId);
+      return basecampId === null ? <NotFoundPage /> : <MapPage mode="basecamps" basecampId={basecampId} />;
+    },
+  },
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },

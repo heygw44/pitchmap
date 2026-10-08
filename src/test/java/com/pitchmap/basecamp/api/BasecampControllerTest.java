@@ -486,6 +486,27 @@ class BasecampControllerTest {
     }
 
     @Test
+    @DisplayName("[F-12] 서비스가 신청 자격을 주면 로그인한 상세 응답에 canApply와 unmetReasons가 있고, 주지 않으면 필드가 없다")
+    void loggedInDetailIncludesEligibilityOnlyWhenServiceGivesIt() {
+        // given
+        when(basecampDetailQueryService.find(any(), eq(77L)))
+                .thenReturn(detail(
+                        BasecampRelation.NONE, null, new JoinEligibility(false, List.of(JoinUnmetReason.TRUST_LEVEL))));
+        when(basecampDetailQueryService.find(any(), eq(78L))).thenReturn(detail(BasecampRelation.NONE, null));
+
+        // when
+        MvcTestResult with = mvc.get().uri(BASECAMPS + "/77").with(unverified()).exchange();
+        MvcTestResult without =
+                mvc.get().uri(BASECAMPS + "/78").with(unverified()).exchange();
+
+        // then
+        assertThat(with).bodyJson().extractingPath("$.canApply").isEqualTo(false);
+        assertThat(with).bodyJson().extractingPath("$.unmetReasons").isEqualTo(List.of("TRUST_LEVEL"));
+        assertThat(without).bodyJson().doesNotHavePath("$.canApply");
+        assertThat(without).bodyJson().doesNotHavePath("$.unmetReasons");
+    }
+
+    @Test
     @DisplayName("[F-12][BC-23] 서비스가 연락 수단을 주면 로그인한 상세 응답에 contactInfo가 있다")
     void loggedInDetailIncludesContactWhenServiceGivesIt() {
         // given
@@ -921,6 +942,10 @@ class BasecampControllerTest {
     }
 
     private static BasecampDetail detail(BasecampRelation relation, String contactInfo) {
+        return detail(relation, contactInfo, null);
+    }
+
+    private static BasecampDetail detail(BasecampRelation relation, String contactInfo, JoinEligibility eligibility) {
         return new BasecampDetail(
                 77L,
                 "굴업도 주말 1박",
@@ -937,7 +962,8 @@ class BasecampControllerTest {
                         new BasecampDetail.DetailMember(31L, "새벽능선", "LEADER", "THIRTIES", true, "FEMALE", true, 2, 5),
                         new BasecampDetail.DetailMember(32L, "달빛야영", "MEMBER", null, false, null, false, 1, 0)),
                 relation,
-                contactInfo);
+                contactInfo,
+                eligibility);
     }
 
     private static String dates() {
