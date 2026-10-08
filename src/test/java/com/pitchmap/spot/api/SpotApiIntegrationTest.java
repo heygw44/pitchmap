@@ -250,6 +250,51 @@ class SpotApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("[F-05] 로그인하지 않은 사용자도 장소 상세에서 모집 중인 베이스캠프를 받고, 연락 수단은 받지 않는다")
+    void anonymousReadsRecruitingBasecampsWithoutContactInfo() {
+        // given
+        long reporterId = insertMember("모집제보자");
+        long spotId = insertBakji("모집 박지", "ACTIVE", reporterId);
+        jdbc.update(
+                "INSERT INTO basecamp (leader_id, spot_id, title, description, start_date, end_date, capacity, status,"
+                        + " contact_info, created_at, updated_at)"
+                        + " VALUES (?, ?, '주말 능선', '설명', '2026-11-07', '2026-11-08', 4, 'RECRUITING',"
+                        + " 'https://open.kakao.com/o/secret', NOW(6), NOW(6))",
+                reporterId,
+                spotId);
+        long basecampId = jdbc.queryForObject("SELECT id FROM basecamp WHERE spot_id = ?", Long.class, spotId);
+        jdbc.update(
+                "INSERT INTO basecamp_member (basecamp_id, member_id, role, status, joined_at, created_at, updated_at)"
+                        + " VALUES (?, ?, 'LEADER', 'ACTIVE', NOW(6), NOW(6), NOW(6))",
+                basecampId,
+                reporterId);
+
+        // when
+        MvcTestResult result = mvc.get().uri(PATH + "/" + spotId).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.recruitingBasecamps[0].title")
+                .isEqualTo("주말 능선");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.recruitingBasecamps[0].headcount")
+                .isEqualTo(1);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.recruitingBasecamps[0]")
+                .asMap()
+                .doesNotContainKey("contactInfo");
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.expectedPeople")
+                .asList()
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("[F-05][NFR-05] 기상청 응답이 응답 대기 시간보다 늦어도 200으로 응답하고 weather만 null이다")
     void detailRespondsWithoutWeatherWhenKmaIsSlow() {
         // given: 테스트 프로필의 응답 대기 시간은 1초라서, 2초 늦은 응답은 시간 초과로 실패한다.

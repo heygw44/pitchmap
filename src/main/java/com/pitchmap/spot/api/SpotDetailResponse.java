@@ -5,10 +5,13 @@ import com.pitchmap.spot.application.PublicSpotOperatingStatus;
 import com.pitchmap.spot.application.PublicSpotSource;
 import com.pitchmap.spot.application.SpotBakjiDetail;
 import com.pitchmap.spot.application.SpotDetail;
+import com.pitchmap.spot.application.SpotExpectedPeople;
 import com.pitchmap.spot.application.SpotFacilities;
+import com.pitchmap.spot.application.SpotJoinCondition;
 import com.pitchmap.spot.application.SpotPublicDetail;
 import com.pitchmap.spot.application.SpotRating;
 import com.pitchmap.spot.application.SpotRecentReview;
+import com.pitchmap.spot.application.SpotRecruitingBasecamp;
 import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.weather.application.SunTimes;
@@ -18,8 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-// 예상 인원과 모집 중인 베이스캠프는 아직 채우지 않는다.
-// 클라이언트가 응답 모양에 맞춰 화면을 만들 수 있도록 서버는 빈 값(null, 0, 빈 배열)을 넣어 준다.
+// expectedPeople은 오늘부터 야영하는 밤별 인원이고, 인원이 있는 날짜만 날짜 순으로 준다. recruitingBasecamps는 모집 중인 베이스캠프만 출발일 순으로 준다.
+// 둘 다 없으면 빈 배열이다.
 // parkWarning은 경고가 아니면 warned만 내보낸다. weather는 기상청 호출이 실패하면 null이고, 천문연만 실패하면 weather 안의 sun이 null이다.
 public record SpotDetailResponse(
         long spotId,
@@ -33,8 +36,8 @@ public record SpotDetailResponse(
         ParkWarningResponse parkWarning,
         Rating rating,
         List<RecentReview> recentReviews,
-        List<Object> expectedPeople,
-        List<Object> recruitingBasecamps,
+        List<ExpectedPeople> expectedPeople,
+        List<RecruitingBasecamp> recruitingBasecamps,
         Weather weather) {
 
     static SpotDetailResponse from(SpotDetail detail) {
@@ -50,9 +53,52 @@ public record SpotDetailResponse(
                 ParkWarningResponse.from(detail.parkWarning()),
                 Rating.from(detail.rating()),
                 detail.recentReviews().stream().map(RecentReview::from).toList(),
-                List.of(),
-                List.of(),
+                detail.expectedPeople().stream().map(ExpectedPeople::from).toList(),
+                detail.recruitingBasecamps().stream()
+                        .map(RecruitingBasecamp::from)
+                        .toList(),
                 detail.weather() == null ? null : Weather.from(detail.weather()));
+    }
+
+    public record ExpectedPeople(LocalDate date, int count) {
+
+        static ExpectedPeople from(SpotExpectedPeople expectedPeople) {
+            return new ExpectedPeople(expectedPeople.date(), expectedPeople.count());
+        }
+    }
+
+    // 베이스캠프 검색 결과의 항목에서 장소와 상태, 신청 가능 여부를 뺀 모양이다. 신청 가능 여부는 로그인한 회원마다 달라서 베이스캠프 상세에서 본다.
+    public record RecruitingBasecamp(
+            long basecampId,
+            String title,
+            LocalDate startDate,
+            LocalDate endDate,
+            int capacity,
+            int headcount,
+            JoinCondition joinCondition) {
+
+        static RecruitingBasecamp from(SpotRecruitingBasecamp basecamp) {
+            return new RecruitingBasecamp(
+                    basecamp.basecampId(),
+                    basecamp.title(),
+                    basecamp.startDate(),
+                    basecamp.endDate(),
+                    basecamp.capacity(),
+                    basecamp.headcount(),
+                    JoinCondition.from(basecamp.joinCondition()));
+        }
+    }
+
+    public record JoinCondition(
+            Integer minTrustLevel, Integer ageGroupMin, Integer ageGroupMax, boolean sameGenderOnly) {
+
+        static JoinCondition from(SpotJoinCondition condition) {
+            return new JoinCondition(
+                    condition.minTrustLevel(),
+                    condition.ageGroupMin(),
+                    condition.ageGroupMax(),
+                    condition.sameGenderOnly());
+        }
     }
 
     public record Bakji(
