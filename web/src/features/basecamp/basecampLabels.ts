@@ -1,5 +1,6 @@
-import type { BasecampStatus, JoinCondition, JoinUnmetReason } from '../../api/types';
+import type { BasecampApplicant, BasecampStatus, JoinCondition, JoinUnmetReason } from '../../api/types';
 import type { BadgeTone } from '../../components/Badge';
+import { AGE_GROUP_LABELS, GENDER_LABELS } from '../member/memberLabels';
 
 type StatusMeta = { label: string; tone: BadgeTone };
 
@@ -80,4 +81,19 @@ export function unmetReasonText(reason: JoinUnmetReason, myTrustLevel: number | 
 // 인원 표시. 예: "3/4"
 export function headcountText(headcount: number, capacity: number): string {
   return `${headcount}/${capacity}`;
+}
+
+// 멤버·신청자 프로필의 한 줄 요약. 연령대와 성별은 본인확인 여부를 함께 적는다. 예: "30대 본인확인 · 남성 자기 신고 · 완료한 동행 2회"
+export function profileSummary(profile: Omit<BasecampApplicant, 'memberId' | 'nickname'>): string[] {
+  const parts: string[] = [];
+  if (profile.ageGroup) {
+    parts.push(`${AGE_GROUP_LABELS[profile.ageGroup]} ${profile.ageGroupVerified ? '본인확인' : '자기 신고'}`);
+  }
+  if (profile.gender) {
+    parts.push(`${GENDER_LABELS[profile.gender]} ${profile.genderVerified ? '본인확인' : '자기 신고'}`);
+  }
+  if (profile.completedCompanions !== undefined) {
+    parts.push(`완료한 동행 ${profile.completedCompanions}회`);
+  }
+  return parts;
 }

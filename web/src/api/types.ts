@@ -504,3 +504,110 @@ export interface BasecampApplyResponse {
   applicationId: number;
   status: 'PENDING';
 }
+
+// 캠프 리더 관리
+
+export type BasecampApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED' | 'EXPIRED';
+
+// 신청자 프로필은 상세의 멤버 항목과 같은 규칙이라 프로필 필드가 빠질 수 있다.
+export interface BasecampApplicant {
+  memberId: number;
+  nickname: string;
+  ageGroup?: SelfAgeGroup | null;
+  ageGroupVerified?: boolean;
+  gender?: SelfGender | null;
+  genderVerified?: boolean;
+  trustLevel?: number;
+  completedCompanions?: number;
+}
+
+export interface BasecampApplicationItem {
+  applicationId: number;
+  status: BasecampApplicationStatus;
+  message: string | null;
+  appliedAt: string;
+  applicant: BasecampApplicant;
+}
+
+// 승인하면 서버가 베이스캠프의 인원과 상태를 돌려준다.
+export interface BasecampApproveResponse {
+  headcount: number;
+  status: BasecampStatus;
+}
+
+export interface BasecampRejectResponse {
+  applicationId: number;
+  status: BasecampApplicationStatus;
+}
+
+export interface BasecampStatusResponse {
+  basecampId: number;
+  status: BasecampStatus;
+}
+
+export type KickReason = 'NO_CONTACT' | 'CONDITION_MISMATCH' | 'INAPPROPRIATE_BEHAVIOR' | 'OTHER';
+
+// 내 베이스캠프
+
+export type MyBasecampRelation = 'LEADER' | 'MEMBER' | 'APPLICANT';
+
+export interface MyBasecampsQuery {
+  relation?: MyBasecampRelation;
+  status?: BasecampStatus;
+  page?: number;
+  size?: number;
+}
+
+export interface MyBasecampItem {
+  basecampId: number;
+  title: string;
+  spot: BasecampDetailSpot;
+  startDate: string;
+  endDate: string;
+  capacity: number;
+  headcount: number;
+  status: BasecampStatus;
+  myRelation: MyBasecampRelation;
+}
+
+// 동행 후기
+
+export interface PendingCompanionTarget {
+  memberId: number;
+  nickname: string;
+}
+
+export interface PendingCompanionReview {
+  basecampId: number;
+  basecampTitle: string;
+  completedAt: string;
+  deadline: string;
+  targets: PendingCompanionTarget[];
+}
+
+export interface CompanionReviewCreateRequest {
+  revieweeId: number;
+  rejoinWanted: boolean;
+  tags?: string[];
+  comment?: string;
+}
+
+export interface RevealedReceivedCompanionReview {
+  reviewId: number;
+  basecampId: number;
+  basecampTitle: string;
+  reviewer: { memberId: number; nickname: string };
+  rejoinWanted: boolean;
+  tags: string[];
+  comment: string | null;
+  createdAt: string;
+  revealed: true;
+}
+
+// 블라인드 공개 전에는 서버가 나머지 필드를 응답에서 뺀다.
+export interface SealedReceivedCompanionReview {
+  basecampId: number;
+  revealed: false;
+}
+
+export type ReceivedCompanionReview = RevealedReceivedCompanionReview | SealedReceivedCompanionReview;

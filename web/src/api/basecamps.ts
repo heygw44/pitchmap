@@ -1,6 +1,13 @@
 import { apiFetch } from './client';
 import type {
+  BasecampApplicationItem,
   BasecampApplyResponse,
+  BasecampApproveResponse,
+  BasecampRejectResponse,
+  BasecampStatusResponse,
+  KickReason,
+  MyBasecampItem,
+  MyBasecampsQuery,
   BasecampDetail,
   BasecampOpenRequest,
   BasecampOpenResponse,
@@ -51,4 +58,72 @@ export function applyToBasecamp(
 // 서버는 본문 없이 204만 준다.
 export function cancelMyApplication(basecampId: number, signal?: AbortSignal): Promise<void> {
   return apiFetch<void>(`/api/basecamps/${basecampId}/applications/me`, { method: 'DELETE', signal });
+}
+
+export const APPLICATION_PAGE_SIZE = 20;
+
+// 캠프 리더만 받을 수 있다. 대기 중인 신청을 오래된 순서로 준다.
+export function fetchBasecampApplications(
+  basecampId: number,
+  page: number,
+  signal?: AbortSignal,
+): Promise<Page<BasecampApplicationItem>> {
+  return apiFetch<Page<BasecampApplicationItem>>(`/api/basecamps/${basecampId}/applications`, {
+    query: { status: 'PENDING', page, size: APPLICATION_PAGE_SIZE },
+    signal,
+  });
+}
+
+export function approveApplication(basecampId: number, applicationId: number): Promise<BasecampApproveResponse> {
+  return apiFetch<BasecampApproveResponse>(`/api/basecamps/${basecampId}/applications/${applicationId}/approve`, {
+    method: 'POST',
+  });
+}
+
+export function rejectApplication(basecampId: number, applicationId: number): Promise<BasecampRejectResponse> {
+  return apiFetch<BasecampRejectResponse>(`/api/basecamps/${basecampId}/applications/${applicationId}/reject`, {
+    method: 'POST',
+  });
+}
+
+export function kickMember(basecampId: number, memberId: number, reason: KickReason): Promise<void> {
+  return apiFetch<void>(`/api/basecamps/${basecampId}/members/${memberId}/kick`, {
+    method: 'POST',
+    body: { reason },
+  });
+}
+
+// 멤버가 스스로 나간다. 서버는 본문 없이 204만 준다.
+export function leaveBasecamp(basecampId: number): Promise<void> {
+  return apiFetch<void>(`/api/basecamps/${basecampId}/members/me`, { method: 'DELETE' });
+}
+
+function changeStatus(basecampId: number, action: 'close' | 'reopen' | 'confirm' | 'cancel') {
+  return apiFetch<BasecampStatusResponse>(`/api/basecamps/${basecampId}/${action}`, { method: 'POST' });
+}
+
+export const closeBasecamp = (basecampId: number) => changeStatus(basecampId, 'close');
+export const reopenBasecamp = (basecampId: number) => changeStatus(basecampId, 'reopen');
+export const confirmBasecamp = (basecampId: number) => changeStatus(basecampId, 'confirm');
+export const cancelBasecamp = (basecampId: number) => changeStatus(basecampId, 'cancel');
+
+export function updateBasecampContact(basecampId: number, contactInfo: string): Promise<BasecampStatusResponse> {
+  return apiFetch<BasecampStatusResponse>(`/api/basecamps/${basecampId}/contact`, {
+    method: 'PUT',
+    body: { contactInfo },
+  });
+}
+
+export const MY_BASECAMP_PAGE_SIZE = 20;
+
+export function fetchMyBasecamps(query: MyBasecampsQuery, signal?: AbortSignal): Promise<Page<MyBasecampItem>> {
+  return apiFetch<Page<MyBasecampItem>>('/api/me/basecamps', {
+    query: {
+      relation: query.relation,
+      status: query.status,
+      page: query.page,
+      size: query.size ?? MY_BASECAMP_PAGE_SIZE,
+    },
+    signal,
+  });
 }

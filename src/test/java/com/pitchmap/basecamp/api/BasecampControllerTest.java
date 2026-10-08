@@ -38,10 +38,14 @@ import com.pitchmap.basecamp.application.BasecampStatusResult;
 import com.pitchmap.basecamp.application.BasecampTransitionService;
 import com.pitchmap.basecamp.application.JoinConditionSummary;
 import com.pitchmap.basecamp.application.JoinEligibility;
+import com.pitchmap.basecamp.application.MyBasecampListQuery;
+import com.pitchmap.basecamp.application.MyBasecampListService;
+import com.pitchmap.basecamp.application.MyBasecampPage;
 import com.pitchmap.basecamp.domain.BasecampApplicationStatus;
 import com.pitchmap.basecamp.domain.BasecampErrorCode;
 import com.pitchmap.basecamp.domain.BasecampException;
 import com.pitchmap.basecamp.domain.BasecampRelation;
+import com.pitchmap.basecamp.domain.BasecampStatus;
 import com.pitchmap.basecamp.domain.JoinUnmetReason;
 import com.pitchmap.basecamp.domain.KickReason;
 import com.pitchmap.common.error.BusinessException;
@@ -84,6 +88,7 @@ class BasecampControllerTest {
     private static final String LEAVE = "/api/basecamps/77/members/me";
     private static final String KICK = "/api/basecamps/77/members/31/kick";
     private static final String BASECAMP = "/api/basecamps/77";
+    private static final String MY_BASECAMPS = "/api/me/basecamps";
     private static final String CONTACT_URL = "https://open.kakao.com/o/example";
     private static final String MY_APPLICATION = "/api/basecamps/77/applications/me";
     private static final String VALID_BODY = body("\"title\":\"북한산 백패킹\"", "\"capacity\":4");
@@ -120,6 +125,9 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampEditService basecampEditService;
+
+    @MockitoBean
+    private MyBasecampListService myBasecampListService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -834,6 +842,78 @@ class BasecampControllerTest {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         verifyNoInteractions(basecampApplicationListService);
+    }
+
+    @Test
+    @DisplayName("[F-13] 내 베이스캠프의 relation과 status를 생략하면 거르지 않고, page는 0, size는 20으로 서비스를 부른다")
+    void listMineUsesDefaults() {
+        // given
+        when(myBasecampListService.list(eq(MEMBER_ID), any())).thenReturn(new MyBasecampPage(List.of(), 0, 20, false));
+
+        // when
+        MvcTestResult result = mvc.get().uri(MY_BASECAMPS).with(unverified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result)
+                .bodyJson()
+                .isStrictlyEqualTo("{ \"content\": [], \"page\": 0, \"size\": 20, \"hasNext\": false }");
+        verify(myBasecampListService).list(MEMBER_ID, new MyBasecampListQuery(null, null, 0, 20));
+    }
+
+    @Test
+    @DisplayName("[F-13] 내 베이스캠프의 relation과 status를 보내면 그대로 서비스에 넘긴다")
+    void listMinePassesFilters() {
+        // given
+        when(myBasecampListService.list(eq(MEMBER_ID), any())).thenReturn(new MyBasecampPage(List.of(), 2, 5, false));
+
+        // when
+        MvcTestResult result = mvc.get()
+                .uri(MY_BASECAMPS + "?relation=APPLICANT&status=CLOSED&page=2&size=5")
+                .with(unverified())
+                .exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        verify(myBasecampListService)
+                .list(MEMBER_ID, new MyBasecampListQuery(BasecampRelation.APPLICANT, BasecampStatus.CLOSED, 2, 5));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "relation=UNKNOWN",
+                "relation=leader",
+                "relation=NONE",
+                "status=UNKNOWN",
+                "status=recruiting",
+                "size=0",
+                "size=51",
+                "page=-1"
+            })
+    @DisplayName("[F-13] 내 베이스캠프의 relation·status가 허용 값이 아니거나 page·size가 범위를 벗어나면 400 INVALID_INPUT이다")
+    void listMineRejectsInvalidParameters(String query) {
+        // when
+        MvcTestResult result =
+                mvc.get().uri(MY_BASECAMPS + "?" + query).with(unverified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors").asList().isNotEmpty();
+        verifyNoInteractions(myBasecampListService);
+    }
+
+    @Test
+    @DisplayName("[F-13] 로그인하지 않고 내 베이스캠프를 조회하면 401 AUTHENTICATION_REQUIRED이다")
+    void listMineRequiresLogin() {
+        // when
+        MvcTestResult result = mvc.get().uri(MY_BASECAMPS).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
+        verifyNoInteractions(myBasecampListService);
     }
 
     @Test
