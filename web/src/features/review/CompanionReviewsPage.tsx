@@ -11,6 +11,7 @@ import type {
   PendingCompanionReview,
   PendingCompanionTarget,
   ReceivedCompanionReview,
+  RevealedReceivedCompanionReview,
 } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
 import { Badge } from '../../components/Badge';
@@ -29,6 +30,7 @@ import { daysUntilKst, formatKstDateTime } from '../../lib/datetime';
 import { companionTagLabel, NEGATIVE_COMPANION_TAGS, POSITIVE_COMPANION_TAGS } from '../member/memberLabels';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
+import { MemberReportDialog } from '../report/MemberReportDialog';
 
 const COMMENT_MAX = 300;
 
@@ -328,6 +330,7 @@ function ReceivedTab() {
   const [state, setState] = useState<ReceivedState | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [reportTarget, setReportTarget] = useState<RevealedReceivedCompanionReview | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -405,6 +408,11 @@ function ReceivedTab() {
               )}
               {item.comment && <p className="whitespace-pre-line break-words text-base text-ink">{item.comment}</p>}
               <p className="font-mono text-sm tabular-nums text-ink-muted">{formatKstDateTime(item.createdAt)}</p>
+              <div>
+                <Button variant="ghost" onClick={() => setReportTarget(item)}>
+                  후기 신고
+                </Button>
+              </div>
             </PageCard>
           ) : (
             <section
@@ -426,6 +434,16 @@ function ReceivedTab() {
             더 보기
           </Button>
         </div>
+      )}
+      {reportTarget && (
+        <MemberReportDialog
+          kind="REVIEW"
+          targetMemberId={reportTarget.reviewer.memberId}
+          targetNickname={reportTarget.reviewer.nickname}
+          basecampId={reportTarget.basecampId}
+          companionReviewId={reportTarget.reviewId}
+          onClose={() => setReportTarget(null)}
+        />
       )}
     </>
   );

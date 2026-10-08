@@ -1,5 +1,9 @@
+import { AdminReportDetailPage } from '../features/admin/AdminReportDetailPage';
+import { AdminReportsPage } from '../features/admin/AdminReportsPage';
+import { AdminSpotsPage } from '../features/admin/AdminSpotsPage';
 import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
 import { MyBasecampsPage } from '../features/basecamp/MyBasecampsPage';
+import { NotificationsPage } from '../features/notification/NotificationsPage';
 import { CompanionReviewsPage } from '../features/review/CompanionReviewsPage';
 import { LoginPage } from '../features/member/LoginPage';
 import { MemberProfilePage } from '../features/member/MemberProfilePage';
@@ -54,6 +58,16 @@ export const routes: RouteDef[] = [
   },
   { path: '/me/basecamps', render: () => <MyBasecampsPage /> },
   { path: '/me/companion-reviews', render: () => <CompanionReviewsPage /> },
+  { path: '/me/notifications', render: () => <NotificationsPage /> },
+  { path: '/admin/reports', render: () => <AdminReportsPage /> },
+  {
+    path: '/admin/reports/:reportId',
+    render: (params) => {
+      const reportId = toPositiveId(params.reportId);
+      return reportId === null ? <NotFoundPage /> : <AdminReportDetailPage key={reportId} reportId={reportId} />;
+    },
+  },
+  { path: '/admin/spots', render: () => <AdminSpotsPage /> },
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },

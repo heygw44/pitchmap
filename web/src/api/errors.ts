@@ -42,11 +42,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   COMPANION_REVIEW_IMMUTABLE: '동행 후기는 고치거나 지울 수 없어요. 문제가 있으면 신고해 주세요.',
   REPORT_NOT_ELIGIBLE: '이 회원은 신고할 수 없어요. 함께한 베이스캠프가 있는지 확인해 주세요.',
   REPORT_DUPLICATED: '이미 신고했어요. 처리 결과를 기다려 주세요.',
+  REPORT_INVALID_STATE: '이미 처리된 신고예요. 화면을 새로고침해 주세요.',
+  SANCTION_INVALID_STATE: '이미 해제됐거나 끝난 제재예요. 화면을 새로고침해 주세요.',
 
   // 장소·박지·후기
   SPOT_RADIUS_TOO_LARGE: '반경은 50km까지 고를 수 있어요. 반경을 줄여 주세요.',
   BAKJI_ALREADY_CONFIRMED: '이미 이 박지를 확인했어요. 다른 박지도 둘러봐 주세요.',
   BAKJI_ALREADY_REPORTED: '이미 이 박지를 신고했어요. 처리 결과를 기다려 주세요.',
+  SPOT_INVALID_STATE: '지금 상태에서는 할 수 없는 작업이에요. 화면을 새로고침해 주세요.',
   SPOT_REVIEW_DUPLICATED: '같은 날 다녀온 후기가 이미 있어요. 방문일을 확인해 주세요.',
 
   // 베이스캠프

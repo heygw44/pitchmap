@@ -18,6 +18,7 @@ import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { departureInstant, formatLocalDate } from '../../lib/datetime';
 import { trustLevelBadge } from '../member/memberLabels';
 import { withNext } from '../member/nextPath';
+import { MemberReportDialog } from '../report/MemberReportDialog';
 import { useSession } from '../member/session';
 import {
   BASECAMP_STATUS_GUIDE,
@@ -151,6 +152,7 @@ function DetailSkeleton() {
 }
 
 function DetailContent({ detail, onChanged }: { detail: BasecampDetail; onChanged: () => void }) {
+  const session = useSession();
   const status = BASECAMP_STATUS_META[detail.status];
   const isMember = detail.myRelation === 'MEMBER' || detail.myRelation === 'LEADER';
 
@@ -192,7 +194,13 @@ function DetailContent({ detail, onChanged }: { detail: BasecampDetail; onChange
           </h3>
           <ul className="mt-2 flex flex-col">
             {detail.members.map((member) => (
-              <MemberRow key={member.memberId} member={member} />
+              <MemberRow
+                key={member.memberId}
+                member={member}
+                basecampId={detail.basecampId}
+                // 신고 버튼은 편의일 뿐이고, 신고할 수 있는지는 서버가 판단한다.
+                reportable={isMember && member.memberId !== session.me?.memberId}
+              />
             ))}
           </ul>
           {detail.leader.trustLevel === undefined && (
@@ -228,7 +236,16 @@ function DetailContent({ detail, onChanged }: { detail: BasecampDetail; onChange
   );
 }
 
-function MemberRow({ member }: { member: BasecampMember }) {
+function MemberRow({
+  member,
+  basecampId,
+  reportable,
+}: {
+  member: BasecampMember;
+  basecampId: number;
+  reportable: boolean;
+}) {
+  const [reporting, setReporting] = useState(false);
   const badge = member.trustLevel === undefined ? null : trustLevelBadge(member.trustLevel);
   const profile = profileSummary(member);
 
@@ -247,8 +264,22 @@ function MemberRow({ member }: { member: BasecampMember }) {
             {badge.label}
           </Badge>
         )}
+        {reportable && (
+          <Button variant="ghost" className="ml-auto" onClick={() => setReporting(true)}>
+            신고
+          </Button>
+        )}
       </div>
       {profile.length > 0 && <p className="text-sm text-ink-muted">{profile.join(' · ')}</p>}
+      {reporting && (
+        <MemberReportDialog
+          kind="MEMBER"
+          targetMemberId={member.memberId}
+          targetNickname={member.nickname}
+          basecampId={basecampId}
+          onClose={() => setReporting(false)}
+        />
+      )}
     </li>
   );
 }

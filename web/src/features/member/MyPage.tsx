@@ -74,6 +74,14 @@ export function MyPage() {
         <Link to="/me/companion-reviews" className={PAGE_LINK_CLASS}>
           동행 후기
         </Link>
+        <Link to="/me/notifications" className={PAGE_LINK_CLASS}>
+          알림
+        </Link>
+        {me.role === 'ADMIN' && (
+          <Link to="/admin/reports" className={PAGE_LINK_CLASS}>
+            관리자
+          </Link>
+        )}
         <Link
           to={`/members/${me.memberId}`}
           className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"

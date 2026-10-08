@@ -3,14 +3,16 @@ import { Link } from '../app/router';
 
 type PageLayoutProps = {
   title: string;
+  // 표나 목록을 넓게 보여 줄 화면에서 켠다. 기본은 한 열(sm) 폭이다.
+  wide?: boolean;
   children: ReactNode;
 };
 
 // 지도가 없는 화면(내 정보, 회원 프로필)의 틀이다. 가운데 한 열에 서비스 이름과 제목을 두고, 내용은 카드 여러 개로 나눈다.
-export function PageLayout({ title, children }: PageLayoutProps) {
+export function PageLayout({ title, wide = false, children }: PageLayoutProps) {
   return (
     <div className="min-h-dvh bg-paper bg-contour">
-      <main className="mx-auto flex max-w-screen-sm flex-col gap-4 px-4 py-10">
+      <main className={`mx-auto flex ${wide ? 'max-w-screen-lg' : 'max-w-screen-sm'} flex-col gap-4 px-4 py-10`}>
         <Link to="/" className="self-start font-serif text-2xl font-semibold text-forest-deep">
           피치맵
         </Link>
