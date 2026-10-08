@@ -57,3 +57,13 @@ const KST_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year
 export function todayKst(now: Date = new Date()): string {
   return KST_DATE.format(now);
 }
+
+// YYYY-MM-DD 한국 날짜에 일수를 더한 날짜를 돌려준다. 시간대 변환 없이 UTC로 계산해서 읽는다. 형식이 다르면 받은 문자열을 그대로 돌려준다.
+export function addDaysToLocalDate(date: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return date;
+  }
+  const moved = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
+  return moved.toISOString().slice(0, 10);
+}

@@ -292,6 +292,111 @@ class BasecampDetailApiIntegrationTest {
         assertThat(loggedIn).bodyJson().extractingPath("$.leader.trustLevel").isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("[F-12][NFR-11] 비로그인 요청자의 모집 중 상세에는 canApply와 unmetReasons 필드가 없다")
+    void anonymousHasNoEligibilityFields() {
+        // given
+        long id = basecamp("RECRUITING");
+
+        // when
+        MvcTestResult result = mvc.get().uri("/api/basecamps/" + id).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().doesNotHavePath("$.canApply");
+        assertThat(result).bodyJson().doesNotHavePath("$.unmetReasons");
+    }
+
+    @Test
+    @DisplayName("[F-12][BC-06] 신뢰 단계 0인 로그인 회원의 모집 중 상세는 canApply false에 TRUST_LEVEL 이유다")
+    void trustLevelZeroGetsTrustLevelReason() {
+        // given
+        long id = basecamp("RECRUITING");
+
+        // when
+        MvcTestResult result =
+                mvc.get().uri("/api/basecamps/" + id).cookie(applicantSession).exchange();
+
+        // then
+        assertThat(result).bodyJson().extractingPath("$.canApply").isEqualTo(false);
+        assertThat(result).bodyJson().extractingPath("$.unmetReasons").asList().containsExactly("TRUST_LEVEL");
+    }
+
+    @Test
+    @DisplayName("[F-12][BC-06] 조건을 충족한 회원의 모집 중 상세는 canApply true에 빈 unmetReasons다")
+    void eligibleMemberCanApply() {
+        // given
+        long id = basecamp("RECRUITING");
+
+        // when
+        MvcTestResult result =
+                mvc.get().uri("/api/basecamps/" + id).cookie(memberSession).exchange();
+
+        // then
+        assertThat(result).bodyJson().extractingPath("$.canApply").isEqualTo(true);
+        assertThat(result).bodyJson().extractingPath("$.unmetReasons").asList().isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-12][BC-06] 캠프 리더와 대기 중인 신청자는 ALREADY_JOINED, 거절된 신청자는 REAPPLY_NOT_ALLOWED 이유다")
+    void priorRelationGivesReasons() {
+        // given
+        long id = basecamp("RECRUITING");
+        fixture.insertApplicationRow(id, member, "PENDING");
+        Member rejected = fixture.saveMember();
+        Cookie rejectedSession = fixture.identityVerifiedSession(rejected, "MALE");
+        fixture.insertApplicationRow(id, rejected, "REJECTED");
+
+        // when
+        MvcTestResult asLeader =
+                mvc.get().uri("/api/basecamps/" + id).cookie(leaderSession).exchange();
+        MvcTestResult asApplicant =
+                mvc.get().uri("/api/basecamps/" + id).cookie(memberSession).exchange();
+        MvcTestResult asRejected =
+                mvc.get().uri("/api/basecamps/" + id).cookie(rejectedSession).exchange();
+
+        // then
+        assertThat(asLeader).bodyJson().extractingPath("$.canApply").isEqualTo(false);
+        assertThat(asLeader)
+                .bodyJson()
+                .extractingPath("$.unmetReasons")
+                .asList()
+                .containsExactly("ALREADY_JOINED");
+        assertThat(asApplicant)
+                .bodyJson()
+                .extractingPath("$.unmetReasons")
+                .asList()
+                .containsExactly("ALREADY_JOINED");
+        assertThat(asRejected)
+                .bodyJson()
+                .extractingPath("$.unmetReasons")
+                .asList()
+                .containsExactly("REAPPLY_NOT_ALLOWED");
+    }
+
+    @Test
+    @DisplayName("[F-12] 마감·확정된 베이스캠프의 상세에는 로그인해도 canApply와 unmetReasons 필드가 없다")
+    void notRecruitingHasNoEligibilityFields() {
+        // given
+        long closed = basecamp("CLOSED");
+        long confirmed = basecamp("CONFIRMED");
+
+        // when
+        MvcTestResult closedResult =
+                mvc.get().uri("/api/basecamps/" + closed).cookie(memberSession).exchange();
+        MvcTestResult confirmedResult = mvc.get()
+                .uri("/api/basecamps/" + confirmed)
+                .cookie(memberSession)
+                .exchange();
+
+        // then
+        for (MvcTestResult result : new MvcTestResult[] {closedResult, confirmedResult}) {
+            assertThat(result).hasStatus(HttpStatus.OK);
+            assertThat(result).bodyJson().doesNotHavePath("$.canApply");
+            assertThat(result).bodyJson().doesNotHavePath("$.unmetReasons");
+        }
+    }
+
     private long basecamp(String status) {
         return fixture.insertBasecamp(leader, spotId, status, BasecampApiFixture.DEFAULT_START_DATE);
     }
