@@ -4,12 +4,10 @@ import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.basecamp.domain.BasecampErrorCode;
-import com.pitchmap.basecamp.domain.BasecampRepository;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.ErrorCode;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.member.infra.MemberJpaRepository;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
 class BasecampApprovalConcurrencyIntegrationTest {
@@ -37,19 +33,13 @@ class BasecampApprovalConcurrencyIntegrationTest {
     private BasecampApprovalService basecampApprovalService;
 
     @Autowired
-    private BasecampRepository basecampRepository;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
+    private BasecampTransitionService basecampTransitionService;
 
     @Autowired
     private MemberJpaRepository memberRepository;
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private Clock clock;
 
     @RepeatedTest(5)
     @DisplayName("[F-13][BC-08] 남은 자리 1개에 서로 다른 신청 2건을 동시에 승인하면 1건만 성공하고, ACTIVE 멤버는 정원과 같으며 자동 마감된다")
@@ -91,15 +81,7 @@ class BasecampApprovalConcurrencyIntegrationTest {
         // given
         Scenario scenario = saveScenario(4, 1);
         long applicationId = scenario.applicationIds().get(0);
-        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        // 마감 서비스는 아직 없다. 서비스가 쓸 방식대로 베이스캠프 행을 쓰기 잠금으로 읽고 마감한다.
-        Callable<Object> close = () -> transaction.execute(status -> {
-            basecampRepository
-                    .findByIdForUpdate(scenario.basecampId())
-                    .orElseThrow()
-                    .close(clock.instant());
-            return null;
-        });
+        Callable<Object> close = () -> basecampTransitionService.close(scenario.basecampId(), scenario.leaderId());
         Callable<Object> approve =
                 () -> basecampApprovalService.approve(scenario.basecampId(), applicationId, scenario.leaderId());
 

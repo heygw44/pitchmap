@@ -5,9 +5,11 @@ import com.pitchmap.basecamp.application.BasecampApplicationListService;
 import com.pitchmap.basecamp.application.BasecampApplyService;
 import com.pitchmap.basecamp.application.BasecampApprovalService;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
+import com.pitchmap.basecamp.application.BasecampEditService;
 import com.pitchmap.basecamp.application.BasecampMembershipService;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampSearchService;
+import com.pitchmap.basecamp.application.BasecampTransitionService;
 import com.pitchmap.common.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -18,8 +20,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +40,8 @@ class BasecampController {
     private final BasecampApplicationListService basecampApplicationListService;
     private final BasecampApprovalService basecampApprovalService;
     private final BasecampMembershipService basecampMembershipService;
+    private final BasecampTransitionService basecampTransitionService;
+    private final BasecampEditService basecampEditService;
 
     @Operation(
             summary = "베이스캠프 열기",
@@ -219,5 +225,88 @@ class BasecampController {
             @PathVariable long memberId,
             @Valid @RequestBody BasecampKickRequest request) {
         basecampMembershipService.kick(basecampId, memberId, loginMember.memberId(), request.toReason());
+    }
+
+    @Operation(
+            summary = "베이스캠프 마감",
+            description = "캠프 리더가 모집 중인 베이스캠프를 직접 마감하고, 200과 함께 basecampId와 status(CLOSED)를 준다. "
+                    + "직접 마감한 베이스캠프는 빈자리가 생겨도 저절로 다시 열리지 않는다. 본문은 없다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 모집 중이 아니면 409 BASECAMP_INVALID_STATE이다.")
+    @PostMapping("/api/basecamps/{basecampId}/close")
+    BasecampStatusResponse close(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        return BasecampStatusResponse.from(basecampTransitionService.close(basecampId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 모집 재개",
+            description = "캠프 리더가 마감된 베이스캠프의 모집을 다시 열고, 200과 함께 basecampId와 status(RECRUITING)를 준다. 본문은 없다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 마감 상태가 아니면 409 BASECAMP_INVALID_STATE, "
+                    + "정원이 가득 차 있으면 409 BASECAMP_FULL이다.")
+    @PostMapping("/api/basecamps/{basecampId}/reopen")
+    BasecampStatusResponse reopen(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        return BasecampStatusResponse.from(basecampTransitionService.reopen(basecampId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 확정",
+            description = "캠프 리더가 모집 중이거나 마감된 베이스캠프를 확정하고, 200과 함께 basecampId와 status(CONFIRMED)를 준다. "
+                    + "남은 대기 신청은 EXPIRED가 되고, 캠프 리더를 포함한 ACTIVE 멤버 전원에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. 본문은 없다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 모집 중도 마감도 아니면 409 BASECAMP_INVALID_STATE, "
+                    + "인원이 2명 미만이면 409 BASECAMP_NOT_ENOUGH_MEMBERS이다.")
+    @PostMapping("/api/basecamps/{basecampId}/confirm")
+    BasecampStatusResponse confirm(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        return BasecampStatusResponse.from(basecampTransitionService.confirm(basecampId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 취소",
+            description =
+                    "캠프 리더가 베이스캠프를 취소하고, 200과 함께 basecampId와 status(CANCELED)를 준다. 확정된 뒤에도 취소할 수 있다. "
+                            + "취소 사유는 LEADER로 저장하고, 남은 대기 신청은 EXPIRED가 되며, 캠프 리더를 뺀 ACTIVE 멤버에게 알릴 이벤트가 같은 트랜잭션에서 기록된다. 본문은 없다. "
+                            + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                            + "베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, 이미 완료되었거나 취소되었으면 409 BASECAMP_INVALID_STATE이다.")
+    @PostMapping("/api/basecamps/{basecampId}/cancel")
+    BasecampStatusResponse cancel(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long basecampId) {
+        return BasecampStatusResponse.from(basecampTransitionService.cancel(basecampId, loginMember.memberId()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 연락 수단 등록",
+            description = "캠프 리더가 연락 수단을 등록하거나 바꾸고, 200과 함께 basecampId와 status를 준다. "
+                    + "contactInfo는 필수이고 255자 이하의 https URL이어야 하며, 어긋나면 400 INVALID_INPUT이다. "
+                    + "연락 수단은 베이스캠프가 확정된 뒤부터 완료 후 7일까지 ACTIVE 멤버에게만 상세 응답에 나타난다. "
+                    + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                    + "요청 값이 어긋나면 400 INVALID_INPUT, 베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, "
+                    + "완료되었거나 취소되었으면 409 BASECAMP_INVALID_STATE이다.")
+    @PutMapping("/api/basecamps/{basecampId}/contact")
+    BasecampStatusResponse registerContact(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @Valid @RequestBody BasecampContactRequest request) {
+        return BasecampStatusResponse.from(
+                basecampEditService.registerContact(basecampId, loginMember.memberId(), request.contactInfo()));
+    }
+
+    @Operation(
+            summary = "베이스캠프 수정",
+            description =
+                    "캠프 리더가 title, description, joinCondition, capacity 가운데 보낸 필드만 고치고, 200과 함께 basecampId와 status를 준다. "
+                            + "한 필드도 보내지 않으면 400 INVALID_INPUT이다. 보내지 않은 필드는 그대로 둔다. "
+                            + "joinCondition을 보내면 합류 조건 전체를 바꾸며 규칙은 열 때와 같다(sameGenderOnly는 캠프 리더의 본인확인 성별을 쓴다). "
+                            + "정원은 캠프 리더를 포함해 2~6명이고 늘리기만 할 수 있다. 정원이 차서 자동 마감된 베이스캠프는 정원을 늘리면 다시 모집 중이 된다. "
+                            + "다음 순서로 검사하고 처음 걸린 이유로 응답한다. "
+                            + "요청 값이 어긋나면 400 INVALID_INPUT, 베이스캠프가 없으면 404 NOT_FOUND, 캠프 리더가 아니면 403 ACCESS_DENIED, "
+                            + "정원이 2~6명이 아니면 400 BASECAMP_CAPACITY_INVALID, 합류 조건 값이 올바르지 않으면 400 INVALID_INPUT, "
+                            + "확정된 뒤이면 409 BASECAMP_INVALID_STATE, 정원을 줄이면 400 BASECAMP_CAPACITY_INVALID이다.")
+    @PatchMapping("/api/basecamps/{basecampId}")
+    BasecampStatusResponse revise(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @PathVariable long basecampId,
+            @Valid @RequestBody BasecampReviseRequest request) {
+        return BasecampStatusResponse.from(
+                basecampEditService.revise(basecampId, loginMember.memberId(), request.toCommand()));
     }
 }
