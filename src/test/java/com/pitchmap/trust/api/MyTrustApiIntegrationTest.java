@@ -5,11 +5,15 @@ import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
+import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
 import com.pitchmap.member.application.EmailVerificationService;
 import com.pitchmap.member.domain.Member;
 import com.pitchmap.member.infra.MemberJpaRepository;
+import com.pitchmap.trust.application.CompanionReviewFixture;
 import jakarta.servlet.http.Cookie;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,6 +95,55 @@ class MyTrustApiIntegrationTest {
         assertThat(result).bodyJson().isStrictlyEqualTo(expected(0, true));
     }
 
+    @Test
+    @DisplayName("[TR-01] 완료 동행 3회와 다시 동행 80%를 채운 성인은 단계 2이고 nextLevel 필드가 없다")
+    void trustedAdultIsLevelTwoWithoutNextLevel() {
+        Member member = saveMember();
+        Cookie session = verifiedSession(member);
+        verifyIdentity(session, 2007, "demo-trusted");
+        new CompanionReviewFixture(jdbc, memberRepository)
+                .insertQualifiedRecord(member.getId(), MutableClock.DEFAULT_INSTANT.minus(Duration.ofDays(20)));
+
+        MvcTestResult result = mvc.get().uri(PATH).cookie(session).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                { "trustLevel": 2, "identityVerified": true }
+                """);
+    }
+
+    @Test
+    @DisplayName("[BC-21] 임박 탈퇴 3회면 다른 조건을 채워도 단계 1이고 recentEarlyLeaves가 현재 3회와 한도 3을 알려 준다")
+    void earlyLeavesKeepLevelOne() {
+        Member member = saveMember();
+        Cookie session = verifiedSession(member);
+        verifyIdentity(session, 2007, "demo-early-leaver");
+        CompanionReviewFixture fixture = new CompanionReviewFixture(jdbc, memberRepository);
+        Instant now = MutableClock.DEFAULT_INSTANT;
+        fixture.insertQualifiedRecord(member.getId(), now.minus(Duration.ofDays(20)));
+        for (int i = 1; i <= 3; i++) {
+            fixture.insertEarlyLeaver(
+                    fixture.saveBasecamp("CONFIRMED", null), member.getId(), now.minus(Duration.ofDays(i)));
+        }
+
+        MvcTestResult result = mvc.get().uri(PATH).cookie(session).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {
+                  "trustLevel": 1,
+                  "identityVerified": true,
+                  "nextLevel": {
+                    "level": 2,
+                    "completedCompanions": { "current": 3, "required": 3 },
+                    "rejoinRate": { "current": 80, "required": 80 },
+                    "recentEarlyLeaves": { "current": 3, "limit": 3 },
+                    "noRecentSanction": true
+                  }
+                }
+                """);
+    }
+
     private static String expected(int trustLevel, boolean identityVerified) {
         return """
                 {
@@ -100,6 +153,7 @@ class MyTrustApiIntegrationTest {
                     "level": 2,
                     "completedCompanions": { "current": 0, "required": 3 },
                     "rejoinRate": { "current": null, "required": 80 },
+                    "recentEarlyLeaves": { "current": 0, "limit": 3 },
                     "noRecentSanction": true
                   }
                 }

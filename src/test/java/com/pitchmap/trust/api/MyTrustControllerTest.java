@@ -42,7 +42,7 @@ class MyTrustControllerTest {
     @DisplayName("[TR-01] 단계 1이면 nextLevel에 단계 2 조건과 현재 값을 담고, 후기가 없으면 rejoinRate.current는 null이다")
     void levelOneHasNextLevel() {
         when(trustSummaryService.detail(MEMBER_ID))
-                .thenReturn(new TrustDetail(true, true, 1, 2, null, true, List.of(), "TWENTIES", "MALE"));
+                .thenReturn(new TrustDetail(true, true, 1, 2, null, 1, true, List.of(), "TWENTIES", "MALE"));
 
         MvcTestResult result = mvc.get().uri(PATH).with(login()).exchange();
 
@@ -55,6 +55,7 @@ class MyTrustControllerTest {
                     "level": 2,
                     "completedCompanions": { "current": 2, "required": 3 },
                     "rejoinRate": { "current": null, "required": 80 },
+                    "recentEarlyLeaves": { "current": 1, "limit": 3 },
                     "noRecentSanction": true
                   }
                 }
@@ -65,7 +66,7 @@ class MyTrustControllerTest {
     @DisplayName("[TR-01] 단계 2이면 nextLevel 필드를 응답에서 뺀다")
     void levelTwoOmitsNextLevel() {
         when(trustSummaryService.detail(MEMBER_ID))
-                .thenReturn(new TrustDetail(true, true, 2, 3, 100, true, List.of(), "TWENTIES", "MALE"));
+                .thenReturn(new TrustDetail(true, true, 2, 3, 100, 0, true, List.of(), "TWENTIES", "MALE"));
 
         MvcTestResult result = mvc.get().uri(PATH).with(login()).exchange();
 

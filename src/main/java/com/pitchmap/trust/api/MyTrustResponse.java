@@ -22,6 +22,7 @@ public record MyTrustResponse(
                     MAX_LEVEL,
                     new Progress(detail.completedCompanions(), CompanionRecord.REQUIRED_COMPLETED_COMPANIONS),
                     new RateProgress(detail.rejoinRate(), CompanionRecord.REQUIRED_REJOIN_PERCENT),
+                    new Limit(detail.recentEarlyLeaves(), CompanionRecord.EARLY_LEAVE_LIMIT),
                     detail.noRecentSanction());
         }
         return new MyTrustResponse(detail.trustLevel(), detail.identityVerified(), nextLevel);
@@ -29,11 +30,18 @@ public record MyTrustResponse(
 
     /** 다음 단계의 조건이다. */
     public record NextLevel(
-            int level, Progress completedCompanions, RateProgress rejoinRate, boolean noRecentSanction) {}
+            int level,
+            Progress completedCompanions,
+            RateProgress rejoinRate,
+            Limit recentEarlyLeaves,
+            boolean noRecentSanction) {}
 
     /** 횟수 조건의 현재 값과 필요한 값이다. */
     public record Progress(int current, int required) {}
 
     /** 비율 조건의 현재 값(정수 %)과 필요한 값이다. 받은 후기가 없어 비율을 정할 수 없으면 current는 null이다. */
     public record RateProgress(Integer current, int required) {}
+
+    /** 상한 조건의 현재 값과 한도다. current가 limit 이상이면 조건을 채우지 못한다. */
+    public record Limit(int current, int limit) {}
 }

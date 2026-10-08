@@ -5,11 +5,14 @@ import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
+import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
 import com.pitchmap.member.application.EmailVerificationService;
 import com.pitchmap.member.domain.Member;
 import com.pitchmap.member.infra.MemberJpaRepository;
+import com.pitchmap.trust.application.CompanionReviewFixture;
 import jakarta.servlet.http.Cookie;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +85,33 @@ class MemberProfileApiIntegrationTest {
             assertThat(result).hasStatus(HttpStatus.OK);
             assertThat(result).bodyJson().isStrictlyEqualTo(memberView);
         }
+    }
+
+    @Test
+    @DisplayName("[TR-01][F-15] 공개된 후기가 있으면 프로필에 단계 2, 완료 동행, 다시 동행 비율, 대표 태그를 채운다")
+    void profileShowsCompanionRecord() {
+        Member target = saveMember();
+        verifyIdentity(verifiedSession(target), 1990, "demo-target");
+        CompanionReviewFixture fixture = new CompanionReviewFixture(jdbc, memberRepository);
+        fixture.insertQualifiedRecord(target.getId(), MutableClock.DEFAULT_INSTANT.minus(Duration.ofDays(20)));
+        jdbc.update("INSERT INTO companion_review_tag (review_id, tag) SELECT id, 'ON_TIME' FROM companion_review");
+        jdbc.update(
+                "INSERT INTO companion_review_tag (review_id, tag) SELECT id, 'LATE' FROM companion_review LIMIT 1");
+        Cookie viewer = login(saveMember());
+
+        MvcTestResult result = mvc.get().uri(pathOf(target)).cookie(viewer).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.trustLevel").isEqualTo(2);
+        assertThat(result).bodyJson().extractingPath("$.completedCompanions").isEqualTo(3);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.companionReviewSummary.rejoinRate")
+                .isEqualTo(80);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.companionReviewSummary.topTags")
+                .isEqualTo(java.util.List.of("ON_TIME", "LATE"));
     }
 
     @Test
