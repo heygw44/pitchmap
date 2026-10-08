@@ -10,7 +10,9 @@ public enum TrustErrorCode implements ErrorCode {
     COMPANION_REVIEW_DEADLINE_PASSED(HttpStatus.BAD_REQUEST, "동행 후기를 쓸 수 있는 기한이 지났습니다."),
     COMPANION_REVIEW_DUPLICATED(HttpStatus.CONFLICT, "같은 베이스캠프에서 이 회원에게 쓴 후기가 이미 있습니다."),
     REPORT_NOT_ELIGIBLE(HttpStatus.FORBIDDEN, "이 회원이나 후기를 신고할 자격이 없습니다."),
-    REPORT_DUPLICATED(HttpStatus.CONFLICT, "같은 베이스캠프에서 같은 회원을 같은 종류로 이미 신고했습니다.");
+    REPORT_DUPLICATED(HttpStatus.CONFLICT, "같은 베이스캠프에서 같은 회원을 같은 종류로 이미 신고했습니다."),
+    REPORT_INVALID_STATE(HttpStatus.CONFLICT, "현재 처리 상태에서는 이 신고를 처리할 수 없습니다."),
+    SANCTION_INVALID_STATE(HttpStatus.CONFLICT, "적용 중인 제재만 해제할 수 있습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

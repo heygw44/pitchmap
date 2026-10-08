@@ -62,15 +62,15 @@ public class SyncJobLauncher {
     }
 
     /**
-     * 호출하면 작업 종류의 실행 기록을 만들고 작업을 실행기에 넘긴 뒤, 작업이 끝나기를 기다리지 않고 실행 기록 ID를 돌려준다.
+     * 호출하면 관리자 adminId가 요청한 작업 종류의 실행 기록을 만들고, 같은 트랜잭션에서 감사 로그를 남긴다. 그리고 작업을 실행기에 넘긴 뒤, 작업이 끝나기를 기다리지 않고 실행 기록 ID를 돌려준다.
      *
      * <p>같은 종류가 이미 실행 중이면 {@code SYNC_JOB_ALREADY_RUNNING}을 던진다. 공원 경계 적재가 성공하면 같은 작업 스레드가 이어서 박지 재판정을
      * 시작하고, 그 재판정은 별도의 실행 기록으로 남는다.
      */
-    public long launch(SyncJobType jobType) {
+    public long launch(SyncJobType jobType, long adminId) {
         Job job = jobFor(jobType);
         SyncJobStart start = syncJobRunService
-                .begin(jobType, job.staleAfter())
+                .begin(jobType, job.staleAfter(), adminId)
                 .orElseThrow(() -> new BusinessException(PublicDataErrorCode.SYNC_JOB_ALREADY_RUNNING));
         submit(jobType, start, job);
         log.info("sync job launched jobType={} runId={}", jobType, start.runId());

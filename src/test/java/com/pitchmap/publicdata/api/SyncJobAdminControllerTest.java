@@ -61,7 +61,7 @@ class SyncJobAdminControllerTest {
     @DisplayName("[F-06] 관리자가 작업 실행을 요청하면 202와 실행 기록 ID를 응답하고 요청한 종류로 작업을 시작한다")
     void adminLaunchReturnsAcceptedWithJobRunId() {
         // given
-        when(syncJobLauncher.launch(SyncJobType.GOCAMPING)).thenReturn(7L);
+        when(syncJobLauncher.launch(SyncJobType.GOCAMPING, 1L)).thenReturn(7L);
 
         // when
         MvcTestResult result = launch(admin(), "{\"jobType\":\"GOCAMPING\"}");
@@ -69,7 +69,7 @@ class SyncJobAdminControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.ACCEPTED);
         assertThat(result).bodyJson().extractingPath("$.jobRunId").isEqualTo(7);
-        verify(syncJobLauncher).launch(SyncJobType.GOCAMPING);
+        verify(syncJobLauncher).launch(SyncJobType.GOCAMPING, 1L);
     }
 
     @Test
@@ -134,7 +134,7 @@ class SyncJobAdminControllerTest {
     @DisplayName("[F-06] 같은 종류의 작업이 실행 중이면 409 SYNC_JOB_ALREADY_RUNNING으로 응답한다")
     void alreadyRunningReturnsConflict() {
         // given
-        when(syncJobLauncher.launch(SyncJobType.FOREST))
+        when(syncJobLauncher.launch(SyncJobType.FOREST, 1L))
                 .thenThrow(new BusinessException(PublicDataErrorCode.SYNC_JOB_ALREADY_RUNNING));
 
         // when

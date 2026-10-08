@@ -2,9 +2,12 @@ package com.pitchmap.trust.infra;
 
 import com.pitchmap.trust.domain.Sanction;
 import com.pitchmap.trust.domain.SanctionRepository;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +36,35 @@ public interface SanctionJpaRepository extends JpaRepository<Sanction, Long>, Sa
               and (s.endsAt is null or s.endsAt > :now)
             """)
     boolean existsActiveSuspension(@Param("memberId") long memberId, @Param("now") Instant now);
+
+    @Override
+    Optional<Sanction> findById(Long id);
+
+    @Override
+    @Query("SELECT s.memberId FROM Sanction s WHERE s.id = :sanctionId")
+    Optional<Long> findMemberIdById(@Param("sanctionId") long sanctionId);
+
+    // 이름만으로는 Spring Data가 쿼리를 만들 수 없어서 JPQL을 직접 쓴다.
+    @Override
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Sanction s WHERE s.id = :id")
+    Optional<Sanction> findByIdForUpdate(@Param("id") long id);
+
+    @Override
+    @Query("""
+            select s from Sanction s
+            where s.memberId = :memberId
+              and s.status = com.pitchmap.trust.domain.SanctionStatus.ACTIVE
+              and s.type <> com.pitchmap.trust.domain.SanctionType.WARNING
+            """)
+    List<Sanction> findActiveSuspensions(@Param("memberId") long memberId);
+
+    @Override
+    @Query("""
+            select s from Sanction s
+            where s.reportId = :reportId
+              and s.type = com.pitchmap.trust.domain.SanctionType.TEMPORARY_72H
+              and s.status = com.pitchmap.trust.domain.SanctionStatus.ACTIVE
+            """)
+    List<Sanction> findActiveTemporaryByReportId(@Param("reportId") long reportId);
 }

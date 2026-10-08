@@ -66,4 +66,17 @@ class CompanionReviewTest {
         assertThatThrownBy(() -> CompanionReview.write(3L, 10L, 11L, true, List.of(), null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("[SN-07] 후기를 숨기면 숨긴 시각이 남고, 이미 숨긴 후기는 처음 숨긴 시각을 그대로 둔다")
+    void hideKeepsFirstHiddenTime() {
+        CompanionReview review = CompanionReview.write(3L, 10L, 11L, true, List.of(), "코멘트", NOW);
+        Instant later = NOW.plusSeconds(60);
+
+        review.hide(NOW.plusSeconds(10));
+        review.hide(later);
+
+        assertThat(review.getHiddenAt()).isEqualTo(NOW.plusSeconds(10));
+        assertThatThrownBy(() -> review.hide(null)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

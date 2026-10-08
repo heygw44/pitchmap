@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 /**
  * 완료된 베이스캠프의 멤버가 같은 베이스캠프의 다른 멤버에게 쓴 후기. 한 베이스캠프에서 같은 상대에게는 한 번만 쓸 수 있다.
  *
- * <p>쓴 뒤에는 바꾸거나 지우지 않으므로 수정 메서드가 없다. 베이스캠프와 회원은 다른 모듈의 엔티티라서 연관관계로 걸지 않고 ID로만 가리킨다.
+ * <p>쓴 뒤에는 바꾸거나 지우지 않으므로 수정 메서드가 없고, 관리자가 신고를 처리할 때 숨기기만 한다. 베이스캠프와 회원은 다른 모듈의 엔티티라서 연관관계로 걸지 않고 ID로만 가리킨다.
  * 작성 자격과 기한은 서비스가 검사하고, 이 엔티티는 값의 형식만 지킨다.
  */
 @Entity
@@ -107,5 +107,18 @@ public class CompanionReview {
         String normalizedComment = comment == null || comment.isBlank() ? null : comment;
         Collection<CompanionReviewTag> safeTags = tags == null ? Set.of() : tags;
         return new CompanionReview(basecampId, reviewerId, revieweeId, rejoinWanted, safeTags, normalizedComment, now);
+    }
+
+    /**
+     * 호출하면 관리자가 신고를 확인한 후기를 숨긴다. 숨긴 후기는 목록과 집계에서 빠진다.
+     * 이미 숨긴 후기이면 처음 숨긴 시각을 그대로 둔다.
+     */
+    public void hide(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("후기를 숨기는 시각이 null입니다.");
+        }
+        if (hiddenAt == null) {
+            this.hiddenAt = now;
+        }
     }
 }
