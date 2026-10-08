@@ -73,11 +73,14 @@ class SanctionConfirmServiceIntegrationTest {
         assertThat(event.get("status")).isEqualTo("PENDING");
         assertThat(event.get("aggregate_type")).isEqualTo("MEMBER");
         assertThat(event.get("aggregate_id")).isEqualTo(targetId);
-        assertThat(count("outbox_event")).isEqualTo(1);
+        // 경고와 7일 정지의 제재 알림 이벤트 2건과 정지의 베이스캠프 정리 이벤트 1건이다.
+        assertThat(count("outbox_event")).isEqualTo(3);
+        assertThat(countEvents(SanctionEvents.BASECAMP_CLEANUP_EVENT_TYPE)).isEqualTo(1);
+        assertThat(countEvents(SanctionEvents.NOTIFICATION_EVENT_TYPE)).isEqualTo(2);
     }
 
     @Test
-    @DisplayName("[SN-10] 경고는 제재 기록만 남기고 회원 상태와 아웃박스는 그대로다")
+    @DisplayName("[SN-10] 경고는 제재 기록과 제재 알림 이벤트만 남기고 회원 상태는 그대로이며 베이스캠프 정리 이벤트는 없다")
     void warningOnlyRecordsSanction() {
         SanctionConfirmResult result = confirm(SanctionType.WARNING);
 
@@ -86,7 +89,9 @@ class SanctionConfirmServiceIntegrationTest {
                 .isNull();
         assertThat(jdbc.queryForObject("SELECT status FROM member WHERE id = ?", String.class, targetId))
                 .isEqualTo("UNVERIFIED");
-        assertThat(count("outbox_event")).isZero();
+        assertThat(count("outbox_event")).isEqualTo(1);
+        assertThat(countEvents(SanctionEvents.BASECAMP_CLEANUP_EVENT_TYPE)).isZero();
+        assertThat(countEvents(SanctionEvents.NOTIFICATION_EVENT_TYPE)).isEqualTo(1);
     }
 
     @Test
@@ -170,6 +175,12 @@ class SanctionConfirmServiceIntegrationTest {
                 type,
                 level,
                 status);
+    }
+
+    private int countEvents(String eventType) {
+        Integer count =
+                jdbc.queryForObject("SELECT COUNT(*) FROM outbox_event WHERE event_type = ?", Integer.class, eventType);
+        return count == null ? 0 : count;
     }
 
     private int count(String table) {

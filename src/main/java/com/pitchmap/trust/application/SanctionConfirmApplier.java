@@ -27,7 +27,7 @@ public class SanctionConfirmApplier {
 
     /**
      * 호출하면 대상 회원에게 제재를 확정해 저장한다. 제재가 정지이면 같은 트랜잭션에서 회원을 정지하고, 진행 중인 베이스캠프를 정리하라는
-     * 이벤트를 기록한다. 경고는 회원 상태를 바꾸지 않고 이벤트도 기록하지 않는다.
+     * 이벤트를 기록한다. 경고는 회원 상태를 바꾸지 않고 정리 이벤트도 기록하지 않는다. 제재받은 회원에게 알리는 이벤트는 경고를 포함한 모든 제재에 기록한다.
      *
      * <p>회원 행을 쓰기 잠금으로 읽는 일이 가장 먼저다. 제재 행을 넣으면 외래 키 때문에 회원 행에 읽기 잠금이 먼저 걸리는데,
      * 같은 회원에게 동시에 제재를 확정하면 둘 다 읽기 잠금을 쥔 채 쓰기 잠금을 기다리다 데드락이 난다.
@@ -57,6 +57,12 @@ public class SanctionConfirmApplier {
                     memberId,
                     new SanctionEvents.Payload(memberId, sanction.getId()));
         }
+        outboxEventRecorder.record(
+                SanctionEvents.NOTIFICATION_EVENT_TYPE,
+                SanctionEvents.AGGREGATE_TYPE,
+                memberId,
+                new SanctionEvents.NotificationPayload(
+                        memberId, sanction.getId(), sanction.getType().name(), sanction.getEndsAt()));
         return new SanctionConfirmResult(sanction.getId(), memberId, suspended);
     }
 

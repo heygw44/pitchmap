@@ -118,7 +118,7 @@ class SanctionConfirmApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("[SN-10] 경고는 세션을 지우지 않고 베이스캠프도 건드리지 않는다")
+    @DisplayName("[SN-10] 경고는 세션을 지우지 않고 베이스캠프도 건드리지 않으며, 정리 이벤트 없이 제재 알림 이벤트만 처리한다")
     void warningKeepsSessionAndBasecamps() {
         Cookie session = login(targetId);
         long ledBasecamp = ledBasecamp(targetId);
@@ -128,8 +128,11 @@ class SanctionConfirmApiIntegrationTest {
 
         assertThat(mvc.get().uri("/api/me").cookie(session).exchange()).hasStatus(HttpStatus.OK);
         assertThat(basecampStatus(ledBasecamp)).isEqualTo("RECRUITING");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_event", Integer.class))
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'SANCTION_BASECAMP_CLEANUP'",
+                        Integer.class))
                 .isZero();
+        assertThat(eventStatus("SANCTION_CONFIRMED")).isEqualTo("PUBLISHED");
     }
 
     private long ledBasecamp(long leaderId) {
