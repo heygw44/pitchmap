@@ -3,6 +3,7 @@ package com.pitchmap.trust.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,6 +22,8 @@ import com.pitchmap.trust.domain.IdentityVerification;
 import com.pitchmap.trust.domain.IdentityVerificationRepository;
 import com.pitchmap.trust.domain.TrustErrorCode;
 import com.pitchmap.trust.domain.VerifiedIdentity;
+import com.pitchmap.trust.infra.TrustRecordMapper;
+import com.pitchmap.trust.infra.TrustRecordRow;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +37,7 @@ class IdentityVerificationServiceTest {
     private final IdentityVerificationRepository repository = mock(IdentityVerificationRepository.class);
     private final IdentityProvider provider = mock(IdentityProvider.class);
     private final CiHasher hasher = mock(CiHasher.class);
+    private final TrustRecordMapper recordMapper = mock(TrustRecordMapper.class);
 
     @Test
     @DisplayName("[ID-03] 한국 시각 2025-12-31 23:59:59에는 2007년생이 미성년이고, 2026-01-01 0시에는 성인이다")
@@ -143,12 +147,14 @@ class IdentityVerificationServiceTest {
         when(provider.type()).thenReturn(IdentityProviderType.FAKE);
         when(hasher.hash("ci-raw")).thenReturn(CI_HASH);
         when(repository.saveAndFlush(any(IdentityVerification.class))).thenAnswer(call -> call.getArgument(0));
+        when(recordMapper.selectCompanionRecord(anyLong(), any(), any()))
+                .thenReturn(new TrustRecordRow(0, 0, 0, 0, false));
     }
 
     private IdentityVerificationService serviceAt(String instant) {
         MutableClock clock = MutableClock.at(Instant.parse(instant));
         return new IdentityVerificationService(new IdentityVerificationApplier(
-                repository, provider, hasher, new TrustSummaryService(repository, clock), clock));
+                repository, provider, hasher, new TrustSummaryService(repository, recordMapper, clock), clock));
     }
 
     private static IdentityVerifyCommand command(int birthYear) {

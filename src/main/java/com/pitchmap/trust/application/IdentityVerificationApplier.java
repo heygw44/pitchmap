@@ -57,7 +57,7 @@ public class IdentityVerificationApplier {
         }
         IdentityVerification saved =
                 save(IdentityVerification.verify(memberId, identity, ciHash, identityProvider.type(), now));
-        TrustSummary summary = trustSummaryService.summarizeOf(saved, currentYear);
+        TrustSummary summary = trustSummaryService.summarizeOf(saved, memberId, now);
         return new IdentityVerificationResult(
                 summary.identityVerified(), saved.isAdult(currentYear), summary.trustLevel());
     }

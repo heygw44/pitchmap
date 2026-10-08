@@ -1,5 +1,6 @@
 package com.pitchmap.publicdata.api;
 
+import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.publicdata.application.SyncJobLauncher;
 import com.pitchmap.publicdata.application.SyncJobRunQueryService;
 import com.pitchmap.publicdata.domain.SyncJobType;
@@ -8,6 +9,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,11 +39,13 @@ class SyncJobAdminController {
             description = "jobType 작업(GOCAMPING, FOREST, PARK_BOUNDARY, BAKJI_REJUDGE)의 실행 기록을 만들고 작업을 백그라운드에서 시작한다. "
                     + "작업이 끝나기를 기다리지 않고 202와 실행 기록 ID를 돌려주므로, 결과는 실행 기록 목록에서 확인한다. "
                     + "같은 종류의 작업이 실행 중이면 409 SYNC_JOB_ALREADY_RUNNING으로 응답한다. "
+                    + "관리자가 요청한 실행은 감사 로그에 한 줄 남는다. "
                     + "PARK_BOUNDARY 적재가 성공하면 서버가 바로 이어서 박지 재판정(BAKJI_REJUDGE)을 별도의 실행 기록으로 시작한다.")
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    SyncJobLaunchResponse launch(@Valid @RequestBody SyncJobLaunchRequest request) {
-        return new SyncJobLaunchResponse(syncJobLauncher.launch(request.jobType()));
+    SyncJobLaunchResponse launch(
+            @AuthenticationPrincipal LoginMember admin, @Valid @RequestBody SyncJobLaunchRequest request) {
+        return new SyncJobLaunchResponse(syncJobLauncher.launch(request.jobType(), admin.memberId()));
     }
 
     @Operation(

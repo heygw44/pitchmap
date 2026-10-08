@@ -57,3 +57,27 @@ const KST_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year
 export function todayKst(now: Date = new Date()): string {
   return KST_DATE.format(now);
 }
+
+// YYYY-MM-DD 한국 날짜에 일수를 더한 날짜를 돌려준다. 시간대 변환 없이 UTC로 계산해서 읽는다. 형식이 다르면 받은 문자열을 그대로 돌려준다.
+export function addDaysToLocalDate(date: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return date;
+  }
+  const moved = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
+  return moved.toISOString().slice(0, 10);
+}
+
+// 출발일 0시(한국 시간)의 시각이다. 출발 며칠 전인지 따질 때 기준으로 쓴다.
+export function departureInstant(startDate: string): Date {
+  return new Date(`${startDate}T00:00:00+09:00`);
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// 한국 날짜 기준으로 기한까지 남은 일수다. 기한이 오늘이면 0이고, 이미 지났으면 음수다.
+export function daysUntilKst(iso: string, now: Date = new Date()): number {
+  const target = Date.parse(`${KST_DATE.format(new Date(iso))}T00:00:00+09:00`);
+  const today = Date.parse(`${todayKst(now)}T00:00:00+09:00`);
+  return Math.round((target - today) / MS_PER_DAY);
+}

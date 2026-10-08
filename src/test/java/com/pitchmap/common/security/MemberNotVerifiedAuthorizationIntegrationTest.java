@@ -138,7 +138,12 @@ class MemberNotVerifiedAuthorizationIntegrationTest {
 
         MvcTestResult result = call(method, path, session);
 
-        assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+        // 보안 설정을 통과한 뒤에도 서비스가 신뢰 단계 같은 업무 규칙으로 403을 줄 수 있다. 그래서 보안 설정이 막은 403(MEMBER_NOT_VERIFIED, ACCESS_DENIED)이 아닌지만
+        // 확인한다.
+        assertThat(result.getResponse().getStatus()).isNotEqualTo(401);
+        if (result.getResponse().getStatus() == 403) {
+            assertThat(result).bodyJson().extractingPath("$.code").isNotIn("MEMBER_NOT_VERIFIED", "ACCESS_DENIED");
+        }
     }
 
     @ParameterizedTest(name = "{0} {1}")

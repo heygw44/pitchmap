@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.trust.infra.TrustRecordMapper">
+
+    <!-- trust 모듈이 basecamp·basecamp_member 테이블을 SQL로 직접 읽는 이유: 완료한 동행과 임박 탈퇴는 별도 기록 테이블 없이
+         베이스캠프 상태와 멤버 행에서 매번 센다. 자바 코드로 basecamp 모듈의 클래스를 부르면 trust가 basecamp에 기대게 되지만,
+         SQL은 테이블 이름에만 기대므로 모듈 경계를 지킨다. 이 매퍼는 읽기만 하고 basecamp 테이블을 바꾸지 않는다. -->
+
+    <!-- 받은 후기는 공개된 것만 센다. 공개 전 후기를 세면 비율이 바뀌는 것만으로 후기 내용이 드러나기 때문이다.
+         공개 조건은 CompanionReviewMapper.selectPublicByReviewee와 같다: 완료 시각이 revealCutoff(지금 - 14일)보다 앞서거나
+         반대 방향 후기가 있다. 기한 정각에는 아직 쓸 수 있으므로 같은 시각은 지난 것이 아니다.
+         임박 탈퇴는 recentSince(지금 - 180일) 정각을 포함한다.
+         최근 제재는 recentSince 정각에 시작한 것도 포함한다. 서버가 먼저 내린 임시 정지(TEMPORARY_72H)는 관리자가
+         확인하기 전이라 확정 제재가 아니므로 넣지 않고, 해제된 제재도 넣지 않는다. 경고는 넣는다.
+         "다시 동행" 수는 SUM이 DECIMAL을 돌려줘서 record의 long 필드와 맞지 않으므로 COUNT(CASE ...)로 센다. -->
+    <select id="selectCompanionRecord" resultType="com.pitchmap.trust.infra.TrustRecordRow">
+        SELECT (SELECT COUNT(*)
+                FROM basecamp_member bm
+                JOIN basecamp b ON b.id = bm.basecamp_id
+                WHERE bm.member_id = #{memberId} AND bm.status = 'ACTIVE' AND b.status = 'COMPLETED') AS completed_companions,
+               (SELECT COUNT(*)
+                FROM companion_review r
+                JOIN basecamp b ON b.id = r.basecamp_id
+                WHERE r.reviewee_id = #{memberId}
+                  AND r.hidden_at IS NULL
+                  AND (b.completed_at &lt; #{revealCutoff}
+                       OR EXISTS (SELECT 1 FROM companion_review rv
+                                  WHERE rv.basecamp_id = r.basecamp_id AND rv.reviewer_id = r.reviewee_id
+                                    AND rv.reviewee_id = r.reviewer_id))) AS received_reviews,
+               (SELECT COUNT(CASE WHEN r.rejoin_wanted THEN 1 END)
+                FROM companion_review r
+                JOIN basecamp b ON b.id = r.basecamp_id
+                WHERE r.reviewee_id = #{memberId}
+                  AND r.hidden_at IS NULL
+                  AND (b.completed_at &lt; #{revealCutoff}
+                       OR EXISTS (SELECT 1 FROM companion_review rv
+                                  WHERE rv.basecamp_id = r.basecamp_id AND rv.reviewer_id = r.reviewee_id
+                                    AND rv.reviewee_id = r.reviewer_id))) AS rejoin_wanted,
+               (SELECT COUNT(*)
+                FROM basecamp_member bm
+                WHERE bm.member_id = #{memberId} AND bm.early_leave = TRUE
+                  AND bm.left_at &gt;= #{recentSince}) AS recent_early_leaves,
+               EXISTS (SELECT 1
+                       FROM sanction s
+                       WHERE s.member_id = #{memberId}
+                         AND s.type &lt;&gt; 'TEMPORARY_72H'
+                         AND s.status &lt;&gt; 'LIFTED'
+                         AND s.starts_at &gt;= #{recentSince}) AS recent_sanction
+    </select>
+
+    <!-- 태그 횟수도 받은 후기 집계와 같은 공개 조건을 쓴다. 후기마다 같은 태그는 한 번만 붙으므로 행 수가 곧 후기 수다. -->
+    <select id="selectRevealedTagCounts" resultType="com.pitchmap.trust.infra.TagCountRow">
+        SELECT t.tag AS tag,
+               COUNT(*) AS count
+        FROM companion_review r
+        JOIN basecamp b ON b.id = r.basecamp_id
+        JOIN companion_review_tag t ON t.review_id = r.id
+        WHERE r.reviewee_id = #{memberId}
+          AND r.hidden_at IS NULL
+          AND (b.completed_at &lt; #{revealCutoff}
+               OR EXISTS (SELECT 1 FROM companion_review rv
+                          WHERE rv.basecamp_id = r.basecamp_id AND rv.reviewer_id = r.reviewee_id
+                            AND rv.reviewee_id = r.reviewer_id))
+        GROUP BY t.tag
+    </select>
+
+</mapper>

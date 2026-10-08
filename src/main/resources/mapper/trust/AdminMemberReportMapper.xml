@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.trust.infra.AdminMemberReportMapper">
+
+    <!-- trust 모듈이 member·basecamp 테이블을 SQL로 직접 읽는 이유: 관리자 화면에는 신고자·대상 닉네임과 베이스캠프 제목이 함께 필요하다.
+         자바 코드로 다른 모듈의 클래스를 부르면 trust가 그 모듈에 기대게 되지만, SQL은 테이블 이름에만 기대므로 모듈 경계를 지킨다.
+         이 매퍼는 읽기만 하고 다른 모듈의 테이블을 바꾸지 않는다. -->
+
+    <!-- 정렬은 긴급 신고, 금전 요구 신고, 나머지 순이다. 같은 묶음에서는 접수 시각이 이른 신고, 즉 오래 기다린 신고가 먼저다.
+         접수 시각이 같아도 페이지 경계에서 순서가 흔들리지 않도록 id를 보조 정렬 키로 쓴다. -->
+    <select id="selectList" resultType="com.pitchmap.trust.infra.AdminMemberReportRow">
+        SELECT r.id AS report_id,
+               r.kind AS kind,
+               r.type AS type,
+               r.urgent AS urgent,
+               r.status AS status,
+               r.reporter_id AS reporter_id,
+               rm.nickname AS reporter_nickname,
+               r.target_member_id AS target_id,
+               tm.nickname AS target_nickname,
+               r.basecamp_id AS basecamp_id,
+               r.created_at AS created_at
+        FROM member_report r
+        JOIN member rm ON rm.id = r.reporter_id
+        JOIN member tm ON tm.id = r.target_member_id
+        <where>
+            <if test="status != null">
+                r.status = #{status}
+            </if>
+            <if test="urgent != null">
+                AND r.urgent = #{urgent}
+            </if>
+        </where>
+        ORDER BY r.urgent DESC, (r.type = 'MONEY_REQUEST') DESC, r.created_at ASC, r.id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectDetail" resultType="com.pitchmap.trust.infra.AdminMemberReportDetailRow">
+        SELECT r.id AS report_id,
+               r.kind AS kind,
+               r.type AS type,
+               r.urgent AS urgent,
+               r.status AS status,
+               r.reporter_id AS reporter_id,
+               rm.nickname AS reporter_nickname,
+               r.target_member_id AS target_id,
+               tm.nickname AS target_nickname,
+               r.basecamp_id AS basecamp_id,
+               r.created_at AS created_at,
+               r.content AS content,
+               r.result_note AS result_note,
+               r.handled_by AS handled_by,
+               r.handled_at AS handled_at,
+               b.title AS basecamp_title,
+               b.status AS basecamp_status,
+               b.start_date AS basecamp_start_date,
+               cr.id AS review_id,
+               cr.comment AS review_comment,
+               cr.rejoin_wanted AS review_rejoin_wanted,
+               (cr.hidden_at IS NOT NULL) AS review_hidden
+        FROM member_report r
+        JOIN member rm ON rm.id = r.reporter_id
+        JOIN member tm ON tm.id = r.target_member_id
+        JOIN basecamp b ON b.id = r.basecamp_id
+        LEFT JOIN companion_review cr ON cr.id = r.companion_review_id
+        WHERE r.id = #{reportId}
+    </select>
+
+    <select id="selectReviewTags" resultType="java.lang.String">
+        SELECT t.tag
+        FROM companion_review_tag t
+        WHERE t.review_id = #{reviewId}
+        ORDER BY t.tag ASC
+    </select>
+
+    <!-- 기각된 신고가 만든 임시 정지는 정지를 풀 때 LIFTED가 되지만 제재 이력에는 남기지 않는다. 그래서 신고 상태가 DISMISSED인 임시 정지를 뺀다.
+         조치된 신고의 임시 정지는 그대로 이력에 보인다. -->
+    <select id="selectSanctionHistory" resultType="com.pitchmap.trust.infra.AdminSanctionHistoryRow">
+        SELECT s.id AS sanction_id,
+               s.type AS type,
+               s.level AS level,
+               s.status AS status,
+               s.reason AS reason,
+               s.starts_at AS starts_at,
+               s.ends_at AS ends_at,
+               s.lifted_at AS lifted_at
+        FROM sanction s
+        LEFT JOIN member_report mr ON mr.id = s.report_id
+        WHERE s.member_id = #{memberId}
+          AND NOT (s.type = 'TEMPORARY_72H' AND mr.status = 'DISMISSED')
+        ORDER BY s.created_at DESC, s.id DESC
+    </select>
+
+</mapper>

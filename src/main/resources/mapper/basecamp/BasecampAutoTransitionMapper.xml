@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.basecamp.infra.BasecampAutoTransitionMapper">
+
+    <!-- 마지막으로 읽은 ID 뒤부터 읽어서, 처리하지 못하고 남은 베이스캠프가 있어도 같은 행을 다시 읽지 않는다. -->
+    <select id="selectDueForDepartureIds" resultType="long">
+        SELECT id
+        FROM basecamp
+        WHERE status IN ('RECRUITING', 'CLOSED')
+          AND start_date &lt;= #{dueStartDate}
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectDueForCompletionIds" resultType="long">
+        SELECT id
+        FROM basecamp
+        WHERE status = 'CONFIRMED'
+          AND end_date &lt; #{today}
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectStatusForUpdate" resultType="string">
+        SELECT status
+        FROM basecamp
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <select id="countActiveMembers" resultType="int">
+        SELECT COUNT(*)
+        FROM basecamp_member
+        WHERE basecamp_id = #{id}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="selectActiveMemberIds" resultType="long">
+        SELECT member_id
+        FROM basecamp_member
+        WHERE basecamp_id = #{id}
+          AND status = 'ACTIVE'
+        ORDER BY id
+    </select>
+
+    <update id="confirmIfBeforeConfirm">
+        UPDATE basecamp
+        SET status = 'CONFIRMED',
+            closed_reason = NULL,
+            confirmed_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND status IN ('RECRUITING', 'CLOSED')
+    </update>
+
+    <update id="cancelForNotEnoughMembers">
+        UPDATE basecamp
+        SET status = 'CANCELED',
+            closed_reason = NULL,
+            canceled_at = #{now},
+            cancel_reason = 'NOT_ENOUGH_MEMBERS',
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND status IN ('RECRUITING', 'CLOSED')
+    </update>
+
+    <update id="completeIfConfirmed">
+        UPDATE basecamp
+        SET status = 'COMPLETED',
+            completed_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND status = 'CONFIRMED'
+          AND end_date &lt; #{today}
+    </update>
+
+    <update id="expirePendingApplications">
+        UPDATE basecamp_application
+        SET status = 'EXPIRED',
+            updated_at = #{now}
+        WHERE basecamp_id = #{basecampId}
+          AND status = 'PENDING'
+    </update>
+
+</mapper>

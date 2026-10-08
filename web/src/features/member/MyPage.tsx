@@ -35,6 +35,9 @@ const GENDER_OPTIONS: ReadonlyArray<ChoiceOption<GenderChoice>> = [
   { value: NOT_SET, label: '밝히지 않음' },
 ];
 
+const PAGE_LINK_CLASS =
+  'inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep';
+
 const UNVERIFIED_REASON = '이메일 인증을 마치면 고칠 수 있어요';
 
 export function MyPage() {
@@ -65,6 +68,20 @@ export function MyPage() {
       <TrustCard me={me} />
       <SelfReportForm me={me} onSaved={() => void session.refresh().catch(() => null)} />
       <div className="flex flex-wrap gap-2">
+        <Link to="/me/basecamps" className={PAGE_LINK_CLASS}>
+          내 베이스캠프
+        </Link>
+        <Link to="/me/companion-reviews" className={PAGE_LINK_CLASS}>
+          동행 후기
+        </Link>
+        <Link to="/me/notifications" className={PAGE_LINK_CLASS}>
+          알림
+        </Link>
+        {me.role === 'ADMIN' && (
+          <Link to="/admin/reports" className={PAGE_LINK_CLASS}>
+            관리자
+          </Link>
+        )}
         <Link
           to={`/members/${me.memberId}`}
           className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"

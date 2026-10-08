@@ -26,12 +26,19 @@ export function trustLevelBadge(level: number): { label: string; tone: BadgeTone
   return TRUST_LEVEL_BADGES[level] ?? TRUST_LEVEL_BADGES[0]!;
 }
 
+// 동행 후기를 쓸 때 고르는 태그. 긍정과 부정을 나눠 보여 준다.
+export const POSITIVE_COMPANION_TAGS = ['ON_TIME', 'LEAVE_NO_TRACE', 'CONSIDERATE', 'WELL_PREPARED'] as const;
+export const NEGATIVE_COMPANION_TAGS = ['LATE', 'NO_SHOW', 'LITTERING'] as const;
+
 // 동행 후기 태그. 서버가 아직 모르는 값을 주면 받은 코드를 그대로 보여 준다.
 const COMPANION_TAG_LABELS: Record<string, string> = {
   ON_TIME: '시간 약속',
   LEAVE_NO_TRACE: '흔적 남기지 않기 실천',
   CONSIDERATE: '배려',
   WELL_PREPARED: '준비성',
+  LATE: '지각',
+  NO_SHOW: '노쇼',
+  LITTERING: '쓰레기 방치',
 };
 
 export function companionTagLabel(tag: string): string {

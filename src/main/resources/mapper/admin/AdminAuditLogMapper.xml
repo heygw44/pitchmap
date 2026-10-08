@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.admin.infra.AdminAuditLogMapper">
+
+    <!-- 기간 조건에 맞춰 (created_at, id) 인덱스를 두었다. 정렬은 id 내림차순이고, 기록 순서와 id 순서가 같아서 최근 기록이 먼저 나온다. -->
+    <select id="selectLogs" resultType="com.pitchmap.admin.infra.AdminAuditLogRow">
+        SELECT id AS audit_log_id,
+               admin_id AS admin_id,
+               action AS action,
+               target_type AS target_type,
+               target_id AS target_id,
+               detail AS detail,
+               created_at AS created_at
+        FROM admin_audit_log
+        <where>
+            <if test="adminId != null">
+                admin_id = #{adminId}
+            </if>
+            <if test="targetType != null">
+                AND target_type = #{targetType}
+            </if>
+            <if test="from != null">
+                AND created_at &gt;= #{from}
+            </if>
+            <if test="to != null">
+                AND created_at &lt; #{to}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

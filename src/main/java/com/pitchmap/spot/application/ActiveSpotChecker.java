@@ -5,6 +5,7 @@ import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.spot.domain.Spot;
 import com.pitchmap.spot.domain.SpotRepository;
 import com.pitchmap.spot.domain.SpotStatus;
+import com.pitchmap.spot.domain.SpotType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,20 @@ public class ActiveSpotChecker {
                 .findById(spotId)
                 .filter(ActiveSpotChecker::isActive)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+    }
+
+    /**
+     * 호출하면 spotId인 장소가 공원 경계 경고가 붙은 박지이면 true를 돌려준다. 야영장·자연휴양림이거나 경고가 없는 박지이면 false다.
+     *
+     * <p>장소가 없거나 ACTIVE가 아니면 {@link #requireActive}와 같은 이유로 NOT_FOUND로 거부한다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isWarningBakji(long spotId) {
+        Spot spot = spotRepository
+                .findById(spotId)
+                .filter(ActiveSpotChecker::isActive)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        return spot.getType() == SpotType.BAKJI && spot.isParkWarning();
     }
 
     private static boolean isActive(Spot spot) {

@@ -1,3 +1,10 @@
+import { AdminReportDetailPage } from '../features/admin/AdminReportDetailPage';
+import { AdminReportsPage } from '../features/admin/AdminReportsPage';
+import { AdminSpotsPage } from '../features/admin/AdminSpotsPage';
+import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
+import { MyBasecampsPage } from '../features/basecamp/MyBasecampsPage';
+import { NotificationsPage } from '../features/notification/NotificationsPage';
+import { CompanionReviewsPage } from '../features/review/CompanionReviewsPage';
 import { LoginPage } from '../features/member/LoginPage';
 import { MemberProfilePage } from '../features/member/MemberProfilePage';
 import { MyPage } from '../features/member/MyPage';
@@ -24,6 +31,43 @@ export const routes: RouteDef[] = [
     },
   },
   { path: '/bakjis/new', render: () => <MapPage mode="report" /> },
+  { path: '/basecamps', render: () => <MapPage mode="basecamps" /> },
+  {
+    path: '/basecamps/new',
+    // 장소 ID는 주소의 spotId에서 읽는다. 양의 정수가 아니면 서버에 묻지 않고 없는 페이지로 보여 준다.
+    render: () => {
+      const spotId = toPositiveId(new URLSearchParams(window.location.search).get('spotId') ?? undefined);
+      return spotId === null ? <NotFoundPage /> : <MapPage mode="basecampOpen" openSpotId={spotId} />;
+    },
+  },
+  {
+    path: '/basecamps/:basecampId',
+    // 베이스캠프 ID도 양의 정수만 있다. 위의 '/basecamps/new'가 먼저 맞아야 하므로 이 경로는 그 뒤에 둔다.
+    render: (params) => {
+      const basecampId = toPositiveId(params.basecampId);
+      return basecampId === null ? <NotFoundPage /> : <MapPage mode="basecamps" basecampId={basecampId} />;
+    },
+  },
+  {
+    path: '/basecamps/:basecampId/manage',
+    // 세그먼트 수가 달라서 '/basecamps/:basecampId'와 겹치지 않는다.
+    render: (params) => {
+      const basecampId = toPositiveId(params.basecampId);
+      return basecampId === null ? <NotFoundPage /> : <BasecampManagePage key={basecampId} basecampId={basecampId} />;
+    },
+  },
+  { path: '/me/basecamps', render: () => <MyBasecampsPage /> },
+  { path: '/me/companion-reviews', render: () => <CompanionReviewsPage /> },
+  { path: '/me/notifications', render: () => <NotificationsPage /> },
+  { path: '/admin/reports', render: () => <AdminReportsPage /> },
+  {
+    path: '/admin/reports/:reportId',
+    render: (params) => {
+      const reportId = toPositiveId(params.reportId);
+      return reportId === null ? <NotFoundPage /> : <AdminReportDetailPage key={reportId} reportId={reportId} />;
+    },
+  },
+  { path: '/admin/spots', render: () => <AdminSpotsPage /> },
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },

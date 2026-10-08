@@ -10,7 +10,7 @@ class CompanionRecordTest {
     @Test
     @DisplayName("[TR-01] 받은 후기가 없으면 다시 동행 비율은 null이고 단계 2 조건을 채우지 못한다")
     void noReviewsHasNoRateAndIsNotTrusted() {
-        CompanionRecord record = new CompanionRecord(5, 0, 0, false);
+        CompanionRecord record = new CompanionRecord(5, 0, 0, 0, false);
 
         assertThat(record.rejoinRate()).isNull();
         assertThat(record.meetsTrustedCondition()).isFalse();
@@ -19,22 +19,25 @@ class CompanionRecordTest {
     @Test
     @DisplayName("[TR-01] 비율은 정수 %로 버린다. 3건 중 2건이면 66이다")
     void rateIsFloored() {
-        assertThat(new CompanionRecord(3, 3, 2, false).rejoinRate()).isEqualTo(66);
-        assertThat(new CompanionRecord(3, 5, 4, false).rejoinRate()).isEqualTo(80);
+        assertThat(new CompanionRecord(3, 3, 2, 0, false).rejoinRate()).isEqualTo(66);
+        assertThat(new CompanionRecord(3, 5, 4, 0, false).rejoinRate()).isEqualTo(80);
     }
 
     @Test
     @DisplayName("[TR-01] 완료한 동행이 2회면 부족하고 3회면 충분하다")
     void completedCompanionsThreshold() {
-        assertThat(new CompanionRecord(2, 5, 5, false).meetsTrustedCondition()).isFalse();
-        assertThat(new CompanionRecord(3, 5, 5, false).meetsTrustedCondition()).isTrue();
+        assertThat(new CompanionRecord(2, 5, 5, 0, false).meetsTrustedCondition())
+                .isFalse();
+        assertThat(new CompanionRecord(3, 5, 5, 0, false).meetsTrustedCondition())
+                .isTrue();
     }
 
     @Test
     @DisplayName("[TR-01] 다시 동행 비율은 80%까지 채워야 한다. 5건 중 4건은 충족, 100건 중 79건은 미충족이다")
     void rejoinRateThreshold() {
-        assertThat(new CompanionRecord(3, 5, 4, false).meetsTrustedCondition()).isTrue();
-        assertThat(new CompanionRecord(3, 100, 79, false).meetsTrustedCondition())
+        assertThat(new CompanionRecord(3, 5, 4, 0, false).meetsTrustedCondition())
+                .isTrue();
+        assertThat(new CompanionRecord(3, 100, 79, 0, false).meetsTrustedCondition())
                 .isFalse();
     }
 
@@ -42,7 +45,7 @@ class CompanionRecordTest {
     @DisplayName("[TR-01] 반올림하면 80이 되는 79.5%도 개수로 비교해서 미충족이다")
     void comparesCountsNotRoundedRate() {
         // 200건 중 159건은 79.5%다.
-        CompanionRecord record = new CompanionRecord(3, 200, 159, false);
+        CompanionRecord record = new CompanionRecord(3, 200, 159, 0, false);
 
         assertThat(record.rejoinRate()).isEqualTo(79);
         assertThat(record.meetsTrustedCondition()).isFalse();
@@ -51,7 +54,8 @@ class CompanionRecordTest {
     @Test
     @DisplayName("[TR-01] 최근 확정 제재가 있으면 다른 조건을 모두 채워도 미충족이다")
     void recentSanctionBlocks() {
-        assertThat(new CompanionRecord(3, 5, 5, true).meetsTrustedCondition()).isFalse();
+        assertThat(new CompanionRecord(3, 5, 5, 0, true).meetsTrustedCondition())
+                .isFalse();
     }
 
     @Test
@@ -59,5 +63,21 @@ class CompanionRecordTest {
     void noneConstant() {
         assertThat(CompanionRecord.NONE.rejoinRate()).isNull();
         assertThat(CompanionRecord.NONE.meetsTrustedCondition()).isFalse();
+    }
+
+    @Test
+    @DisplayName("[BC-21][TR-01] 최근 임박 탈퇴가 2회면 단계 2 조건을 채우고 3회면 다른 조건을 모두 채워도 미충족이다")
+    void earlyLeaveThreshold() {
+        assertThat(new CompanionRecord(3, 5, 5, 2, false).meetsTrustedCondition())
+                .isTrue();
+        assertThat(new CompanionRecord(3, 5, 5, 3, false).meetsTrustedCondition())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("[TR-01] 완료한 동행 3회와 80%를 채워도 받은 후기가 0건이면 미충족이다")
+    void noReceivedReviewsIsNotTrustedEvenWithEnoughCompanions() {
+        assertThat(new CompanionRecord(10, 0, 0, 0, false).meetsTrustedCondition())
+                .isFalse();
     }
 }

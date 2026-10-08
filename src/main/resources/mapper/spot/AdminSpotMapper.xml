@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.spot.infra.AdminSpotMapper">
+
+    <!-- spot 모듈이 member 테이블을 SQL로 직접 읽는 이유: 관리자 화면에는 박지 제보자의 닉네임이 함께 필요하다.
+         자바 코드로 member 모듈을 부르면 spot이 그 모듈에 기대게 되지만, SQL은 테이블 이름에만 기대므로 모듈 경계를 지킨다.
+         이 매퍼는 읽기만 한다.
+         신고 수는 검토 전 신고(reviewed_at IS NULL)만 센다. 사유별 개수는 CASE로 한 번에 센다. 신고가 없는 장소는 LEFT JOIN이 NULL을
+         주므로 COALESCE로 0을 채운다. 집계 대상은 조회하는 상태의 장소로 좁힌다.
+         정렬은 상태가 바뀐 시각이 이른 장소, 즉 오래 기다린 장소가 먼저다. 시각이 같아도 페이지 경계에서 순서가 흔들리지 않도록
+         id를 보조 정렬 키로 쓴다. 좌표는 SRID 4326 점에서 ST_Latitude, ST_Longitude로 읽는다. -->
+    <select id="selectPage" resultType="com.pitchmap.spot.infra.AdminSpotRow">
+        SELECT s.id AS spot_id,
+               s.type AS type,
+               s.name AS name,
+               s.status AS status,
+               ST_Latitude(s.location) AS lat,
+               ST_Longitude(s.location) AS lng,
+               s.park_warning AS park_warning,
+               b.reporter_id AS reporter_id,
+               m.nickname AS reporter_nickname,
+               COALESCE(rc.report_count, 0) AS report_count,
+               COALESCE(rc.illegal_area_count, 0) AS illegal_area_count,
+               COALESCE(rc.closed_count, 0) AS closed_count,
+               COALESCE(rc.false_info_count, 0) AS false_info_count,
+               s.updated_at AS status_changed_at
+        FROM spot s
+        LEFT JOIN bakji_detail b ON b.spot_id = s.id
+        LEFT JOIN member m ON m.id = b.reporter_id
+        LEFT JOIN (
+            SELECT r.spot_id AS spot_id,
+                   COUNT(*) AS report_count,
+                   COUNT(CASE WHEN r.reason = 'ILLEGAL_AREA' THEN 1 END) AS illegal_area_count,
+                   COUNT(CASE WHEN r.reason = 'CLOSED' THEN 1 END) AS closed_count,
+                   COUNT(CASE WHEN r.reason = 'FALSE_INFO' THEN 1 END) AS false_info_count
+            FROM bakji_report r
+            JOIN spot target ON target.id = r.spot_id
+            WHERE r.reviewed_at IS NULL
+              AND target.status = #{status}
+            GROUP BY r.spot_id
+        ) rc ON rc.spot_id = s.id
+        WHERE s.status = #{status}
+        ORDER BY s.updated_at ASC, s.id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 장소마다 검토 전 신고를 최신순으로 번호 매겨 5번째까지만 남긴다. 신고 시각이 같아도 순서가 고정되도록 id를 보조 정렬 키로 쓴다. -->
+    <select id="selectRecentReports" resultType="com.pitchmap.spot.infra.AdminSpotRecentReportRow">
+        SELECT ranked.spot_id AS spot_id,
+               ranked.reason AS reason,
+               ranked.content AS content,
+               ranked.created_at AS created_at
+        FROM (
+            SELECT r.spot_id AS spot_id,
+                   r.reason AS reason,
+                   r.content AS content,
+                   r.created_at AS created_at,
+                   r.id AS id,
+                   ROW_NUMBER() OVER (PARTITION BY r.spot_id ORDER BY r.created_at DESC, r.id DESC) AS row_num
+            FROM bakji_report r
+            WHERE r.reviewed_at IS NULL
+              AND r.spot_id IN
+            <foreach collection="spotIds" item="spotId" open="(" separator="," close=")">
+                #{spotId}
+            </foreach>
+        ) ranked
+        WHERE ranked.row_num &lt;= 5
+        ORDER BY ranked.spot_id ASC, ranked.row_num ASC
+    </select>
+
+</mapper>

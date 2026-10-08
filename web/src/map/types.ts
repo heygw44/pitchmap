@@ -20,6 +20,8 @@ export interface SpotMarkerData {
   position: LatLng;
   warning: boolean;
   closed: boolean;
+  // 이 장소의 모집 중 베이스캠프 수다. 베이스캠프를 찾는 화면에서만 채운다.
+  count?: number;
 }
 
 // 서버가 묶어서 보낸 장소 묶음이다. 클라이언트에서 다시 묶지 않는다.

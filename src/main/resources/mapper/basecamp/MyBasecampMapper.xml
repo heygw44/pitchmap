@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.basecamp.infra.MyBasecampMapper">
+
+    <!-- 현재 인원은 상태가 ACTIVE인 멤버 행의 수이고 캠프 리더도 센다. 베이스캠프 검색 매퍼와 같은 식이다. -->
+    <sql id="headcount">
+        (SELECT COUNT(*) FROM basecamp_member m WHERE m.basecamp_id = b.id AND m.status = 'ACTIVE')
+    </sql>
+
+    <!-- 요청자와 지금 관계가 있는 베이스캠프를 UNION ALL로 모은다. 탈퇴·강퇴된 멤버 행과 대기 중이 아닌 신청 행은 지금 관계가 아니라서 뺀다.
+         멤버 행은 (베이스캠프, 회원)마다 하나이고, 대기 중인 신청은 멤버가 아닌 회원에게만 있으므로 한 베이스캠프가 두 번 나오지 않는다.
+         출발일이 같으면 ID 순서로 정렬해서, 페이지를 넘겨도 같은 베이스캠프가 두 번 나오거나 빠지지 않게 한다. -->
+    <select id="selectMine" resultType="com.pitchmap.basecamp.infra.MyBasecampRow">
+        SELECT b.id AS basecamp_id,
+               b.title AS title,
+               s.id AS spot_id,
+               s.name AS spot_name,
+               s.type AS spot_type,
+               b.start_date AS start_date,
+               b.end_date AS end_date,
+               b.capacity AS capacity,
+               <include refid="headcount"/> AS headcount,
+               b.status AS status,
+               mine.relation AS my_relation
+        FROM (
+            SELECT bm.basecamp_id AS basecamp_id,
+                   CASE bm.role WHEN 'LEADER' THEN 'LEADER' ELSE 'MEMBER' END AS relation
+            FROM basecamp_member bm
+            WHERE bm.member_id = #{memberId}
+              AND bm.status = 'ACTIVE'
+            UNION ALL
+            SELECT ba.basecamp_id AS basecamp_id,
+                   'APPLICANT' AS relation
+            FROM basecamp_application ba
+            WHERE ba.applicant_id = #{memberId}
+              AND ba.status = 'PENDING'
+        ) mine
+        JOIN basecamp b ON b.id = mine.basecamp_id
+        JOIN spot s ON s.id = b.spot_id
+        <where>
+            <if test="relation != null">
+                mine.relation = #{relation}
+            </if>
+            <if test="status != null">
+                AND b.status = #{status}
+            </if>
+        </where>
+        ORDER BY b.start_date DESC, b.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

@@ -49,9 +49,17 @@ public class SyncJobRunService {
      * 다시 시도하면 먼저 끝낸 쪽이 커밋한 RUNNING 기록을 읽어 빈 값을 돌려주거나 새로 넣는다. 모든 시도가 실패하면 마지막 예외를 던진다.
      */
     public Optional<SyncJobStart> begin(SyncJobType jobType, Duration staleAfter) {
+        return begin(jobType, staleAfter, null);
+    }
+
+    /**
+     * 호출하면 {@link #begin(SyncJobType, Duration)}처럼 실행 기록을 만들고, 관리자 adminId가 요청한 실행이면 같은 트랜잭션에서 감사 로그도 남긴다.
+     * 실행 기록을 만들지 못하고 빈 값을 돌려줄 때는 감사 로그도 남지 않는다.
+     */
+    public Optional<SyncJobStart> begin(SyncJobType jobType, Duration staleAfter, Long adminId) {
         for (int attempt = 1; ; attempt++) {
             try {
-                return syncJobRunStartService.start(jobType, staleAfter);
+                return syncJobRunStartService.start(jobType, staleAfter, adminId);
             } catch (DataIntegrityViolationException e) {
                 if (!isRunningUniqueViolation(e)) {
                     throw e;
