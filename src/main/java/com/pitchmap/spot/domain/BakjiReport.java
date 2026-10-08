@@ -45,6 +45,10 @@ public class BakjiReport {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    // 관리자가 박지를 복구하면서 검토를 마친 것으로 표시한 시각이다. null이면 아직 검토 전이다.
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
     private BakjiReport(long spotId, long reporterId, BakjiReportReason reason, String content, Instant now) {
         this.spotId = spotId;
         this.reporterId = reporterId;

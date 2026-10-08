@@ -3,6 +3,7 @@ package com.pitchmap.spot.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.testsupport.MutableClock;
 import java.time.Duration;
 import java.time.Instant;
@@ -180,5 +181,87 @@ class SpotTest {
         // when & then
         assertThatThrownBy(() -> spot.markPendingReview(NOW.plusSeconds(2))).isInstanceOf(IllegalStateException.class);
         assertThat(spot.getStatus()).isEqualTo(SpotStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("[F-21] ACTIVE나 PENDING_REVIEW 박지를 숨기면 상태가 HIDDEN이 되고 수정 시각을 갱신한다")
+    void hideChangesActiveAndPendingReviewToHidden() {
+        // given
+        Spot active = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        Spot pending = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        pending.markPendingReview(NOW.plusSeconds(1));
+        Instant hiddenAt = NOW.plusSeconds(10);
+
+        // when
+        active.hide(hiddenAt);
+        pending.hide(hiddenAt);
+
+        // then
+        assertThat(active.getStatus()).isEqualTo(SpotStatus.HIDDEN);
+        assertThat(active.getUpdatedAt()).isEqualTo(hiddenAt);
+        assertThat(pending.getStatus()).isEqualTo(SpotStatus.HIDDEN);
+        assertThat(pending.getUpdatedAt()).isEqualTo(hiddenAt);
+    }
+
+    @Test
+    @DisplayName("[F-21] 이미 숨겼거나 삭제한 박지를 숨기면 SPOT_INVALID_STATE이고 상태와 수정 시각은 그대로다")
+    void hideRejectsHiddenAndDeletedSpot() {
+        // given
+        Spot hidden = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        hidden.hide(NOW.plusSeconds(1));
+        Spot deleted = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        deleted.delete(NOW.plusSeconds(1));
+
+        // when & then
+        for (Spot spot : new Spot[] {hidden, deleted}) {
+            SpotStatus before = spot.getStatus();
+            assertThatThrownBy(() -> spot.hide(NOW.plusSeconds(5)))
+                    .isInstanceOfSatisfying(
+                            BusinessException.class,
+                            e -> assertThat(e.getErrorCode()).isEqualTo(SpotErrorCode.SPOT_INVALID_STATE));
+            assertThat(spot.getStatus()).isEqualTo(before);
+            assertThat(spot.getUpdatedAt()).isEqualTo(NOW.plusSeconds(1));
+        }
+    }
+
+    @Test
+    @DisplayName("[F-21] 검토 대기나 숨긴 박지를 복구하면 상태가 ACTIVE가 되고 수정 시각을 갱신한다")
+    void restoreChangesPendingReviewAndHiddenToActive() {
+        // given
+        Spot pending = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        pending.markPendingReview(NOW.plusSeconds(1));
+        Spot hidden = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        hidden.hide(NOW.plusSeconds(1));
+        Instant restoredAt = NOW.plusSeconds(10);
+
+        // when
+        pending.restore(restoredAt);
+        hidden.restore(restoredAt);
+
+        // then
+        assertThat(pending.getStatus()).isEqualTo(SpotStatus.ACTIVE);
+        assertThat(pending.getUpdatedAt()).isEqualTo(restoredAt);
+        assertThat(hidden.getStatus()).isEqualTo(SpotStatus.ACTIVE);
+        assertThat(hidden.getUpdatedAt()).isEqualTo(restoredAt);
+    }
+
+    @Test
+    @DisplayName("[F-21] ACTIVE이거나 삭제한 박지를 복구하면 SPOT_INVALID_STATE이고 상태와 수정 시각은 그대로다")
+    void restoreRejectsActiveAndDeletedSpot() {
+        // given
+        Spot active = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        Spot deleted = Spot.bakji("능선 끝 평지", SEOUL_CITY_HALL, ParkAreaJudgement.outside(NOW), NOW);
+        deleted.delete(NOW);
+
+        // when & then
+        for (Spot spot : new Spot[] {active, deleted}) {
+            SpotStatus before = spot.getStatus();
+            assertThatThrownBy(() -> spot.restore(NOW.plusSeconds(5)))
+                    .isInstanceOfSatisfying(
+                            BusinessException.class,
+                            e -> assertThat(e.getErrorCode()).isEqualTo(SpotErrorCode.SPOT_INVALID_STATE));
+            assertThat(spot.getStatus()).isEqualTo(before);
+            assertThat(spot.getUpdatedAt()).isEqualTo(NOW);
+        }
     }
 }

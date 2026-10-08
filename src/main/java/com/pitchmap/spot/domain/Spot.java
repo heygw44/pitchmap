@@ -1,5 +1,6 @@
 package com.pitchmap.spot.domain;
 
+import com.pitchmap.common.error.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -156,6 +157,40 @@ public class Spot {
         }
         this.status = SpotStatus.PENDING_REVIEW;
         this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 관리자가 장소를 숨긴 것으로 상태를 {@link SpotStatus#HIDDEN}으로 바꾸고 수정 시각을 now로 갱신한다. ACTIVE나
+     * PENDING_REVIEW에서만 숨길 수 있고, 이미 숨겼거나 제보자가 지운 장소이면 {@link BusinessException}(SPOT_INVALID_STATE)을 던진다.
+     */
+    public void hide(Instant now) {
+        if (status != SpotStatus.ACTIVE && status != SpotStatus.PENDING_REVIEW) {
+            throw new BusinessException(SpotErrorCode.SPOT_INVALID_STATE);
+        }
+        this.status = SpotStatus.HIDDEN;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 관리자가 장소를 되살린 것으로 상태를 {@link SpotStatus#ACTIVE}로 바꾸고 수정 시각을 now로 갱신한다. PENDING_REVIEW나
+     * HIDDEN에서만 되살릴 수 있고, 이미 ACTIVE이거나 제보자가 지운 장소이면 {@link BusinessException}(SPOT_INVALID_STATE)을 던진다.
+     */
+    public void restore(Instant now) {
+        if (status != SpotStatus.PENDING_REVIEW && status != SpotStatus.HIDDEN) {
+            throw new BusinessException(SpotErrorCode.SPOT_INVALID_STATE);
+        }
+        this.status = SpotStatus.ACTIVE;
+        this.updatedAt = now;
+    }
+
+    /** 제보자가 지운 장소(DELETED)이면 true다. 지운 장소는 관리자도 다루지 못하고 없는 것처럼 취급한다. */
+    public boolean isDeleted() {
+        return status == SpotStatus.DELETED;
+    }
+
+    /** 공공데이터에서 적재한 장소(야영장, 자연휴양림)이면 true다. */
+    public boolean isPublicData() {
+        return type == SpotType.CAMPSITE || type == SpotType.FOREST;
     }
 
     /** 사용자가 제보한 박지이고 지도에 보이는 상태(ACTIVE)이면 true다. 제보자가 고치거나 지울 수 있는 박지인지 가릴 때 쓴다. */

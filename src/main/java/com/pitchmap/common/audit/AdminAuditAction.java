@@ -6,5 +6,7 @@ public enum AdminAuditAction {
     REPORT_ACTION,
     REPORT_DISMISS,
     SANCTION_LIFT,
+    SPOT_HIDE,
+    SPOT_RESTORE,
     SYNC_JOB_RUN
 }
