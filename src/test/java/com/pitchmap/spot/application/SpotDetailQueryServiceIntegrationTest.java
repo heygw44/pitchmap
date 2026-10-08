@@ -382,6 +382,165 @@ class SpotDetailQueryServiceIntegrationTest {
         assertThat(detail.weather().sun()).isNull();
     }
 
+    @Test
+    @DisplayName("[F-05] 겹치는 확정 베이스캠프는 밤마다 인원을 합산하고, 종료일은 밤으로 세지 않는다")
+    void sumsConfirmedMembersPerNightAndExcludesEndDate() {
+        // given: 한국 날짜 2026-11-01. 3명이 11-07, 11-08 두 밤을, 2명이 11-08 한 밤을 야영한다.
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long first = insertBasecamp(spotId, "CONFIRMED", "2026-11-07", "2026-11-09");
+        insertBasecampMembers(first, "ACTIVE", 3);
+        long second = insertBasecamp(spotId, "CONFIRMED", "2026-11-08", "2026-11-09");
+        insertBasecampMembers(second, "ACTIVE", 2);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople())
+                .containsExactly(
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-07"), 3),
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-08"), 5));
+    }
+
+    @Test
+    @DisplayName("[F-05] 탈퇴하거나 강퇴된 멤버는 예상 인원에 세지 않는다")
+    void doesNotCountLeftOrKickedMembers() {
+        // given
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long basecampId = insertBasecamp(spotId, "CONFIRMED", "2026-11-07", "2026-11-08");
+        insertBasecampMembers(basecampId, "ACTIVE", 2);
+        insertBasecampMembers(basecampId, "LEFT", 1);
+        insertBasecampMembers(basecampId, "KICKED", 1);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).containsExactly(new SpotExpectedPeople(LocalDate.parse("2026-11-07"), 2));
+    }
+
+    @Test
+    @DisplayName("[F-05] 확정이 아닌 베이스캠프와 다른 장소의 베이스캠프는 예상 인원에 세지 않는다")
+    void countsOnlyConfirmedBasecampsOfThisSpot() {
+        // given
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long otherSpotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        for (String status : new String[] {"RECRUITING", "CLOSED", "CANCELED", "COMPLETED"}) {
+            insertBasecampMembers(insertBasecamp(spotId, status, "2026-11-07", "2026-11-08"), "ACTIVE", 2);
+        }
+        insertBasecampMembers(insertBasecamp(otherSpotId, "CONFIRMED", "2026-11-07", "2026-11-08"), "ACTIVE", 2);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-05] 이미 지난 밤은 예상 인원에서 빼고, 오늘 밤부터 센다")
+    void excludesPastNights() {
+        // given: 한국 날짜 2026-11-08. 11-07 밤은 지났고 11-08 밤부터 센다.
+        clock.setInstant(Instant.parse("2026-11-08T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        insertBasecampMembers(insertBasecamp(spotId, "CONFIRMED", "2026-11-07", "2026-11-10"), "ACTIVE", 2);
+        insertBasecampMembers(insertBasecamp(spotId, "CONFIRMED", "2026-11-06", "2026-11-08"), "ACTIVE", 4);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople())
+                .containsExactly(
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-08"), 2),
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-09"), 2));
+    }
+
+    @Test
+    @DisplayName("[F-05] 예상 인원의 오늘은 UTC가 아니라 한국 날짜로 정한다")
+    void decidesTodayByKoreanDate() {
+        // given: 한국은 2026-11-08 0시 30분이고 UTC로는 아직 2026-11-07이다.
+        clock.setInstant(Instant.parse("2026-11-07T15:30:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        insertBasecampMembers(insertBasecamp(spotId, "CONFIRMED", "2026-11-07", "2026-11-09"), "ACTIVE", 2);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).containsExactly(new SpotExpectedPeople(LocalDate.parse("2026-11-08"), 2));
+    }
+
+    @Test
+    @DisplayName("[F-05] 모집 중인 베이스캠프만 출발일, ID 순서로 인원과 합류 조건을 채워 준다")
+    void listsOnlyRecruitingBasecampsInOrder() {
+        // given
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long otherSpotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long later = insertBasecamp(spotId, "RECRUITING", "2026-11-14", "2026-11-16", 4, "늦은 출발");
+        long sameDayFirst = insertBasecamp(spotId, "RECRUITING", "2026-11-07", "2026-11-08", 6, "같은 날 먼저");
+        long sameDaySecond = insertBasecamp(spotId, "RECRUITING", "2026-11-07", "2026-11-09", 3, "같은 날 나중");
+        insertBasecamp(spotId, "CLOSED", "2026-11-05", "2026-11-06");
+        insertBasecamp(spotId, "CONFIRMED", "2026-11-05", "2026-11-06");
+        insertBasecamp(otherSpotId, "RECRUITING", "2026-11-05", "2026-11-06");
+        insertBasecampMembers(sameDayFirst, "ACTIVE", 3);
+        insertBasecampMembers(sameDayFirst, "LEFT", 1);
+        insertBasecampMembers(later, "ACTIVE", 1);
+        jdbcTemplate.update(
+                "UPDATE basecamp SET min_trust_level = 1, age_group_min = 20, age_group_max = 30,"
+                        + " same_gender_only = TRUE, required_gender = 'FEMALE' WHERE id = ?",
+                sameDayFirst);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.recruitingBasecamps())
+                .containsExactly(
+                        new SpotRecruitingBasecamp(
+                                sameDayFirst,
+                                "같은 날 먼저",
+                                LocalDate.parse("2026-11-07"),
+                                LocalDate.parse("2026-11-08"),
+                                6,
+                                3,
+                                new SpotJoinCondition(1, 20, 30, true)),
+                        new SpotRecruitingBasecamp(
+                                sameDaySecond,
+                                "같은 날 나중",
+                                LocalDate.parse("2026-11-07"),
+                                LocalDate.parse("2026-11-09"),
+                                3,
+                                0,
+                                new SpotJoinCondition(null, null, null, false)),
+                        new SpotRecruitingBasecamp(
+                                later,
+                                "늦은 출발",
+                                LocalDate.parse("2026-11-14"),
+                                LocalDate.parse("2026-11-16"),
+                                4,
+                                1,
+                                new SpotJoinCondition(null, null, null, false)));
+    }
+
+    @Test
+    @DisplayName("[F-05] 모집 중인 베이스캠프와 확정 베이스캠프가 없으면 두 목록은 빈 목록이다")
+    void returnsEmptyListsWithoutBasecamps() {
+        // given
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).isEmpty();
+        assertThat(detail.recruitingBasecamps()).isEmpty();
+    }
+
     private long insertSeoulCampsite() {
         // 한국 시각 2026-10-04 12:58. 날씨 픽스처를 받은 시각이다.
         clock.setInstant(Instant.parse("2026-10-04T03:58:00Z"));
@@ -483,6 +642,38 @@ class SpotDetailQueryServiceIntegrationTest {
                 "INSERT INTO bakji_confirmation (spot_id, member_id, created_at) VALUES (?, ?, NOW(6))",
                 spotId,
                 memberId);
+    }
+
+    private long insertBasecamp(long spotId, String status, String startDate, String endDate) {
+        return insertBasecamp(spotId, status, startDate, endDate, 6, TestSequence.unique("베이스캠프"));
+    }
+
+    private long insertBasecamp(
+            long spotId, String status, String startDate, String endDate, int capacity, String title) {
+        long leaderId = insertMember(TestSequence.nickname());
+        jdbcTemplate.update(
+                "INSERT INTO basecamp (leader_id, spot_id, title, description, start_date, end_date, capacity, status,"
+                        + " created_at, updated_at) VALUES (?, ?, ?, '설명', ?, ?, ?, ?, NOW(6), NOW(6))",
+                leaderId,
+                spotId,
+                title,
+                startDate,
+                endDate,
+                capacity,
+                status);
+        return jdbcTemplate.queryForObject("SELECT id FROM basecamp WHERE title = ?", Long.class, title);
+    }
+
+    // 멤버 수만큼 새 회원을 만들어 주어진 상태의 멤버 행으로 넣는다.
+    private void insertBasecampMembers(long basecampId, String status, int count) {
+        for (int i = 0; i < count; i++) {
+            jdbcTemplate.update(
+                    "INSERT INTO basecamp_member (basecamp_id, member_id, role, status, joined_at, created_at,"
+                            + " updated_at) VALUES (?, ?, 'MEMBER', ?, NOW(6), NOW(6), NOW(6))",
+                    basecampId,
+                    insertMember(TestSequence.nickname()),
+                    status);
+        }
     }
 
     private long insertMember(String nickname) {

@@ -19,7 +19,9 @@ import com.pitchmap.spot.application.SpotBakjiDetail;
 import com.pitchmap.spot.application.SpotCluster;
 import com.pitchmap.spot.application.SpotDetail;
 import com.pitchmap.spot.application.SpotDetailQueryService;
+import com.pitchmap.spot.application.SpotExpectedPeople;
 import com.pitchmap.spot.application.SpotFacilities;
+import com.pitchmap.spot.application.SpotJoinCondition;
 import com.pitchmap.spot.application.SpotMapQueryService;
 import com.pitchmap.spot.application.SpotMarker;
 import com.pitchmap.spot.application.SpotNearbyItem;
@@ -30,6 +32,7 @@ import com.pitchmap.spot.application.SpotParkWarning;
 import com.pitchmap.spot.application.SpotPublicDetail;
 import com.pitchmap.spot.application.SpotRating;
 import com.pitchmap.spot.application.SpotRecentReview;
+import com.pitchmap.spot.application.SpotRecruitingBasecamp;
 import com.pitchmap.spot.application.SpotWeather;
 import com.pitchmap.spot.domain.SpotType;
 import com.pitchmap.weather.application.SunTimes;
@@ -482,6 +485,8 @@ class SpotControllerTest {
                         null,
                         NO_RATING,
                         List.of(),
+                        List.of(),
+                        List.of(),
                         null));
 
         // when
@@ -528,6 +533,8 @@ class SpotControllerTest {
                         null,
                         new SpotRating(4.3, 3),
                         List.of(review),
+                        List.of(),
+                        List.of(),
                         null));
 
         // when
@@ -584,6 +591,8 @@ class SpotControllerTest {
                         publicDetail,
                         NO_RATING,
                         List.of(),
+                        List.of(),
+                        List.of(),
                         null));
 
         // when
@@ -638,6 +647,26 @@ class SpotControllerTest {
                         null,
                         NO_RATING,
                         List.of(),
+                        List.of(
+                                new SpotExpectedPeople(LocalDate.of(2026, 11, 7), 9),
+                                new SpotExpectedPeople(LocalDate.of(2026, 11, 8), 4)),
+                        List.of(
+                                new SpotRecruitingBasecamp(
+                                        41L,
+                                        "설악 능선 1박",
+                                        LocalDate.of(2026, 11, 7),
+                                        LocalDate.of(2026, 11, 8),
+                                        6,
+                                        3,
+                                        new SpotJoinCondition(1, 20, 30, true)),
+                                new SpotRecruitingBasecamp(
+                                        42L,
+                                        "누구나 환영",
+                                        LocalDate.of(2026, 11, 14),
+                                        LocalDate.of(2026, 11, 16),
+                                        4,
+                                        1,
+                                        new SpotJoinCondition(null, null, null, false))),
                         new SpotWeather(forecast, sun)));
 
         // when
@@ -660,7 +689,18 @@ class SpotControllerTest {
                     "guide": "자연공원 안에서는 지정된 야영장 밖의 야영과 취사가 금지돼 있고, 어기면 과태료 대상입니다. 이곳에서 야영하지 말고 가까운 지정 야영장을 이용하세요."
                   },
                   "rating": { "average": null, "count": 0 },
-                  "recentReviews": [], "expectedPeople": [], "recruitingBasecamps": [],
+                  "recentReviews": [],
+                  "expectedPeople": [{ "date": "2026-11-07", "count": 9 }, { "date": "2026-11-08", "count": 4 }],
+                  "recruitingBasecamps": [
+                    { "basecampId": 41, "title": "설악 능선 1박", "startDate": "2026-11-07", "endDate": "2026-11-08",
+                      "capacity": 6, "headcount": 3,
+                      "joinCondition": { "minTrustLevel": 1, "ageGroupMin": 20, "ageGroupMax": 30,
+                                         "sameGenderOnly": true } },
+                    { "basecampId": 42, "title": "누구나 환영", "startDate": "2026-11-14", "endDate": "2026-11-16",
+                      "capacity": 4, "headcount": 1,
+                      "joinCondition": { "minTrustLevel": null, "ageGroupMin": null, "ageGroupMax": null,
+                                         "sameGenderOnly": false } }
+                  ],
                   "weather": {
                     "source": "기상청",
                     "shortTerm": [
@@ -695,6 +735,8 @@ class SpotControllerTest {
                         null,
                         NO_RATING,
                         List.of(),
+                        List.of(),
+                        List.of(),
                         new SpotWeather(forecast, null)));
 
         // when
@@ -728,6 +770,8 @@ class SpotControllerTest {
                         null,
                         null,
                         NO_RATING,
+                        List.of(),
+                        List.of(),
                         List.of(),
                         null));
 

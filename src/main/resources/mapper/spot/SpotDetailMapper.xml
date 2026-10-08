@@ -70,4 +70,38 @@
         LIMIT #{limit}
     </select>
 
+    <!-- 현재 인원은 상태가 ACTIVE인 멤버 행의 수이고 캠프 리더도 센다. 베이스캠프 검색과 같은 식이다. -->
+    <sql id="headcount">
+        (SELECT COUNT(*) FROM basecamp_member m WHERE m.basecamp_id = b.id AND m.status = 'ACTIVE')
+    </sql>
+
+    <!-- 종료일이 오늘 이전이면 남은 밤이 없으므로 SQL에서 미리 거른다. 종료일 당일은 밤으로 세지 않아서 end_date가 오늘이어도 제외한다. -->
+    <select id="selectConfirmedStays" resultType="com.pitchmap.spot.infra.SpotConfirmedStayRow">
+        SELECT b.start_date AS start_date,
+               b.end_date AS end_date,
+               <include refid="headcount"/> AS headcount
+        FROM basecamp b
+        WHERE b.spot_id = #{spotId}
+          AND b.status = 'CONFIRMED'
+          AND b.end_date &gt; #{today}
+    </select>
+
+    <!-- 출발일이 같으면 ID 순서로 정렬해서 목록 순서가 조회할 때마다 바뀌지 않게 한다. -->
+    <select id="selectRecruitingBasecamps" resultType="com.pitchmap.spot.infra.SpotRecruitingBasecampRow">
+        SELECT b.id AS basecamp_id,
+               b.title AS title,
+               b.start_date AS start_date,
+               b.end_date AS end_date,
+               b.capacity AS capacity,
+               <include refid="headcount"/> AS headcount,
+               b.min_trust_level AS min_trust_level,
+               b.age_group_min AS age_group_min,
+               b.age_group_max AS age_group_max,
+               b.same_gender_only AS same_gender_only
+        FROM basecamp b
+        WHERE b.spot_id = #{spotId}
+          AND b.status = 'RECRUITING'
+        ORDER BY b.start_date, b.id
+    </select>
+
 </mapper>

@@ -3,14 +3,18 @@ package com.pitchmap.spot.application;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.spot.domain.SpotType;
+import com.pitchmap.spot.infra.SpotConfirmedStayRow;
 import com.pitchmap.spot.infra.SpotDetailMapper;
 import com.pitchmap.spot.infra.SpotDetailRow;
 import com.pitchmap.spot.infra.SpotRatingRow;
 import com.pitchmap.spot.infra.SpotRecentReviewRow;
+import com.pitchmap.spot.infra.SpotRecruitingBasecampRow;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,8 +70,39 @@ class SpotDetailReader {
                 spotDetailMapper.selectRecentReviews(spotId, RECENT_REVIEW_COUNT).stream()
                         .map(SpotDetailReader::toRecentReview)
                         .toList(),
+                toExpectedPeople(spotDetailMapper.selectConfirmedStays(spotId, today), today),
+                spotDetailMapper.selectRecruitingBasecamps(spotId).stream()
+                        .map(SpotDetailReader::toRecruitingBasecamp)
+                        .toList(),
                 null);
         return new Read(detail, row.weatherNx(), row.weatherNy());
+    }
+
+    // 확정 베이스캠프마다 시작일부터 종료일 전날까지 밤마다 인원을 더한다. 종료일은 이미 집으로 돌아간 날이라 세지 않는다.
+    // 겹치는 베이스캠프는 같은 날짜에 합산한다. 이미 지난 밤은 건너뛴다. 날짜 순서는 TreeMap이 맞춘다.
+    private static List<SpotExpectedPeople> toExpectedPeople(List<SpotConfirmedStayRow> stays, LocalDate today) {
+        Map<LocalDate, Integer> countByNight = new TreeMap<>();
+        for (SpotConfirmedStayRow stay : stays) {
+            LocalDate firstNight = stay.startDate().isBefore(today) ? today : stay.startDate();
+            for (LocalDate night = firstNight; night.isBefore(stay.endDate()); night = night.plusDays(1)) {
+                countByNight.merge(night, stay.headcount(), Integer::sum);
+            }
+        }
+        return countByNight.entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .map(entry -> new SpotExpectedPeople(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private static SpotRecruitingBasecamp toRecruitingBasecamp(SpotRecruitingBasecampRow row) {
+        return new SpotRecruitingBasecamp(
+                row.basecampId(),
+                row.title(),
+                row.startDate(),
+                row.endDate(),
+                row.capacity(),
+                row.headcount(),
+                new SpotJoinCondition(row.minTrustLevel(), row.ageGroupMin(), row.ageGroupMax(), row.sameGenderOnly()));
     }
 
     private static SpotRating toRating(SpotRatingRow row) {
