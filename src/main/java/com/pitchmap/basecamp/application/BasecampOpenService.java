@@ -8,7 +8,6 @@ import com.pitchmap.basecamp.domain.BasecampOpenPolicy;
 import com.pitchmap.basecamp.domain.BasecampRepository;
 import com.pitchmap.basecamp.domain.Capacity;
 import com.pitchmap.basecamp.domain.JoinCondition;
-import com.pitchmap.basecamp.domain.JoinGender;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.spot.application.ActiveSpotChecker;
@@ -63,7 +62,7 @@ public class BasecampOpenService {
         Capacity capacity = Capacity.of(command.capacity());
         TrustDetail trust = trustSummaryService.detail(leaderId);
         requireTrustLevel(trust);
-        JoinCondition joinCondition = toJoinCondition(command.joinCondition(), trust);
+        JoinCondition joinCondition = JoinConditions.from(command.joinCondition(), trust);
         requireNotWarningSpot(command.spotId());
         BasecampOpenPolicy.requireUnderOpenLimit(
                 basecampRepository.countByLeaderIdAndStatusIn(leaderId, BasecampOpenPolicy.OPEN_COUNTED_STATUSES));
@@ -98,39 +97,5 @@ public class BasecampOpenService {
         } catch (IllegalArgumentException e) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT, e.getMessage());
         }
-    }
-
-    // 동성만 받는 조건의 성별은 요청이 아니라 캠프 리더가 본인확인한 성별로 정한다. 연령대의 한쪽만 보내면 거부한다.
-    private static JoinCondition toJoinCondition(
-            BasecampOpenCommand.JoinConditionCommand requested, TrustDetail trust) {
-        if (requested == null) {
-            return JoinCondition.none();
-        }
-        try {
-            JoinCondition condition = JoinCondition.none();
-            if (requested.minTrustLevel() != null) {
-                condition = condition.withMinTrustLevel(requested.minTrustLevel());
-            }
-            condition = withAgeGroupRange(condition, requested);
-            if (requested.sameGenderOnly()) {
-                condition = condition.withSameGenderOnly(JoinGender.valueOf(trust.verifiedGender()));
-            }
-            return condition;
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT, e.getMessage());
-        }
-    }
-
-    private static JoinCondition withAgeGroupRange(
-            JoinCondition condition, BasecampOpenCommand.JoinConditionCommand requested) {
-        Integer min = requested.ageGroupMin();
-        Integer max = requested.ageGroupMax();
-        if (min == null && max == null) {
-            return condition;
-        }
-        if (min == null || max == null) {
-            throw new IllegalArgumentException("연령대 하한과 상한은 함께 보내야 합니다.");
-        }
-        return condition.withAgeGroupRange(min, max);
     }
 }

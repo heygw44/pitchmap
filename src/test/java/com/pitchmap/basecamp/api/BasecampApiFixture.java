@@ -9,6 +9,8 @@ import com.pitchmap.member.domain.Member;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -150,5 +152,43 @@ final class BasecampApiFixture {
                 status,
                 AT_DEFAULT_INSTANT,
                 AT_DEFAULT_INSTANT);
+    }
+
+    void setClosedReason(long basecampId, String status, String closedReason) {
+        jdbc.update("UPDATE basecamp SET status = ?, closed_reason = ? WHERE id = ?", status, closedReason, basecampId);
+    }
+
+    void setStatus(long basecampId, String status) {
+        jdbc.update("UPDATE basecamp SET status = ? WHERE id = ?", status, basecampId);
+    }
+
+    void setContactInfo(long basecampId, String contactInfo) {
+        jdbc.update("UPDATE basecamp SET contact_info = ? WHERE id = ?", contactInfo, basecampId);
+    }
+
+    void setCapacity(long basecampId, int capacity) {
+        jdbc.update("UPDATE basecamp SET capacity = ? WHERE id = ?", capacity, basecampId);
+    }
+
+    List<Map<String, Object>> outboxEvents(String eventType) {
+        return jdbc.queryForList(
+                "SELECT aggregate_type, aggregate_id, payload FROM outbox_event WHERE event_type = ? ORDER BY id",
+                eventType);
+    }
+
+    int outboxCount() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM outbox_event", Integer.class);
+    }
+
+    Map<String, Object> basecampRow(long basecampId) {
+        return jdbc.queryForMap("SELECT * FROM basecamp WHERE id = ?", basecampId);
+    }
+
+    String applicationStatus(long basecampId, Member applicant) {
+        return jdbc.queryForObject(
+                "SELECT status FROM basecamp_application WHERE basecamp_id = ? AND applicant_id = ?",
+                String.class,
+                basecampId,
+                applicant.getId());
     }
 }

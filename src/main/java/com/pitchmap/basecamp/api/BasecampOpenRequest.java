@@ -42,17 +42,17 @@ public record BasecampOpenRequest(
             @Schema(description = "연령대 상한. 20~60의 십 단위이고 60은 60대 이상이다.", example = "30")
             Integer ageGroupMax,
 
-            @Schema(description = "true이면 캠프 리더와 같은 성별(본인확인 값)만 받는다.", example = "false")
-            boolean sameGenderOnly) {}
+            @Schema(description = "true이면 캠프 리더와 같은 성별(본인확인 값)만 받는다. 보내지 않으면 false다.", example = "false")
+            Boolean sameGenderOnly) {
+
+        BasecampOpenCommand.JoinConditionCommand toCommand() {
+            return new BasecampOpenCommand.JoinConditionCommand(
+                    minTrustLevel, ageGroupMin, ageGroupMax, Boolean.TRUE.equals(sameGenderOnly));
+        }
+    }
 
     BasecampOpenCommand toCommand() {
-        BasecampOpenCommand.JoinConditionCommand condition = joinCondition == null
-                ? null
-                : new BasecampOpenCommand.JoinConditionCommand(
-                        joinCondition.minTrustLevel(),
-                        joinCondition.ageGroupMin(),
-                        joinCondition.ageGroupMax(),
-                        joinCondition.sameGenderOnly());
+        BasecampOpenCommand.JoinConditionCommand condition = joinCondition == null ? null : joinCondition.toCommand();
         return new BasecampOpenCommand(spotId, title, description, startDate, endDate, capacity, condition);
     }
 }

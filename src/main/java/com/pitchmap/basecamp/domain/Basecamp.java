@@ -171,6 +171,14 @@ public class Basecamp {
         return (int) members.stream().filter(BasecampMember::isActive).count();
     }
 
+    /** 호출하면 ACTIVE인 멤버의 회원 ID를 합류한 순서대로 돌려준다. 캠프 리더도 들어 있다. */
+    public List<Long> activeMemberIds() {
+        return members.stream()
+                .filter(BasecampMember::isActive)
+                .map(BasecampMember::getMemberId)
+                .toList();
+    }
+
     public boolean isFull() {
         return capacity.isFilledBy(headcount());
     }

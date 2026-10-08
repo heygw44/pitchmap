@@ -22,16 +22,20 @@ import com.pitchmap.basecamp.application.BasecampApprovalService;
 import com.pitchmap.basecamp.application.BasecampApproveResult;
 import com.pitchmap.basecamp.application.BasecampDetail;
 import com.pitchmap.basecamp.application.BasecampDetailQueryService;
+import com.pitchmap.basecamp.application.BasecampEditService;
 import com.pitchmap.basecamp.application.BasecampMembershipService;
 import com.pitchmap.basecamp.application.BasecampOpenCommand;
 import com.pitchmap.basecamp.application.BasecampOpenCommand.JoinConditionCommand;
 import com.pitchmap.basecamp.application.BasecampOpenResult;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampRejectResult;
+import com.pitchmap.basecamp.application.BasecampReviseCommand;
 import com.pitchmap.basecamp.application.BasecampSearchItem;
 import com.pitchmap.basecamp.application.BasecampSearchPage;
 import com.pitchmap.basecamp.application.BasecampSearchQuery;
 import com.pitchmap.basecamp.application.BasecampSearchService;
+import com.pitchmap.basecamp.application.BasecampStatusResult;
+import com.pitchmap.basecamp.application.BasecampTransitionService;
 import com.pitchmap.basecamp.application.JoinConditionSummary;
 import com.pitchmap.basecamp.application.JoinEligibility;
 import com.pitchmap.basecamp.domain.BasecampApplicationStatus;
@@ -79,6 +83,8 @@ class BasecampControllerTest {
     private static final String REJECT = "/api/basecamps/77/applications/501/reject";
     private static final String LEAVE = "/api/basecamps/77/members/me";
     private static final String KICK = "/api/basecamps/77/members/31/kick";
+    private static final String BASECAMP = "/api/basecamps/77";
+    private static final String CONTACT_URL = "https://open.kakao.com/o/example";
     private static final String MY_APPLICATION = "/api/basecamps/77/applications/me";
     private static final String VALID_BODY = body("\"title\":\"북한산 백패킹\"", "\"capacity\":4");
 
@@ -108,6 +114,12 @@ class BasecampControllerTest {
 
     @MockitoBean
     private BasecampMembershipService basecampMembershipService;
+
+    @MockitoBean
+    private BasecampTransitionService basecampTransitionService;
+
+    @MockitoBean
+    private BasecampEditService basecampEditService;
 
     @Test
     @DisplayName("[F-12] 베이스캠프를 열면 201과 basecampId·status를 응답하고, 요청 값과 로그인한 회원의 ID를 서비스에 넘긴다")
@@ -915,6 +927,199 @@ class BasecampControllerTest {
         assertThat(denied).bodyJson().extractingPath("$.code").isEqualTo("ACCESS_DENIED");
         assertThat(invalidState).hasStatus(HttpStatus.CONFLICT);
         assertThat(invalidState).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_INVALID_STATE");
+    }
+
+    @Test
+    @DisplayName("[F-14][BC-12] 마감·재개·확정·취소는 200과 basecampId·status를 응답하고, 경로의 ID와 로그인한 회원 ID를 서비스에 넘긴다")
+    void transitionsReturnStatus() {
+        // given
+        when(basecampTransitionService.close(77L, MEMBER_ID)).thenReturn(new BasecampStatusResult(77L, "CLOSED"));
+        when(basecampTransitionService.reopen(77L, MEMBER_ID)).thenReturn(new BasecampStatusResult(77L, "RECRUITING"));
+        when(basecampTransitionService.confirm(77L, MEMBER_ID)).thenReturn(new BasecampStatusResult(77L, "CONFIRMED"));
+        when(basecampTransitionService.cancel(77L, MEMBER_ID)).thenReturn(new BasecampStatusResult(77L, "CANCELED"));
+
+        // when
+        MvcTestResult close = send("POST", BASECAMP + "/close", verified(), true, null);
+        MvcTestResult reopen = send("POST", BASECAMP + "/reopen", verified(), true, null);
+        MvcTestResult confirm = send("POST", BASECAMP + "/confirm", verified(), true, null);
+        MvcTestResult cancel = send("POST", BASECAMP + "/cancel", verified(), true, null);
+
+        // then
+        assertThat(close).hasStatus(HttpStatus.OK);
+        assertThat(close).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"CLOSED\" }");
+        assertThat(reopen).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"RECRUITING\" }");
+        assertThat(confirm).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"CONFIRMED\" }");
+        assertThat(cancel).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"CANCELED\" }");
+    }
+
+    @Test
+    @DisplayName("[F-14] 연락 수단을 등록하면 200과 basecampId·status를 응답하고, 연락 수단을 서비스에 넘긴다")
+    void registerContactReturnsStatus() {
+        // given
+        when(basecampEditService.registerContact(77L, MEMBER_ID, CONTACT_URL))
+                .thenReturn(new BasecampStatusResult(77L, "CONFIRMED"));
+
+        // when
+        MvcTestResult result = send("PUT", BASECAMP + "/contact", verified(), true, contactBody(CONTACT_URL));
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"CONFIRMED\" }");
+    }
+
+    @Test
+    @DisplayName("[F-14] 수정하면 200과 basecampId·status를 응답하고, 보낸 필드만 서비스에 넘긴다")
+    void reviseReturnsStatus() {
+        // given
+        when(basecampEditService.revise(eq(77L), eq(MEMBER_ID), any()))
+                .thenReturn(new BasecampStatusResult(77L, "RECRUITING"));
+
+        // when
+        MvcTestResult result = send("PATCH", BASECAMP, verified(), true, "{\"capacity\":5}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().isStrictlyEqualTo("{ \"basecampId\": 77, \"status\": \"RECRUITING\" }");
+        ArgumentCaptor<BasecampReviseCommand> captor = ArgumentCaptor.forClass(BasecampReviseCommand.class);
+        verify(basecampEditService).revise(eq(77L), eq(MEMBER_ID), captor.capture());
+        assertThat(captor.getValue()).isEqualTo(new BasecampReviseCommand(null, null, null, 5));
+    }
+
+    @Test
+    @DisplayName("[F-14] 로그인하지 않은 사용자는 수동 전이·연락 수단·수정이 401이고, 이메일 인증 전의 회원은 403 MEMBER_NOT_VERIFIED다")
+    void manualEndpointsRequireVerifiedLogin() {
+        for (String[] endpoint : manualEndpoints()) {
+            // when
+            MvcTestResult anonymous = sendAnonymous(endpoint[0], endpoint[1], endpoint[2]);
+            MvcTestResult unverified = send(endpoint[0], endpoint[1], unverified(), true, endpoint[2]);
+
+            // then
+            assertThat(anonymous).as(endpoint[1]).hasStatus(HttpStatus.UNAUTHORIZED);
+            assertThat(unverified).as(endpoint[1]).hasStatus(HttpStatus.FORBIDDEN);
+            assertThat(unverified).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        }
+        verifyNoInteractions(basecampTransitionService, basecampEditService);
+    }
+
+    @Test
+    @DisplayName("[F-14] CSRF 토큰 없이 수동 전이·연락 수단·수정을 요청하면 403이다")
+    void manualEndpointsRequireCsrf() {
+        for (String[] endpoint : manualEndpoints()) {
+            // when
+            MvcTestResult result = send(endpoint[0], endpoint[1], verified(), false, endpoint[2]);
+
+            // then
+            assertThat(result).as(endpoint[1]).hasStatus(HttpStatus.FORBIDDEN);
+        }
+        verifyNoInteractions(basecampTransitionService, basecampEditService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidContactBodies")
+    @DisplayName("[F-14] 연락 수단이 없거나 공백이거나 255자를 넘거나 https URL이 아니면 400 INVALID_INPUT이고 fieldErrors가 있다")
+    void registerContactRejectsInvalidContact(String body) {
+        // when
+        MvcTestResult result = send("PUT", BASECAMP + "/contact", verified(), true, body);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors").isNotNull();
+        verifyNoInteractions(basecampEditService);
+    }
+
+    static Stream<String> invalidContactBodies() {
+        return Stream.of(
+                "{}",
+                contactBody("   "),
+                contactBody("http://open.kakao.com/o/example"),
+                contactBody("javascript:alert(1)"),
+                contactBody("https://"),
+                contactBody("kakao open chat"),
+                contactBody("https://example.com/" + "a".repeat(240)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "{}",
+                "{\"title\":null}",
+                "{\"title\":\"   \"}",
+                "{\"description\":\"\"}",
+                "{\"title\":\"가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하\"}"
+            })
+    @DisplayName("[F-14] 수정할 필드를 하나도 보내지 않았거나 제목·설명이 비었거나 너무 길면 400 INVALID_INPUT이고 fieldErrors가 있다")
+    void reviseRejectsInvalidBody(String body) {
+        // when
+        MvcTestResult result = send("PATCH", BASECAMP, verified(), true, body);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors").isNotNull();
+        verifyNoInteractions(basecampEditService);
+    }
+
+    @Test
+    @DisplayName("[F-14] 수동 전이·수정 서비스가 던진 오류는 코드와 상태 그대로 응답한다")
+    void manualErrorsAreMapped() {
+        // given
+        when(basecampTransitionService.close(77L, MEMBER_ID))
+                .thenThrow(new BusinessException(CommonErrorCode.ACCESS_DENIED));
+        when(basecampTransitionService.confirm(77L, MEMBER_ID))
+                .thenThrow(new BasecampException(BasecampErrorCode.BASECAMP_NOT_ENOUGH_MEMBERS));
+        when(basecampEditService.revise(eq(77L), eq(MEMBER_ID), any()))
+                .thenThrow(new BasecampException(BasecampErrorCode.BASECAMP_CAPACITY_INVALID));
+
+        // when
+        MvcTestResult denied = send("POST", BASECAMP + "/close", verified(), true, null);
+        MvcTestResult notEnough = send("POST", BASECAMP + "/confirm", verified(), true, null);
+        MvcTestResult capacity = send("PATCH", BASECAMP, verified(), true, "{\"capacity\":3}");
+
+        // then
+        assertThat(denied).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(denied).bodyJson().extractingPath("$.code").isEqualTo("ACCESS_DENIED");
+        assertThat(notEnough).hasStatus(HttpStatus.CONFLICT);
+        assertThat(notEnough).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_NOT_ENOUGH_MEMBERS");
+        assertThat(capacity).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(capacity).bodyJson().extractingPath("$.code").isEqualTo("BASECAMP_CAPACITY_INVALID");
+    }
+
+    private static List<String[]> manualEndpoints() {
+        return List.of(
+                new String[] {"POST", BASECAMP + "/close", null},
+                new String[] {"POST", BASECAMP + "/reopen", null},
+                new String[] {"POST", BASECAMP + "/confirm", null},
+                new String[] {"POST", BASECAMP + "/cancel", null},
+                new String[] {"PUT", BASECAMP + "/contact", contactBody(CONTACT_URL)},
+                new String[] {"PATCH", BASECAMP, "{\"capacity\":5}"});
+    }
+
+    private static String contactBody(String contactInfo) {
+        return "{\"contactInfo\":\"%s\"}".formatted(contactInfo);
+    }
+
+    private MvcTestResult sendAnonymous(String method, String uri, String requestBody) {
+        return send(method, uri, null, true, requestBody);
+    }
+
+    private MvcTestResult send(
+            String method, String uri, RequestPostProcessor login, boolean withCsrf, String requestBody) {
+        MockMvcTester.MockMvcRequestBuilder builder = switch (method) {
+            case "PUT" -> mvc.put().uri(uri);
+            case "PATCH" -> mvc.patch().uri(uri);
+            default -> mvc.post().uri(uri);
+        };
+        if (login != null) {
+            builder = builder.with(login);
+        }
+        if (withCsrf) {
+            builder = builder.with(csrf());
+        }
+        if (requestBody != null) {
+            builder = builder.contentType(MediaType.APPLICATION_JSON).content(requestBody);
+        }
+        return builder.exchange();
     }
 
     private MvcTestResult postKick(RequestPostProcessor login, String requestBody) {
