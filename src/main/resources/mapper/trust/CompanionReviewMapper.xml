@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.trust.infra.CompanionReviewMapper">
+
+    <!-- trust 모듈이 basecamp·basecamp_member 테이블을 SQL로 직접 읽는 이유: 후기 자격(완료된 베이스캠프의 ACTIVE 멤버)은 자격 테이블을
+         따로 두지 않고 매번 이 테이블들에서 판단한다. 자바 코드로 basecamp 모듈의 클래스를 부르면 trust가 basecamp에 기대게 되지만,
+         SQL은 테이블 이름에만 기대므로 모듈 경계를 지킨다. 이 매퍼는 읽기만 하고 basecamp 테이블을 바꾸지 않는다. -->
+
+    <select id="selectWriteContext" resultType="com.pitchmap.trust.infra.CompanionReviewWriteContextRow">
+        SELECT b.status AS basecamp_status,
+               b.completed_at AS completed_at,
+               EXISTS (SELECT 1 FROM basecamp_member bm
+                       WHERE bm.basecamp_id = b.id AND bm.member_id = #{reviewerId} AND bm.status = 'ACTIVE') AS reviewer_active,
+               EXISTS (SELECT 1 FROM basecamp_member bm
+                       WHERE bm.basecamp_id = b.id AND bm.member_id = #{revieweeId} AND bm.status = 'ACTIVE') AS reviewee_active,
+               EXISTS (SELECT 1 FROM companion_review cr
+                       WHERE cr.basecamp_id = b.id AND cr.reviewer_id = #{reviewerId}
+                         AND cr.reviewee_id = #{revieweeId}) AS already_written
+        FROM basecamp b
+        WHERE b.id = #{basecampId}
+    </select>
+
+    <!-- 마감이 빠른 순서는 완료 시각이 빠른 순서와 같다(마감 = 완료 + 14일). 작성 기한이 남았다는 조건은 완료 시각이 writableSince(지금 - 14일)
+         이후라는 뜻이고, 같은 시각이면 기한 정각이라 포함한다. 대상은 내가 아직 쓰지 않은 다른 ACTIVE 멤버라서 대상이 없는
+         베이스캠프는 조인에서 빠진다. -->
+    <select id="selectPending" resultType="com.pitchmap.trust.infra.CompanionReviewPendingRow">
+        SELECT b.id AS basecamp_id,
+               b.title AS basecamp_title,
+               b.completed_at AS completed_at,
+               t.member_id AS target_id,
+               m.nickname AS target_nickname
+        FROM basecamp b
+        JOIN basecamp_member me ON me.basecamp_id = b.id AND me.member_id = #{memberId} AND me.status = 'ACTIVE'
+        JOIN basecamp_member t ON t.basecamp_id = b.id AND t.member_id &lt;&gt; #{memberId} AND t.status = 'ACTIVE'
+        JOIN member m ON m.id = t.member_id
+        WHERE b.status = 'COMPLETED'
+          AND b.completed_at &gt;= #{writableSince}
+          AND NOT EXISTS (SELECT 1 FROM companion_review cr
+                          WHERE cr.basecamp_id = b.id AND cr.reviewer_id = #{memberId} AND cr.reviewee_id = t.member_id)
+        ORDER BY b.completed_at ASC, b.id ASC, t.member_id ASC
+    </select>
+
+    <!-- 태그는 후기마다 최대 7개라서 GROUP_CONCAT 결과가 기본 길이 제한(1024바이트)을 넘지 않는다.
+         작성 시각이 같은 후기가 있어도 페이지 경계에서 순서가 흔들리지 않도록 id를 보조 정렬 키로 쓴다. -->
+    <select id="selectReceived" resultType="com.pitchmap.trust.infra.CompanionReviewReceivedRow">
+        SELECT r.id AS review_id,
+               r.basecamp_id AS basecamp_id,
+               b.title AS basecamp_title,
+               b.completed_at AS completed_at,
+               r.reviewer_id AS reviewer_id,
+               m.nickname AS reviewer_nickname,
+               r.rejoin_wanted AS rejoin_wanted,
+               (SELECT GROUP_CONCAT(t.tag) FROM companion_review_tag t WHERE t.review_id = r.id) AS tags,
+               r.comment AS comment,
+               r.created_at AS created_at,
+               EXISTS (SELECT 1 FROM companion_review rv
+                       WHERE rv.basecamp_id = r.basecamp_id AND rv.reviewer_id = r.reviewee_id
+                         AND rv.reviewee_id = r.reviewer_id) AS reverse_written
+        FROM companion_review r
+        JOIN basecamp b ON b.id = r.basecamp_id
+        JOIN member m ON m.id = r.reviewer_id
+        WHERE r.reviewee_id = #{memberId}
+          AND r.hidden_at IS NULL
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 작성 기한이 지났다는 조건은 완료 시각이 revealCutoff(지금 - 14일)보다 앞이라는 뜻이다. 기한 정각에는 아직 쓸 수 있으므로 같은 시각은 지난 것이 아니다. -->
+    <select id="selectPublicByReviewee" resultType="com.pitchmap.trust.infra.CompanionReviewPublicRow">
+        SELECT (SELECT GROUP_CONCAT(t.tag) FROM companion_review_tag t WHERE t.review_id = r.id) AS tags,
+               r.comment AS comment,
+               r.created_at AS created_at
+        FROM companion_review r
+        JOIN basecamp b ON b.id = r.basecamp_id
+        WHERE r.reviewee_id = #{memberId}
+          AND r.hidden_at IS NULL
+          AND (b.completed_at &lt; #{revealCutoff}
+               OR EXISTS (SELECT 1 FROM companion_review rv
+                          WHERE rv.basecamp_id = r.basecamp_id AND rv.reviewer_id = r.reviewee_id
+                            AND rv.reviewee_id = r.reviewer_id))
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>
