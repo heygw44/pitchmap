@@ -23,6 +23,10 @@ pitchmap:
     auto-transition:
       # 자동 처리를 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
       enabled: false
+  trust:
+    sanction-expiry:
+      # 만료 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
   weather:
     kma:
       # 실제 인증키 대신 쓰는 값이다. 클라이언트가 +, /, = 를 퍼센트 인코딩하는지 확인하려고 이 문자를 일부러 넣는다.

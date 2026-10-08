@@ -8,6 +8,8 @@ import com.pitchmap.common.testsupport.TestSequence;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -156,6 +158,41 @@ class TrustSummaryServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("[TR-01][SN-10] 최근 180일 안에 시작한 경고가 있으면 다른 조건을 채워도 단계 1이고, 정각 180일 전 경고도 센다")
+    void recentWarningKeepsLevelOne() {
+        long member = fixture.saveVerifiedMember(TestSequence.nickname());
+        makeQualified(member);
+        insertSanction(member, "WARNING", "ACTIVE", NOW.minus(RECENT_PERIOD));
+
+        assertThat(trustSummaryService.summarize(member).trustLevel()).isEqualTo(1);
+        assertThat(trustSummaryService.detail(member).trustLevel()).isEqualTo(1);
+        assertThat(trustSummaryService.detail(member).noRecentSanction()).isFalse();
+    }
+
+    @Test
+    @DisplayName("[TR-01][SN-10] 180일보다 1마이크로초 앞선 제재, 해제된 제재, 임시 정지는 단계에 영향이 없다")
+    void oldLiftedAndTemporarySanctionsDoNotMatter() {
+        long member = fixture.saveVerifiedMember(TestSequence.nickname());
+        makeQualified(member);
+        insertSanction(member, "WARNING", "EXPIRED", NOW.minus(RECENT_PERIOD).minusNanos(1_000));
+        insertSanction(member, "SUSPEND_7D", "LIFTED", NOW.minus(Duration.ofDays(1)));
+        insertSanction(member, "TEMPORARY_72H", "ACTIVE", NOW.minus(Duration.ofDays(1)));
+
+        assertThat(trustSummaryService.summarize(member).trustLevel()).isEqualTo(2);
+        assertThat(trustSummaryService.detail(member).noRecentSanction()).isTrue();
+    }
+
+    @Test
+    @DisplayName("[TR-01][SN-10] 기간이 끝난 제재도 시작한 지 180일이 안 됐으면 단계 2에서 뺀다")
+    void expiredSanctionStillCountsWithinPeriod() {
+        long member = fixture.saveVerifiedMember(TestSequence.nickname());
+        makeQualified(member);
+        insertSanction(member, "SUSPEND_7D", "EXPIRED", NOW.minus(Duration.ofDays(30)));
+
+        assertThat(trustSummaryService.summarize(member).trustLevel()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("[F-15] 대표 태그는 공개된 후기의 태그만 세어 많은 순서로 3개, 같은 횟수는 선언 순서로 고른다")
     void topTagsCountOnlyRevealedReviews() {
         long member = fixture.saveVerifiedMember(TestSequence.nickname());
@@ -214,5 +251,15 @@ class TrustSummaryServiceIntegrationTest {
 
     private void makeQualified(long member) {
         fixture.insertQualifiedRecord(member, LONG_AGO);
+    }
+
+    private void insertSanction(long memberId, String type, String status, Instant startsAt) {
+        jdbc.update(
+                "INSERT INTO sanction (member_id, type, level, reason, starts_at, status, created_at, updated_at)"
+                        + " VALUES (?, ?, 1, '테스트', ?, ?, NOW(6), NOW(6))",
+                memberId,
+                type,
+                LocalDateTime.ofInstant(startsAt, ZoneOffset.UTC),
+                status);
     }
 }

@@ -8,7 +8,9 @@ import com.pitchmap.member.domain.MemberException;
 import com.pitchmap.member.domain.MemberRepository;
 import com.pitchmap.member.domain.MemberStatus;
 import com.pitchmap.member.domain.MemberSuspendedException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,8 @@ public class MemberLoginService {
     private final MemberRepository memberRepository;
     private final LoginAttemptService loginAttemptService;
     private final PasswordEncoder passwordEncoder;
+    private final MemberSuspensionService memberSuspensionService;
+    private final Clock clock;
 
     // 가입하지 않은 이메일로 시도해도 비밀번호 비교를 한 번 한다. 그렇지 않으면 BCrypt를 건너뛴 만큼 응답이 빨라져서,
     // 응답 시간만 재도 가입 여부를 알 수 있다. 해시는 주입받은 인코더로 직접 만들어 해시 강도를 실제 회원 해시와 맞춘다.
@@ -36,17 +40,22 @@ public class MemberLoginService {
     public MemberLoginService(
             MemberRepository memberRepository,
             LoginAttemptService loginAttemptService,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            MemberSuspensionService memberSuspensionService,
+            Clock clock) {
         this.memberRepository = memberRepository;
         this.loginAttemptService = loginAttemptService;
         this.passwordEncoder = passwordEncoder;
+        this.memberSuspensionService = memberSuspensionService;
+        this.clock = clock;
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     public LoginResult login(LoginCommand command) {
         String attemptedEmail = normalizeEmail(command.email());
         rejectIfLocked(attemptedEmail);
-        Member member = authenticate(attemptedEmail, command);
+        Member authenticated = authenticate(attemptedEmail, command);
+        Member member = releaseIfSuspensionEnded(authenticated);
         rejectIfSuspended(member);
         loginAttemptService.recordSuccess(member.getId(), attemptedEmail, command.ip());
         return new LoginResult(member.getId(), member.getNickname(), member.getStatus(), member.getRole());
@@ -84,6 +93,20 @@ public class MemberLoginService {
             throw new MemberException(MemberErrorCode.LOGIN_FAILED);
         }
         return member;
+    }
+
+    // 정지 기간이 끝났으면 정지 만료 작업이 도는 주기를 기다리지 않고 로그인할 때 바로 풀어 준다. 그래야 정지가 기간이 끝나는 시각에 정확히 풀린다.
+    // 풀면 다른 요청이 바꾼 값까지 반영해서 회원을 다시 읽는다.
+    private Member releaseIfSuspensionEnded(Member member) {
+        if (member.getStatus() != MemberStatus.SUSPENDED || member.getSuspendedUntil() == null) {
+            return member;
+        }
+        Instant now = clock.instant();
+        if (member.getSuspendedUntil().isAfter(now)) {
+            return member;
+        }
+        memberSuspensionService.releaseIfExpired(member.getId());
+        return memberRepository.findById(member.getId()).orElse(member);
     }
 
     // 정지 여부는 비밀번호가 맞은 뒤에 알린다. 비밀번호를 모르는 사람에게 계정이 정지됐다는 사실을 알리지 않기 위해서다.

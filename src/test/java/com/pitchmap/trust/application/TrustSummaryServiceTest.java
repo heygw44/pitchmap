@@ -30,7 +30,7 @@ class TrustSummaryServiceTest {
     private static final long MEMBER_ID = 7L;
 
     private static final Instant NOW = Instant.parse("2026-10-05T03:00:00Z");
-    private static final TrustRecordRow NO_RECORD = new TrustRecordRow(0, 0, 0, 0);
+    private static final TrustRecordRow NO_RECORD = new TrustRecordRow(0, 0, 0, 0, false);
 
     private final IdentityVerificationRepository repository = mock(IdentityVerificationRepository.class);
     private final TrustRecordMapper recordMapper = mock(TrustRecordMapper.class);
@@ -61,11 +61,20 @@ class TrustSummaryServiceTest {
     @DisplayName("[TR-01][BC-21] 본인확인한 성인이 동행 기록으로 단계 2 조건을 채우면 단계 2다")
     void adultMeetingConditionIsLevelTwo() {
         when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(recordBornIn(2007)));
-        stubRecord(new TrustRecordRow(3, 5, 4, 2));
+        stubRecord(new TrustRecordRow(3, 5, 4, 2, false));
 
         assertThat(serviceAt("2026-10-05T03:00:00Z").summarize(MEMBER_ID)).isEqualTo(new TrustSummary(true, 2));
 
-        stubRecord(new TrustRecordRow(3, 5, 4, 3));
+        stubRecord(new TrustRecordRow(3, 5, 4, 3, false));
+        assertThat(serviceAt("2026-10-05T03:00:00Z").summarize(MEMBER_ID)).isEqualTo(new TrustSummary(true, 1));
+    }
+
+    @Test
+    @DisplayName("[TR-01][SN-10] 최근 180일 안에 확정 제재가 있으면 다른 조건을 채워도 단계 1이다")
+    void recentSanctionKeepsLevelOne() {
+        when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(recordBornIn(2007)));
+        stubRecord(new TrustRecordRow(3, 5, 4, 0, true));
+
         assertThat(serviceAt("2026-10-05T03:00:00Z").summarize(MEMBER_ID)).isEqualTo(new TrustSummary(true, 1));
     }
 
@@ -132,7 +141,7 @@ class TrustSummaryServiceTest {
     @DisplayName("[TR-01][F-15] 상세는 동행 기록으로 단계 2를 판정하고 완료 동행·비율·임박 탈퇴·대표 태그를 채운다")
     void detailFillsCompanionRecord() {
         when(repository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(recordBornIn(2007)));
-        stubRecord(new TrustRecordRow(4, 5, 4, 1));
+        stubRecord(new TrustRecordRow(4, 5, 4, 1, false));
         when(recordMapper.selectRevealedTagCounts(eq(MEMBER_ID), any()))
                 .thenReturn(List.of(
                         new TagCountRow("LATE", 2), new TagCountRow("ON_TIME", 2), new TagCountRow("NO_SHOW", 1)));

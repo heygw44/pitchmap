@@ -147,7 +147,8 @@ class IdentityVerificationServiceTest {
         when(provider.type()).thenReturn(IdentityProviderType.FAKE);
         when(hasher.hash("ci-raw")).thenReturn(CI_HASH);
         when(repository.saveAndFlush(any(IdentityVerification.class))).thenAnswer(call -> call.getArgument(0));
-        when(recordMapper.selectCompanionRecord(anyLong(), any(), any())).thenReturn(new TrustRecordRow(0, 0, 0, 0));
+        when(recordMapper.selectCompanionRecord(anyLong(), any(), any()))
+                .thenReturn(new TrustRecordRow(0, 0, 0, 0, false));
     }
 
     private IdentityVerificationService serviceAt(String instant) {

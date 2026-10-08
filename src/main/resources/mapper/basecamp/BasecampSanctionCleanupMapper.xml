@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.basecamp.infra.BasecampSanctionCleanupMapper">
+
+    <select id="selectInProgressBasecampIds" resultType="long">
+        SELECT b.id
+        FROM basecamp b
+        WHERE b.status IN ('RECRUITING', 'CLOSED', 'CONFIRMED')
+          AND (EXISTS (SELECT 1
+                       FROM basecamp_member bm
+                       WHERE bm.basecamp_id = b.id
+                         AND bm.member_id = #{memberId}
+                         AND bm.status = 'ACTIVE')
+               OR EXISTS (SELECT 1
+                          FROM basecamp_application a
+                          WHERE a.basecamp_id = b.id
+                            AND a.applicant_id = #{memberId}
+                            AND a.status = 'PENDING'))
+        ORDER BY b.id
+    </select>
+</mapper>
