@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class TrustLevelPolicyTest {
 
-    private static final CompanionRecord ALL_MET = new CompanionRecord(3, 5, 5, false);
+    private static final CompanionRecord ALL_MET = new CompanionRecord(3, 5, 5, 0, false);
 
     @Test
     @DisplayName("[TR-01] 본인확인 전이면 동행 기록이 좋아도 단계 0이다")
@@ -36,7 +36,14 @@ class TrustLevelPolicyTest {
     @Test
     @DisplayName("[TR-01] 최근 확정 제재가 있으면 단계 1이다")
     void recentSanctionIsLevelOne() {
-        assertThat(TrustLevelPolicy.judge(true, true, new CompanionRecord(3, 5, 5, true)))
+        assertThat(TrustLevelPolicy.judge(true, true, new CompanionRecord(3, 5, 5, 0, true)))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[BC-21][TR-01] 최근 임박 탈퇴가 3회면 다른 조건을 채워도 단계 1이다")
+    void threeRecentEarlyLeavesIsLevelOne() {
+        assertThat(TrustLevelPolicy.judge(true, true, new CompanionRecord(3, 5, 5, 3, false)))
                 .isEqualTo(1);
     }
 }
