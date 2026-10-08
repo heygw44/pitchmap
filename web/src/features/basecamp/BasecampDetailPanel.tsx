@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { applyToBasecamp, cancelMyApplication, fetchBasecampDetail } from '../../api/basecamps';
+import { applyToBasecamp, cancelMyApplication, fetchBasecampDetail, leaveBasecamp } from '../../api/basecamps';
 import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import type { BasecampDetail, BasecampMember, JoinUnmetReason } from '../../api/types';
@@ -15,8 +15,8 @@ import { Notice } from '../../components/Notice';
 import { Skeleton } from '../../components/Skeleton';
 import { TextArea } from '../../components/TextArea';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
-import { formatLocalDate } from '../../lib/datetime';
-import { AGE_GROUP_LABELS, GENDER_LABELS, trustLevelBadge } from '../member/memberLabels';
+import { departureInstant, formatLocalDate } from '../../lib/datetime';
+import { trustLevelBadge } from '../member/memberLabels';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import {
@@ -24,6 +24,7 @@ import {
   BASECAMP_STATUS_META,
   headcountText,
   joinConditionSummary,
+  profileSummary,
   unmetReasonText,
 } from './basecampLabels';
 
@@ -37,6 +38,8 @@ type DetailResult = { basecampId: number; detail: BasecampDetail } | { basecampI
 const SECTION_CLASS = 'mt-4 border-t border-contour pt-4';
 const SECTION_TITLE_CLASS = 'text-sm font-semibold text-ink-muted';
 const MESSAGE_MAX = 500;
+const ACTION_LINK_CLASS =
+  'inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep';
 
 const CONFIRMED_SAFETY_RULES = [
   '출발 전에 일정을 가족이나 지인에게 알려 주세요.',
@@ -227,16 +230,7 @@ function DetailContent({ detail, onChanged }: { detail: BasecampDetail; onChange
 
 function MemberRow({ member }: { member: BasecampMember }) {
   const badge = member.trustLevel === undefined ? null : trustLevelBadge(member.trustLevel);
-  const profile: string[] = [];
-  if (member.ageGroup) {
-    profile.push(`${AGE_GROUP_LABELS[member.ageGroup]} ${member.ageGroupVerified ? '본인확인' : '자기 신고'}`);
-  }
-  if (member.gender) {
-    profile.push(`${GENDER_LABELS[member.gender]} ${member.genderVerified ? '본인확인' : '자기 신고'}`);
-  }
-  if (member.completedCompanions !== undefined) {
-    profile.push(`완료한 동행 ${member.completedCompanions}회`);
-  }
+  const profile = profileSummary(member);
 
   return (
     <li className="flex flex-col gap-1 border-t border-contour py-2 first:border-t-0">
@@ -318,7 +312,18 @@ function UnmetReasonList({ reasons, trustLevel }: { reasons: JoinUnmetReason[]; 
   );
 }
 
-type Pending = 'apply' | 'cancel' | null;
+type Pending = 'apply' | 'cancel' | 'leave' | null;
+
+const HOUR_MS = 60 * 60 * 1000;
+const LATE_LEAVE_HOURS = 48;
+
+// 확정된 뒤 출발 48시간 안에 나가면 임박 탈퇴로 기록된다. 서버가 같은 기준으로 기록하고, 여기서는 미리 알리기만 한다.
+function isLateLeave(detail: BasecampDetail): boolean {
+  if (detail.status !== 'CONFIRMED') return false;
+  return Date.now() >= departureInstant(detail.startDate).getTime() - LATE_LEAVE_HOURS * HOUR_MS;
+}
+
+const LEAVABLE_STATUSES: ReadonlyArray<BasecampDetail['status']> = ['RECRUITING', 'CLOSED', 'CONFIRMED'];
 
 // 시트 아래에 붙어서 스크롤해도 보이는 행동 영역이다.
 function ActionArea({ detail, onChanged }: { detail: BasecampDetail; onChanged: () => void }) {
@@ -375,9 +380,39 @@ function ActionArea({ detail, onChanged }: { detail: BasecampDetail; onChanged: 
       </>
     );
   } else if (detail.myRelation === 'LEADER') {
-    content = <p className="text-base text-ink">내가 연 베이스캠프예요.</p>;
+    content = (
+      <>
+        <p className="text-base text-ink">내가 연 베이스캠프예요.</p>
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/basecamps/${detail.basecampId}/manage`} className={ACTION_LINK_CLASS}>
+            관리하기
+          </Link>
+          {detail.status === 'COMPLETED' && (
+            <Link to="/me/companion-reviews" className={ACTION_LINK_CLASS}>
+              동행 후기 쓰기
+            </Link>
+          )}
+        </div>
+      </>
+    );
   } else if (detail.myRelation === 'MEMBER') {
-    content = <p className="text-base text-ink">멤버로 합류했어요.</p>;
+    content = (
+      <>
+        <p className="text-base text-ink">멤버로 합류했어요.</p>
+        <div className="flex flex-wrap gap-2">
+          {LEAVABLE_STATUSES.includes(detail.status) && (
+            <Button variant="secondary" onClick={() => setDialog('leave')}>
+              탈퇴
+            </Button>
+          )}
+          {detail.status === 'COMPLETED' && (
+            <Link to="/me/companion-reviews" className={ACTION_LINK_CLASS}>
+              동행 후기 쓰기
+            </Link>
+          )}
+        </div>
+      </>
+    );
   } else if (detail.myRelation === 'APPLICANT') {
     content = (
       <>
@@ -448,6 +483,30 @@ function ActionArea({ detail, onChanged }: { detail: BasecampDetail; onChanged: 
                 }
               >
                 신청하기
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {dialog === 'leave' && (
+        <Dialog title="베이스캠프 탈퇴" onClose={() => !submitting && setDialog(null)}>
+          <div className="flex flex-col gap-4">
+            <p className="text-base text-ink">탈퇴하면 이 베이스캠프에 다시 신청할 수 없어요.</p>
+            {isLateLeave(detail) && (
+              <Notice tone="warning" title="출발이 얼마 남지 않았어요">
+                <p>출발 48시간 안에 탈퇴하면 임박 탈퇴로 기록돼요. 180일 안에 3번이면 신뢰 회원 단계에서 빠져요.</p>
+              </Notice>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" disabled={submitting} onClick={() => setDialog(null)}>
+                돌아가기
+              </Button>
+              <Button
+                variant="danger"
+                loading={submitting}
+                onClick={() => run(() => leaveBasecamp(detail.basecampId), '베이스캠프에서 탈퇴했어요.')}
+              >
+                탈퇴
               </Button>
             </div>
           </div>

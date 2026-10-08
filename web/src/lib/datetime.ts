@@ -67,3 +67,17 @@ export function addDaysToLocalDate(date: string, days: number): string {
   const moved = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
   return moved.toISOString().slice(0, 10);
 }
+
+// 출발일 0시(한국 시간)의 시각이다. 출발 며칠 전인지 따질 때 기준으로 쓴다.
+export function departureInstant(startDate: string): Date {
+  return new Date(`${startDate}T00:00:00+09:00`);
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// 한국 날짜 기준으로 기한까지 남은 일수다. 기한이 오늘이면 0이고, 이미 지났으면 음수다.
+export function daysUntilKst(iso: string, now: Date = new Date()): number {
+  const target = Date.parse(`${KST_DATE.format(new Date(iso))}T00:00:00+09:00`);
+  const today = Date.parse(`${todayKst(now)}T00:00:00+09:00`);
+  return Math.round((target - today) / MS_PER_DAY);
+}

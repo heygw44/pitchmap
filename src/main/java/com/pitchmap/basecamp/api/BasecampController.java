@@ -10,6 +10,7 @@ import com.pitchmap.basecamp.application.BasecampMembershipService;
 import com.pitchmap.basecamp.application.BasecampOpenService;
 import com.pitchmap.basecamp.application.BasecampSearchService;
 import com.pitchmap.basecamp.application.BasecampTransitionService;
+import com.pitchmap.basecamp.application.MyBasecampListService;
 import com.pitchmap.common.security.LoginMember;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ class BasecampController {
 
     private final BasecampOpenService basecampOpenService;
     private final BasecampSearchService basecampSearchService;
+    private final MyBasecampListService myBasecampListService;
     private final BasecampDetailQueryService basecampDetailQueryService;
     private final BasecampApplyService basecampApplyService;
     private final BasecampApplicationCancelService basecampApplicationCancelService;
@@ -85,6 +87,26 @@ class BasecampController {
             @Valid @ParameterObject @ModelAttribute BasecampSearchRequest request) {
         Long viewerId = loginMember == null ? null : loginMember.memberId();
         return BasecampSearchPageResponse.from(basecampSearchService.search(viewerId, request.toQuery()));
+    }
+
+    @Operation(
+            summary = "내 베이스캠프",
+            description =
+                    "로그인한 회원이 지금 캠프 리더, 멤버, 신청자로 얽혀 있는 베이스캠프를 출발일이 늦은 순서로 돌려준다(출발일이 같으면 베이스캠프 ID가 큰 순서). "
+                            + "이메일 인증 전의 회원도 볼 수 있다. "
+                            + "relation을 생략하면 셋 모두 주고, LEADER(내가 ACTIVE 멤버이고 캠프 리더), MEMBER(내가 ACTIVE 멤버이고 역할이 멤버), "
+                            + "APPLICANT(내 합류 신청이 대기 중) 중 하나를 보내면 그 관계만 준다. 탈퇴·강퇴된 베이스캠프와 거절·취소·만료된 신청은 지금 관계가 아니라서 나오지 않는다. "
+                            + "status를 생략하면 모든 상태를 주고, RECRUITING, CLOSED, CONFIRMED, COMPLETED, CANCELED 중 하나를 보내면 그 상태만 준다. "
+                            + "장소의 상태로는 거르지 않아서, 장소가 숨겨져도 내 기록이면 나온다. "
+                            + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. 응답에는 전체 개수가 없고 다음 페이지가 있는지만 hasNext로 알려 준다. "
+                            + "항목마다 basecampId, title, spot(spotId, name, type), startDate, endDate, capacity, headcount(캠프 리더를 포함한 ACTIVE 멤버 수), "
+                            + "status, myRelation(LEADER, MEMBER, APPLICANT 중 하나)이 있다. "
+                            + "로그인하지 않았으면 401 AUTHENTICATION_REQUIRED, relation이나 status가 허용 값이 아니거나 page·size가 범위를 벗어나면 400 INVALID_INPUT이다.")
+    @GetMapping("/api/me/basecamps")
+    MyBasecampPageResponse listMine(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @Valid @ParameterObject @ModelAttribute MyBasecampListRequest request) {
+        return MyBasecampPageResponse.from(myBasecampListService.list(loginMember.memberId(), request.toQuery()));
     }
 
     @Operation(

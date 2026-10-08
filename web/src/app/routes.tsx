@@ -1,3 +1,6 @@
+import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
+import { MyBasecampsPage } from '../features/basecamp/MyBasecampsPage';
+import { CompanionReviewsPage } from '../features/review/CompanionReviewsPage';
 import { LoginPage } from '../features/member/LoginPage';
 import { MemberProfilePage } from '../features/member/MemberProfilePage';
 import { MyPage } from '../features/member/MyPage';
@@ -41,6 +44,16 @@ export const routes: RouteDef[] = [
       return basecampId === null ? <NotFoundPage /> : <MapPage mode="basecamps" basecampId={basecampId} />;
     },
   },
+  {
+    path: '/basecamps/:basecampId/manage',
+    // 세그먼트 수가 달라서 '/basecamps/:basecampId'와 겹치지 않는다.
+    render: (params) => {
+      const basecampId = toPositiveId(params.basecampId);
+      return basecampId === null ? <NotFoundPage /> : <BasecampManagePage key={basecampId} basecampId={basecampId} />;
+    },
+  },
+  { path: '/me/basecamps', render: () => <MyBasecampsPage /> },
+  { path: '/me/companion-reviews', render: () => <CompanionReviewsPage /> },
   { path: '/login', render: () => <LoginPage /> },
   { path: '/signup', render: () => <SignupPage /> },
   { path: '/verify-email', render: () => <VerifyEmailPage /> },
