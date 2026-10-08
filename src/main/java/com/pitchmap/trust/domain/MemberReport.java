@@ -1,5 +1,6 @@
 package com.pitchmap.trust.domain;
 
+import com.pitchmap.common.error.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,6 +28,9 @@ public class MemberReport {
 
     /** 신고 내용의 최대 길이다. DB 컬럼 크기와 같다. */
     public static final int CONTENT_MAX_LENGTH = 1000;
+
+    /** 처리 메모의 최대 길이다. DB 컬럼 크기와 같다. */
+    public static final int RESULT_NOTE_MAX_LENGTH = 1000;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -121,5 +125,63 @@ public class MemberReport {
             throw new IllegalArgumentException("신고 내용은 1~" + CONTENT_MAX_LENGTH + "자여야 합니다.");
         }
         return new MemberReport(reporterId, targetMemberId, basecampId, companionReviewId, type, content, now);
+    }
+
+    /**
+     * 호출하면 접수 상태(RECEIVED)인 신고를 검토 중(IN_REVIEW)으로 바꾸고 검토를 시작한 관리자와 시각을 남긴다.
+     * 접수 상태가 아니면 REPORT_INVALID_STATE 예외를 던진다.
+     */
+    public void startReview(long adminId, Instant now) {
+        requireNow(now);
+        requireStatus(ReportStatus.RECEIVED);
+        this.status = ReportStatus.IN_REVIEW;
+        this.handledBy = adminId;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 검토 중인 신고를 조치 완료(ACTIONED)로 바꾸고 처리한 관리자, 처리 시각, 메모를 남긴다.
+     * 검토 중이 아니면 REPORT_INVALID_STATE 예외를 던진다. 공백뿐인 메모는 없는 것으로 저장한다.
+     */
+    public void action(long adminId, String note, Instant now) {
+        resolve(ReportStatus.ACTIONED, adminId, note, now);
+    }
+
+    /**
+     * 호출하면 검토 중인 신고를 기각(DISMISSED)으로 바꾸고 처리한 관리자, 처리 시각, 메모를 남긴다.
+     * 검토 중이 아니면 REPORT_INVALID_STATE 예외를 던진다. 공백뿐인 메모는 없는 것으로 저장한다.
+     */
+    public void dismiss(long adminId, String note, Instant now) {
+        resolve(ReportStatus.DISMISSED, adminId, note, now);
+    }
+
+    /** 호출하면 신고가 검토 중(IN_REVIEW)인지 확인한다. 아니면 REPORT_INVALID_STATE 예외를 던진다. */
+    public void requireInReview() {
+        requireStatus(ReportStatus.IN_REVIEW);
+    }
+
+    private void resolve(ReportStatus result, long adminId, String note, Instant now) {
+        requireNow(now);
+        if (note != null && note.length() > RESULT_NOTE_MAX_LENGTH) {
+            throw new IllegalArgumentException("처리 메모는 " + RESULT_NOTE_MAX_LENGTH + "자 이하여야 합니다.");
+        }
+        requireStatus(ReportStatus.IN_REVIEW);
+        this.status = result;
+        this.handledBy = adminId;
+        this.handledAt = now;
+        this.resultNote = note == null || note.isBlank() ? null : note;
+        this.updatedAt = now;
+    }
+
+    private void requireStatus(ReportStatus expected) {
+        if (status != expected) {
+            throw new BusinessException(TrustErrorCode.REPORT_INVALID_STATE);
+        }
+    }
+
+    private static void requireNow(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("처리 시각이 null입니다.");
+        }
     }
 }

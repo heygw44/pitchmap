@@ -3,10 +3,12 @@ package com.pitchmap.trust.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pitchmap.common.error.BusinessException;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class SanctionTest {
 
@@ -82,5 +84,46 @@ class SanctionTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Sanction.confirm(11L, null, SanctionType.WARNING, 1, "사유", null, 99L))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("[SN-15] 적용 중인 제재를 해제하면 LIFTED가 되고 해제한 관리자와 시각을 남긴다")
+    void liftRecordsAdminAndTime() {
+        Sanction sanction = Sanction.confirm(11L, null, SanctionType.SUSPEND_7D, 2, "반복 위반", NOW, 99L);
+        Instant later = NOW.plusSeconds(3600);
+
+        sanction.lift(98L, later);
+
+        assertThat(sanction.getStatus()).isEqualTo(SanctionStatus.LIFTED);
+        assertThat(sanction.getLiftedBy()).isEqualTo(98L);
+        assertThat(sanction.getLiftedAt()).isEqualTo(later);
+        assertThat(sanction.getUpdatedAt()).isEqualTo(later);
+    }
+
+    @Test
+    @DisplayName("[SN-15] 이미 해제됐거나 기간이 끝난 제재는 해제하지 못한다")
+    void cannotLiftInactiveSanction() {
+        Sanction lifted = Sanction.confirm(11L, null, SanctionType.WARNING, 1, "욕설", NOW, 99L);
+        lifted.lift(98L, NOW);
+        Sanction expired = Sanction.confirm(11L, null, SanctionType.SUSPEND_7D, 2, "반복 위반", NOW, 99L);
+        ReflectionTestUtils.setField(expired, "status", SanctionStatus.EXPIRED);
+
+        assertThatThrownBy(() -> lifted.lift(98L, NOW))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(TrustErrorCode.SANCTION_INVALID_STATE));
+        assertThatThrownBy(() -> expired.lift(98L, NOW))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(TrustErrorCode.SANCTION_INVALID_STATE));
+        assertThat(expired.getLiftedBy()).isNull();
+    }
+
+    @Test
+    @DisplayName("[SN-15] 해제 시각이 null이면 거부한다")
+    void liftRejectsNullTime() {
+        Sanction sanction = Sanction.temporary(11L, 5L, NOW);
+
+        assertThatThrownBy(() -> sanction.lift(98L, null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

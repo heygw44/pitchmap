@@ -165,6 +165,35 @@ public class Member {
     }
 
     /**
+     * 호출하면 제재를 해제하거나 기각한 뒤 남은 정지에 맞춰 회원의 정지 상태를 다시 정한다. 탈퇴한 회원은 그대로 둔다.
+     * 영구 정지가 남았으면(permanent) 종료 시각 없이 정지하고, 아니면 latestEnd가 now보다 늦을 때 그 시각까지 정지한다.
+     * 이때 기존 종료 시각보다 짧아질 수 있다. 남은 정지가 없으면(latestEnd가 null이거나 now와 같거나 이르면) 정지 중이던 회원만 풀고,
+     * 이메일 인증을 마친 회원은 ACTIVE로, 마치지 못한 회원은 UNVERIFIED로 돌린다.
+     */
+    public void resyncSuspension(boolean permanent, Instant latestEnd, Instant now) {
+        requireNow(now);
+        if (status == MemberStatus.WITHDRAWN) {
+            return;
+        }
+        if (permanent) {
+            suspendPermanently(now);
+            return;
+        }
+        if (latestEnd != null && latestEnd.isAfter(now)) {
+            this.status = MemberStatus.SUSPENDED;
+            this.suspendedUntil = latestEnd;
+            this.updatedAt = now;
+            return;
+        }
+        if (status != MemberStatus.SUSPENDED) {
+            return;
+        }
+        this.status = emailVerifiedAt != null ? MemberStatus.ACTIVE : MemberStatus.UNVERIFIED;
+        this.suspendedUntil = null;
+        this.updatedAt = now;
+    }
+
+    /**
      * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 규칙을 어기면 입력 오류 예외를 던지고 아무것도 바꾸지 않는다.
      */
     public void changeNickname(String nickname, Instant now) {

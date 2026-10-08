@@ -1,5 +1,8 @@
 package com.pitchmap.publicdata.application;
 
+import com.pitchmap.common.audit.AdminAuditAction;
+import com.pitchmap.common.audit.AdminAuditRecorder;
+import com.pitchmap.common.audit.AdminAuditTargetType;
 import com.pitchmap.publicdata.application.SyncJobRunService.SyncJobStart;
 import com.pitchmap.publicdata.domain.SyncJobRun;
 import com.pitchmap.publicdata.domain.SyncJobRunRepository;
@@ -7,6 +10,7 @@ import com.pitchmap.publicdata.domain.SyncJobType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +30,15 @@ import org.springframework.transaction.annotation.Transactional;
 class SyncJobRunStartService {
 
     private final SyncJobRunRepository syncJobRunRepository;
+    private final AdminAuditRecorder adminAuditRecorder;
     private final Clock clock;
 
+    /**
+     * 호출하면 새 실행 기록을 RUNNING으로 만든다. adminId가 null이 아니면 관리자가 요청한 실행이므로 같은 트랜잭션에서 감사 로그를 남기고,
+     * null이면(스케줄러의 자동 실행) 남기지 않는다. 다른 실행이 진행 중이라 기록을 만들지 않을 때도 감사 로그는 남기지 않는다.
+     */
     @Transactional
-    public Optional<SyncJobStart> start(SyncJobType jobType, Duration staleAfter) {
+    public Optional<SyncJobStart> start(SyncJobType jobType, Duration staleAfter, Long adminId) {
         Instant now = clock.instant();
         Optional<SyncJobRun> latest = syncJobRunRepository.findFirstByJobTypeOrderByIdDesc(jobType);
         if (latest.isPresent() && latest.get().isRunning()) {
@@ -44,6 +53,14 @@ class SyncJobRunStartService {
                 .map(SyncJobRun::getProgressCursor)
                 .orElse(null);
         SyncJobRun started = syncJobRunRepository.save(SyncJobRun.start(jobType, resumeCursor, now));
+        if (adminId != null) {
+            adminAuditRecorder.record(
+                    adminId,
+                    AdminAuditAction.SYNC_JOB_RUN,
+                    AdminAuditTargetType.SYNC_JOB_RUN,
+                    started.getId(),
+                    Map.of("jobType", jobType.name()));
+        }
         return Optional.of(new SyncJobStart(started.getId(), resumeCursor));
     }
 

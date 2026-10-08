@@ -57,6 +57,19 @@ public class MemberSuspensionService {
     }
 
     /**
+     * 호출하면 제재를 해제하거나 기각한 뒤 남은 정지에 맞춰 그 회원의 정지 상태를 다시 정한다. 호출한 쪽의 트랜잭션에 참여하고, 없으면 새로 연다.
+     * permanent는 영구 정지가 남았다는 뜻이고, latestEnd는 남은 기간 정지 중 가장 늦은 종료 시각이다. 남은 정지가 없으면 latestEnd는 null이다.
+     * 회원 행을 쓰기 잠금으로 읽는다. 탈퇴한 회원은 바꾸지 않는다.
+     */
+    @Transactional
+    public void resyncSuspension(long memberId, boolean permanent, Instant latestEnd) {
+        Member member = memberRepository
+                .findByIdForUpdate(memberId)
+                .orElseThrow(() -> new IllegalStateException("정지를 다시 계산할 회원이 없습니다. memberId=" + memberId));
+        member.resyncSuspension(permanent, latestEnd, Instant.now(clock));
+    }
+
+    /**
      * 호출하면 그 회원의 정지 종료 시각이 지났을 때 정지를 풀고 true를 돌려준다. 회원 행을 쓰기 잠금으로 읽는다.
      * 정지 중이 아니거나 영구 정지이거나 아직 끝나지 않았으면 아무것도 바꾸지 않고 false를 돌려준다.
      */

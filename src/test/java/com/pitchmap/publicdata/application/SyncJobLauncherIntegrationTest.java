@@ -1,16 +1,19 @@
 package com.pitchmap.publicdata.application;
 
+import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
+import com.pitchmap.member.infra.MemberJpaRepository;
 import com.pitchmap.publicdata.domain.PublicDataErrorCode;
 import com.pitchmap.publicdata.domain.SyncJobType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +38,21 @@ class SyncJobLauncherIntegrationTest {
     @Autowired
     private MutableClock clock;
 
+    @Autowired
+    private MemberJpaRepository memberRepository;
+
+    private long adminId;
+
+    @BeforeEach
+    void setUp() {
+        adminId = memberRepository.saveAndFlush(aMember().build()).getId();
+    }
+
     @Test
     @DisplayName("[F-06] 휴양림 적재를 시작하면 실행 기록 ID를 바로 돌려주고, 작업이 끝나면 그 기록이 COMPLETED가 된다")
     void launchedForestLoadCompletes() throws InterruptedException {
         // when
-        long runId = syncJobLauncher.launch(SyncJobType.FOREST);
+        long runId = syncJobLauncher.launch(SyncJobType.FOREST, adminId);
 
         // then
         assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");
@@ -55,7 +68,7 @@ class SyncJobLauncherIntegrationTest {
     @DisplayName("[F-06] 공원 경계 적재를 시작하면 실행 기록 ID를 바로 돌려주고, 작업이 끝나면 그 기록이 COMPLETED가 된다")
     void launchedParkBoundaryLoadCompletes() throws InterruptedException {
         // when
-        long runId = syncJobLauncher.launch(SyncJobType.PARK_BOUNDARY);
+        long runId = syncJobLauncher.launch(SyncJobType.PARK_BOUNDARY, adminId);
 
         // then
         assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");
@@ -70,7 +83,7 @@ class SyncJobLauncherIntegrationTest {
         // given: WireMock에 스텁이 없어서 고캠핑 API 호출이 실패한다.
 
         // when
-        long runId = syncJobLauncher.launch(SyncJobType.GOCAMPING);
+        long runId = syncJobLauncher.launch(SyncJobType.GOCAMPING, adminId);
 
         // then
         assertThat(awaitFinished(runId)).isEqualTo("FAILED");
@@ -86,11 +99,41 @@ class SyncJobLauncherIntegrationTest {
         insertRunningRun(SyncJobType.FOREST, clock.instant());
 
         // when, then
-        assertThatThrownBy(() -> syncJobLauncher.launch(SyncJobType.FOREST))
+        assertThatThrownBy(() -> syncJobLauncher.launch(SyncJobType.FOREST, adminId))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(PublicDataErrorCode.SYNC_JOB_ALREADY_RUNNING));
         assertThat(countRows("sync_job_run")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[F-21] 관리자가 작업을 시작하면 같은 요청의 감사 로그가 한 줄 남고, 실행 중이라 거부된 요청은 남기지 않는다")
+    void adminLaunchIsAudited() throws InterruptedException {
+        // when
+        long runId = syncJobLauncher.launch(SyncJobType.FOREST, adminId);
+        awaitFinished(runId);
+
+        // then
+        assertThat(countRows("admin_audit_log")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT CONCAT(admin_id, ':', action, ':', target_type, ':', target_id,"
+                                + " ':', JSON_UNQUOTE(JSON_EXTRACT(detail, '$.jobType'))) FROM admin_audit_log",
+                        String.class))
+                .isEqualTo(adminId + ":SYNC_JOB_RUN:SYNC_JOB_RUN:" + runId + ":FOREST");
+    }
+
+    @Test
+    @DisplayName("[F-21] 이미 같은 종류가 실행 중이라 거부된 관리자 요청은 감사 로그를 남기지 않는다")
+    void rejectedLaunchIsNotAudited() {
+        // given
+        insertRunningRun(SyncJobType.FOREST, clock.instant());
+
+        // when
+        assertThatThrownBy(() -> syncJobLauncher.launch(SyncJobType.FOREST, adminId))
+                .isInstanceOf(BusinessException.class);
+
+        // then
+        assertThat(countRows("admin_audit_log")).isZero();
     }
 
     @Test
@@ -102,7 +145,7 @@ class SyncJobLauncherIntegrationTest {
         long spotId = insertBakji("경계 안 박지", 37.65, 126.95);
 
         // when
-        long runId = syncJobLauncher.launch(SyncJobType.BAKJI_REJUDGE);
+        long runId = syncJobLauncher.launch(SyncJobType.BAKJI_REJUDGE, adminId);
 
         // then
         assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");
@@ -118,7 +161,7 @@ class SyncJobLauncherIntegrationTest {
         long spotId = insertBakji("북한산 안 박지", 37.65, 126.95);
 
         // when
-        long runId = syncJobLauncher.launch(SyncJobType.PARK_BOUNDARY);
+        long runId = syncJobLauncher.launch(SyncJobType.PARK_BOUNDARY, adminId);
 
         // then: 재판정은 적재 기록이 COMPLETED가 된 뒤에 시작하므로, 재판정 기록이 생길 때까지 따로 기다린다.
         assertThat(awaitFinished(runId)).isEqualTo("COMPLETED");

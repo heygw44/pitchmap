@@ -1,5 +1,6 @@
 package com.pitchmap.trust.domain;
 
+import com.pitchmap.common.error.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -146,6 +147,23 @@ public class Sanction {
             throw new IllegalArgumentException("제재 사유는 공백뿐이 아닌 " + REASON_MAX_LENGTH + "자 이하여야 합니다.");
         }
         return new Sanction(memberId, reportId, type, level, reason, startsAt, createdBy);
+    }
+
+    /**
+     * 호출하면 적용 중인 제재를 해제 상태로 바꾸고 해제한 관리자와 시각을 남긴다. 이미 해제됐거나 기간이 끝난 제재이면
+     * SANCTION_INVALID_STATE 예외를 던진다. 회원의 정지 상태를 다시 계산하는 일은 호출하는 쪽이 한다.
+     */
+    public void lift(long adminId, Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("제재를 해제하는 시각이 null입니다.");
+        }
+        if (status != SanctionStatus.ACTIVE) {
+            throw new BusinessException(TrustErrorCode.SANCTION_INVALID_STATE);
+        }
+        this.status = SanctionStatus.LIFTED;
+        this.liftedBy = adminId;
+        this.liftedAt = now;
+        this.updatedAt = now;
     }
 
     private static Instant endsAtOf(SanctionType type, Instant startsAt) {
