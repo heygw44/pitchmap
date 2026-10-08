@@ -114,6 +114,25 @@ public class Member {
     }
 
     /**
+     * 호출하면 회원을 until까지 정지 상태로 바꾼다. 탈퇴한 회원은 그대로 둔다.
+     * 종료 시각이 없는 영구 정지와, 이미 until보다 늦게 끝나는 정지도 그대로 둔다. 그래서 짧은 임시 정지가 긴 정지를 줄이지 못한다.
+     */
+    public void suspendTemporarily(Instant until, Instant now) {
+        if (until == null || now == null) {
+            throw new IllegalArgumentException("정지 종료 시각이나 수정 시각이 null입니다.");
+        }
+        if (status == MemberStatus.WITHDRAWN) {
+            return;
+        }
+        if (status == MemberStatus.SUSPENDED && (suspendedUntil == null || suspendedUntil.isAfter(until))) {
+            return;
+        }
+        this.status = MemberStatus.SUSPENDED;
+        this.suspendedUntil = until;
+        this.updatedAt = now;
+    }
+
+    /**
      * 호출하면 닉네임과 수정 시각만 바꾼다. 닉네임이 규칙을 어기면 입력 오류 예외를 던지고 아무것도 바꾸지 않는다.
      */
     public void changeNickname(String nickname, Instant now) {

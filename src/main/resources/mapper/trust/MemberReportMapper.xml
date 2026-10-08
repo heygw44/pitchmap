@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.trust.infra.MemberReportMapper">
+
+    <!-- trust 모듈이 basecamp 관련 테이블을 SQL로 직접 읽는 이유: 신고 자격(그 베이스캠프에 신청했거나 멤버였던 회원)은 자격 테이블을
+         따로 두지 않고 매번 이 테이블들에서 판단한다. 자바 코드로 basecamp 모듈의 클래스를 부르면 trust가 basecamp에 기대게 되지만,
+         SQL은 테이블 이름에만 기대므로 모듈 경계를 지킨다. 이 매퍼는 읽기만 하고 basecamp 테이블을 바꾸지 않는다. -->
+
+    <!-- 후기 조건은 후기가 그 베이스캠프에서 대상이 신고자에게 쓴 숨기지 않은 후기인지를 본다. 공개 여부는 신고자가 대상에게 쓴
+         반대 방향 후기가 있는지와 완료 시각으로 서비스가 판단한다. companionReviewId가 null이면 id 비교가 참이 될 수 없어 false다. -->
+    <select id="selectContext" resultType="com.pitchmap.trust.infra.MemberReportContextRow">
+        SELECT (EXISTS (SELECT 1 FROM basecamp_application ba
+                        WHERE ba.basecamp_id = b.id AND ba.applicant_id = #{reporterId})
+                OR EXISTS (SELECT 1 FROM basecamp_member bm
+                           WHERE bm.basecamp_id = b.id AND bm.member_id = #{reporterId})) AS reporter_involved,
+               (EXISTS (SELECT 1 FROM basecamp_application ba
+                        WHERE ba.basecamp_id = b.id AND ba.applicant_id = #{targetId})
+                OR EXISTS (SELECT 1 FROM basecamp_member bm
+                           WHERE bm.basecamp_id = b.id AND bm.member_id = #{targetId})) AS target_involved,
+               EXISTS (SELECT 1 FROM member_report mr
+                       WHERE mr.reporter_id = #{reporterId} AND mr.target_member_id = #{targetId}
+                         AND mr.basecamp_id = b.id AND mr.kind = #{kind}) AS already_reported,
+               EXISTS (SELECT 1 FROM companion_review cr
+                       WHERE cr.id = #{companionReviewId,jdbcType=BIGINT} AND cr.basecamp_id = b.id
+                         AND cr.reviewer_id = #{targetId} AND cr.reviewee_id = #{reporterId}
+                         AND cr.hidden_at IS NULL) AS review_matches,
+               EXISTS (SELECT 1 FROM companion_review cr
+                       WHERE cr.basecamp_id = b.id AND cr.reviewer_id = #{reporterId}
+                         AND cr.reviewee_id = #{targetId}) AS reverse_written,
+               b.completed_at AS completed_at
+        FROM basecamp b
+        WHERE b.id = #{basecampId}
+    </select>
+
+</mapper>

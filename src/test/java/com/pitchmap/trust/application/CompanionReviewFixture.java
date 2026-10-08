@@ -104,6 +104,18 @@ public final class CompanionReviewFixture {
                 AT);
     }
 
+    /** 합류 신청 행을 넣는다. 신청 상태가 무엇이든 그 회원은 베이스캠프에 신청한 이력이 있는 회원이다. */
+    public void insertApplication(long basecampId, long applicantId, String status) {
+        jdbc.update(
+                "INSERT INTO basecamp_application (basecamp_id, applicant_id, status, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                basecampId,
+                applicantId,
+                status,
+                AT,
+                AT);
+    }
+
     /** 임박 탈퇴로 표시한 LEFT 멤버 행을 넣는다. leftAt에 베이스캠프를 떠난 것으로 기록한다. */
     public void insertEarlyLeaver(long basecampId, long memberId, Instant leftAt) {
         jdbc.update(
