@@ -97,6 +97,34 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <!-- 신청 ID는 신청한 순서대로 커지므로 ID 내림차순이 곧 최근 신청부터다. 행사 정보는 신청 시점이 아니라 지금 값을 조인한다. -->
+    <select id="selectMyApplications" resultType="com.pitchmap.program.infra.MyProgramApplicationRow">
+        SELECT a.id AS application_id,
+               a.status AS status,
+               a.payment_due_at AS payment_due_at,
+               a.confirmed_at AS confirmed_at,
+               a.canceled_at AS canceled_at,
+               a.cancel_reason AS cancel_reason,
+               a.created_at AS created_at,
+               p.id AS program_id,
+               p.title AS title,
+               p.location_text AS location_text,
+               p.start_at AS start_at,
+               p.end_at AS end_at,
+               p.fee AS fee,
+               p.status AS program_status,
+               p.apply_open_at AS apply_open_at,
+               p.apply_close_at AS apply_close_at
+        FROM program_application a
+        JOIN program p ON p.id = a.program_id
+        WHERE a.member_id = #{memberId}
+        <if test="status != null">
+            AND a.status = #{status}
+        </if>
+        ORDER BY a.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
     <select id="existsActiveSpot" resultType="boolean">
         SELECT EXISTS (SELECT 1 FROM spot s WHERE s.id = #{spotId} AND s.status = 'ACTIVE')
     </select>
