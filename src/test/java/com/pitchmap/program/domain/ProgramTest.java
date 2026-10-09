@@ -31,6 +31,16 @@ class ProgramTest {
     }
 
     @Test
+    @DisplayName("[F-19][PG-06] 환불 취소 기한은 행사 시작 72시간 전이다")
+    void refundDeadlineIsSeventyTwoHoursBeforeStart() {
+        Instant start = NOW.plus(Duration.ofDays(14));
+
+        Program program = create(withTimes(NOW.plus(Duration.ofDays(1)), NOW.plus(Duration.ofDays(5)), start));
+
+        assertThat(program.refundDeadline()).isEqualTo(start.minus(Duration.ofHours(72)));
+    }
+
+    @Test
     @DisplayName("[F-17] 시각 순서(신청 시작 < 신청 마감 <= 행사 시작 < 행사 종료)가 틀리면 만들 수 없다")
     void rejectsWrongScheduleOrder() {
         Instant start = NOW.plus(Duration.ofDays(14));

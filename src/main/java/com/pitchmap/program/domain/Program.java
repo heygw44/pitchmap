@@ -43,6 +43,7 @@ public class Program {
     public static final int PAYMENT_DEADLINE_MINUTES_MAX = 1440;
     public static final int DEFAULT_PAYMENT_DEADLINE_MINUTES = 15;
     public static final int MIN_TRUST_LEVEL_FOR_OVERNIGHT = 1;
+    public static final int REFUND_CANCEL_HOURS_BEFORE_START = 72;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -208,6 +209,11 @@ public class Program {
     /** 호출하면 now에 신청한 회원의 결제 기한을 돌려준다. */
     public Instant paymentDueAt(Instant now) {
         return now.plus(Duration.ofMinutes(paymentDeadlineMinutes));
+    }
+
+    /** 호출하면 결제를 마친 신청자가 환불받으며 취소할 수 있는 마지막 시각(행사 시작 72시간 전)을 돌려준다. 이 시각 정각까지 취소할 수 있다. */
+    public Instant refundDeadline() {
+        return startAt.minus(Duration.ofHours(REFUND_CANCEL_HOURS_BEFORE_START));
     }
 
     // 고친 뒤의 값을 영속 상태가 아닌 임시 객체에 모아서, 검사에 실패하면 이 행사를 건드리지 않게 한다.

@@ -302,6 +302,9 @@ class AdminProgramApiIntegrationTest {
                 .isEqualTo(1);
         assertThat(paymentStatus(otherConfirmed)).isEqualTo("PAID");
         assertThat(applicationStatus(otherConfirmed)).isEqualTo("CONFIRMED");
+        assertThat(canceledEvents()).hasSize(2);
+        assertCanceledEvent(pending, programId, false);
+        assertCanceledEvent(confirmed, programId, true);
         MvcTestResult again = post(ADMIN_PROGRAMS + "/" + programId + "/cancel");
         assertThat(again).hasStatus(HttpStatus.CONFLICT);
         assertThat(again).bodyJson().extractingPath("$.code").isEqualTo("PROGRAM_INVALID_STATE");
@@ -564,6 +567,26 @@ class AdminProgramApiIntegrationTest {
                 clock.instant(),
                 clock.instant(),
                 clock.instant());
+    }
+
+    private List<Map<String, Object>> canceledEvents() {
+        return jdbc.queryForList("SELECT aggregate_id, payload FROM outbox_event"
+                + " WHERE event_type = 'PROGRAM_APPLICATION_CANCELED' AND aggregate_type = 'PROGRAM_APPLICATION'");
+    }
+
+    // 신청 하나의 취소 이벤트가 행사 취소 사유와 환불 여부를 담고 있는지 확인한다.
+    private void assertCanceledEvent(long applicationId, long programId, boolean refunded) {
+        String payload = jdbc.queryForObject(
+                "SELECT payload FROM outbox_event WHERE event_type = 'PROGRAM_APPLICATION_CANCELED'"
+                        + " AND aggregate_id = ?",
+                String.class,
+                applicationId);
+        assertThat(JsonPath.<Number>read(payload, "$.applicationId").longValue())
+                .isEqualTo(applicationId);
+        assertThat(JsonPath.<Number>read(payload, "$.memberId").longValue()).isEqualTo(memberIdOf(applicationId));
+        assertThat(JsonPath.<Number>read(payload, "$.programId").longValue()).isEqualTo(programId);
+        assertThat(JsonPath.<String>read(payload, "$.reason")).isEqualTo("PROGRAM_CANCELED");
+        assertThat(JsonPath.<Boolean>read(payload, "$.refunded")).isEqualTo(refunded);
     }
 
     private long memberIdOf(long applicationId) {
