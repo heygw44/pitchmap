@@ -12,6 +12,8 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'BASECAMP_MEMBER_CHANGED',
   'MEMBER_REPORT_RESOLVED',
   'SANCTION_CONFIRMED',
+  'PROGRAM_APPLICATION_CONFIRMED',
+  'PROGRAM_APPLICATION_CANCELED',
 ];
 
 export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -25,4 +27,6 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   BASECAMP_MEMBER_CHANGED: '베이스캠프 멤버가 바뀌었을 때',
   MEMBER_REPORT_RESOLVED: '내가 한 신고의 처리 결과가 나왔을 때',
   SANCTION_CONFIRMED: '내게 제재가 확정됐을 때',
+  PROGRAM_APPLICATION_CONFIRMED: '행사 신청이 결제로 확정됐을 때',
+  PROGRAM_APPLICATION_CANCELED: '행사 신청이 취소됐을 때',
 };

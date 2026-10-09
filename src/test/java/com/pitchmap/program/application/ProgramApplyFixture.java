@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// 선착순 신청 통합 테스트들이 함께 쓰는 JDBC 데이터 준비와 조회 도구다. 서비스를 거치지 않고 행을 직접 넣어, 원하는 상태에서 시작한다.
+// 선착순 신청과 결제 통합 테스트들이 함께 쓰는 JDBC 데이터 준비와 조회 도구다. 서비스를 거치지 않고 행을 직접 넣어, 원하는 상태에서 시작한다.
 public final class ProgramApplyFixture {
 
     private static final Instant NOW = MutableClock.DEFAULT_INSTANT;
@@ -81,6 +81,55 @@ public final class ProgramApplyFixture {
                 utc(NOW),
                 utc(NOW));
         return jdbc.queryForObject("SELECT MAX(id) FROM program_application", Long.class);
+    }
+
+    /** 결제 기한을 정해서 신청 행을 직접 저장하고 그 ID를 돌려준다. */
+    public long saveApplication(long programId, long memberId, String status, Instant paymentDueAt) {
+        jdbc.update(
+                "INSERT INTO program_application (program_id, member_id, status, payment_due_at, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                programId,
+                memberId,
+                status,
+                utc(paymentDueAt),
+                utc(NOW),
+                utc(NOW));
+        return jdbc.queryForObject("SELECT MAX(id) FROM program_application", Long.class);
+    }
+
+    /** 결제 행을 직접 저장한다. 참가비는 30000원이다. */
+    public void savePayment(long applicationId, String status) {
+        jdbc.update(
+                "INSERT INTO payment (program_application_id, amount, status, paid_at, created_at, updated_at)"
+                        + " VALUES (?, 30000, ?, ?, ?, ?)",
+                applicationId,
+                status,
+                utc(NOW),
+                utc(NOW),
+                utc(NOW));
+    }
+
+    public String applicationStatus(long applicationId) {
+        return jdbc.queryForObject("SELECT status FROM program_application WHERE id = ?", String.class, applicationId);
+    }
+
+    public int paymentCount(long applicationId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payment WHERE program_application_id = ?", Integer.class, applicationId);
+    }
+
+    public String paymentStatus(long applicationId) {
+        return jdbc.queryForObject(
+                "SELECT status FROM payment WHERE program_application_id = ?", String.class, applicationId);
+    }
+
+    /** 이벤트 종류와 집계 ID가 같은 outbox 행 수다. */
+    public int outboxCount(String eventType, long aggregateId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM outbox_event WHERE event_type = ? AND aggregate_id = ?",
+                Integer.class,
+                eventType,
+                aggregateId);
     }
 
     /** 정원을 차지하는(결제 대기, 확정) 신청 수다. */

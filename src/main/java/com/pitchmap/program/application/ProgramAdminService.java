@@ -5,8 +5,10 @@ import com.pitchmap.common.audit.AdminAuditRecorder;
 import com.pitchmap.common.audit.AdminAuditTargetType;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
+import com.pitchmap.common.outbox.OutboxEventRecorder;
 import com.pitchmap.program.domain.PaymentRepository;
 import com.pitchmap.program.domain.Program;
+import com.pitchmap.program.domain.ProgramApplication;
 import com.pitchmap.program.domain.ProgramApplicationRepository;
 import com.pitchmap.program.domain.ProgramApplicationStatus;
 import com.pitchmap.program.domain.ProgramCancelReason;
@@ -18,7 +20,9 @@ import com.pitchmap.program.infra.ProgramApplicantRow;
 import com.pitchmap.program.infra.ProgramQueryMapper;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +48,7 @@ public class ProgramAdminService {
     private final ProgramQueryMapper programQueryMapper;
     private final ProgramQueryService programQueryService;
     private final AdminAuditRecorder adminAuditRecorder;
+    private final OutboxEventRecorder outboxEventRecorder;
     private final Clock clock;
 
     /** 호출하면 adminId인 관리자가 command대로 행사를 등록하고 그 행사의 ID를 돌려준다. */
@@ -87,7 +92,10 @@ public class ProgramAdminService {
 
     /**
      * 호출하면 programId인 행사를 취소하고, 결제 대기·확정 신청을 모두 취소 사유 PROGRAM_CANCELED로 바꾸며, 결제 완료 건을 환불 처리한다.
-     * 이미 취소된 행사는 PROGRAM_INVALID_STATE로 거부한다. 신청자에게 알림은 보내지 않는다.
+     * 이미 취소된 행사는 PROGRAM_INVALID_STATE로 거부한다. 취소된 신청마다 신청자에게 알릴 이벤트(환불 여부 포함)를 같은 트랜잭션에서 기록한다.
+     *
+     * <p>일괄 UPDATE 전에 활성 신청을 쓰기 잠금으로 읽는다. 결제가 진행 중이면 그 커밋을 기다린 뒤에 읽으므로, 이벤트의 환불 여부가
+     * 일괄 UPDATE가 실제로 환불한 결제와 같다.
      */
     @Transactional
     public ProgramCancelResult cancel(long adminId, long programId) {
@@ -95,9 +103,13 @@ public class ProgramAdminService {
         Instant now = clock.instant();
         String fromStatus = program.getStatus().name();
         program.cancel(now);
+        List<ProgramApplication> activeApplications =
+                programApplicationRepository.findActiveByProgramForUpdate(programId);
+        Set<Long> paidApplicationIds = new HashSet<>(paymentRepository.findPaidApplicationIdsByProgram(programId));
         int canceledApplicationCount = programApplicationRepository.cancelActiveByProgram(
                 programId, ProgramCancelReason.PROGRAM_CANCELED, now);
         int refundedPaymentCount = paymentRepository.refundPaidByProgram(programId, now);
+        recordCanceledEvents(programId, activeApplications, paidApplicationIds);
         adminAuditRecorder.record(
                 adminId,
                 AdminAuditAction.PROGRAM_CANCEL,
@@ -112,6 +124,24 @@ public class ProgramAdminService {
                 canceledApplicationCount,
                 refundedPaymentCount);
         return new ProgramCancelResult(programId, program.getStatus().name(), canceledApplicationCount);
+    }
+
+    // 신청자마다 이벤트를 하나씩 기록한다. 결제를 마친 신청은 환불했다고 알린다.
+    private void recordCanceledEvents(
+            long programId, List<ProgramApplication> applications, Set<Long> paidApplicationIds) {
+        for (ProgramApplication application : applications) {
+            long applicationId = application.getId();
+            outboxEventRecorder.record(
+                    ProgramApplicationEvents.CANCELED_EVENT_TYPE,
+                    ProgramApplicationEvents.AGGREGATE_TYPE,
+                    applicationId,
+                    new ProgramApplicationEvents.CanceledPayload(
+                            applicationId,
+                            application.getMemberId(),
+                            programId,
+                            ProgramCancelReason.PROGRAM_CANCELED.name(),
+                            paidApplicationIds.contains(applicationId)));
+        }
     }
 
     /**

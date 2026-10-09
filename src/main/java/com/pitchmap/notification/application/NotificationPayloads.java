@@ -28,4 +28,11 @@ final class NotificationPayloads {
 
     /** 제재 확정 이벤트. endsAt은 기간이 정해진 정지일 때만 값이 있다. */
     record SanctionConfirmed(long memberId, long sanctionId, String sanctionType, Instant endsAt) {}
+
+    /** 행사 신청 확정 이벤트. 신청자에게 알린다. */
+    record ProgramApplicationConfirmed(long applicationId, long memberId, long programId) {}
+
+    /** 행사 신청 취소 이벤트. reason은 USER(본인 취소) 또는 PROGRAM_CANCELED(행사 취소)이고, refunded는 결제를 환불했는지 여부다. */
+    record ProgramApplicationCanceled(
+            long applicationId, long memberId, long programId, String reason, boolean refunded) {}
 }

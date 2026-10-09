@@ -111,6 +111,35 @@ final class NotificationTemplates {
                 null));
     }
 
+    /** 호출하면 결제를 마쳐 행사 신청이 확정됐다고 신청자에게 알리는 알림을 만든다. */
+    static List<NotificationDraft> programApplicationConfirmed(
+            NotificationPayloads.ProgramApplicationConfirmed payload) {
+        return List.of(new NotificationDraft(
+                payload.memberId(),
+                NotificationEventTypes.PROGRAM_APPLICATION_CONFIRMED,
+                "행사 신청 확정",
+                "결제가 끝나 행사 신청이 확정됐습니다.",
+                programLink(payload.programId())));
+    }
+
+    /** 호출하면 취소 사유에 맞는 문구로 신청자에게 알린다. 환불했으면 환불했다는 문장을 덧붙인다. 모르는 사유 이름이면 예외를 던진다. */
+    static List<NotificationDraft> programApplicationCanceled(NotificationPayloads.ProgramApplicationCanceled payload) {
+        String body = switch (payload.reason()) {
+            case "USER" -> "행사 신청을 취소했습니다.";
+            case "PROGRAM_CANCELED" -> "행사가 취소되어 신청이 취소됐습니다.";
+            default -> throw new IllegalArgumentException("알 수 없는 행사 신청 취소 사유입니다: " + payload.reason());
+        };
+        if (payload.refunded()) {
+            body += " 결제한 금액은 환불됩니다.";
+        }
+        return List.of(new NotificationDraft(
+                payload.memberId(),
+                NotificationEventTypes.PROGRAM_APPLICATION_CANCELED,
+                "행사 신청 취소",
+                body,
+                programLink(payload.programId())));
+    }
+
     private static String sanctionBody(NotificationPayloads.SanctionConfirmed payload) {
         return switch (payload.sanctionType()) {
             case "WARNING" -> "경고를 받았습니다.";
@@ -140,6 +169,10 @@ final class NotificationTemplates {
         return payload.memberIds().stream()
                 .map(memberId -> new NotificationDraft(memberId, type, title, body, link))
                 .toList();
+    }
+
+    private static String programLink(long programId) {
+        return "/programs/" + programId;
     }
 
     private static String basecampLink(long basecampId) {

@@ -30,7 +30,7 @@ class NotificationSettingApiIntegrationTest {
     private static final String PATH = "/api/me/notification-settings";
     private static final String PASSWORD = "Valid-pass1";
     private static final String SESSION_COOKIE = "SESSION";
-    private static final int TYPE_COUNT = 10;
+    private static final int TYPE_COUNT = 12;
 
     @Autowired
     private MockMvcTester mvc;
@@ -67,7 +67,7 @@ class NotificationSettingApiIntegrationTest {
         assertThat(types(result))
                 .hasSize(TYPE_COUNT)
                 .startsWith("BASECAMP_APPLIED")
-                .endsWith("SANCTION_CONFIRMED");
+                .endsWith("PROGRAM_APPLICATION_CANCELED");
         assertThat(flags(result)).containsOnly(true);
     }
 

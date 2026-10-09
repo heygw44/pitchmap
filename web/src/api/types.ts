@@ -625,7 +625,9 @@ export type NotificationType =
   | 'BASECAMP_COMPLETED'
   | 'BASECAMP_MEMBER_CHANGED'
   | 'MEMBER_REPORT_RESOLVED'
-  | 'SANCTION_CONFIRMED';
+  | 'SANCTION_CONFIRMED'
+  | 'PROGRAM_APPLICATION_CONFIRMED'
+  | 'PROGRAM_APPLICATION_CANCELED';
 
 export interface NotificationItem {
   notificationId: number;
