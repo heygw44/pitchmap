@@ -354,6 +354,9 @@ function ModeToggle({ basecampMode }: { basecampMode: boolean }) {
       >
         베이스캠프
       </Link>
+      <Link to="/programs" className={idleClass}>
+        행사
+      </Link>
     </nav>
   );
 }
