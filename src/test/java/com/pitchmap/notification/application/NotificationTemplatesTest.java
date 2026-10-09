@@ -285,4 +285,26 @@ class NotificationTemplatesTest {
                 .containsExactly(new NotificationDraft(
                         2L, "PROGRAM_APPLICATION_EXPIRED", "행사 신청 만료", "결제 기한이 지나 행사 신청이 취소됐습니다.", "/programs/9"));
     }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 빈자리 알림은 대상 회원마다 한 건씩 만들고 링크는 행사 화면이다")
+    void programSeatReleasedNotifiesEachMember() {
+        List<NotificationDraft> drafts = NotificationTemplates.programSeatReleased(
+                new NotificationPayloads.ProgramSeatReleased(9L, List.of(2L, 3L)));
+
+        assertThat(drafts)
+                .containsExactly(
+                        new NotificationDraft(
+                                2L,
+                                "PROGRAM_SEAT_RELEASED",
+                                "행사 빈자리 알림",
+                                "신청한 행사에 빈자리가 생겼습니다. 자리는 먼저 신청한 회원에게 돌아갑니다.",
+                                "/programs/9"),
+                        new NotificationDraft(
+                                3L,
+                                "PROGRAM_SEAT_RELEASED",
+                                "행사 빈자리 알림",
+                                "신청한 행사에 빈자리가 생겼습니다. 자리는 먼저 신청한 회원에게 돌아갑니다.",
+                                "/programs/9"));
+    }
 }

@@ -40,6 +40,7 @@ public class ProgramPaymentService {
     private final ProgramRepository programRepository;
     private final PaymentRepository paymentRepository;
     private final OutboxEventRecorder outboxEventRecorder;
+    private final ProgramSeatReleaseRecorder seatReleaseRecorder;
     private final Clock clock;
 
     /**
@@ -87,6 +88,7 @@ public class ProgramPaymentService {
                         application.getProgramId(),
                         ProgramCancelReason.USER.name(),
                         refunded));
+        seatReleaseRecorder.record(program, now);
         log.info(
                 "program application canceled applicationId={} memberId={} refunded={}",
                 applicationId,

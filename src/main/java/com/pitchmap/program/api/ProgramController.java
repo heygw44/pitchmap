@@ -5,12 +5,15 @@ import com.pitchmap.common.idempotency.IdempotentRequest;
 import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.program.application.ProgramApplyService;
 import com.pitchmap.program.application.ProgramQueryService;
+import com.pitchmap.program.application.ProgramVacancyAlertService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +28,7 @@ class ProgramController {
 
     private final ProgramQueryService programQueryService;
     private final ProgramApplyService programApplyService;
+    private final ProgramVacancyAlertService programVacancyAlertService;
     private final IdempotencyExecutor idempotencyExecutor;
 
     @Operation(
@@ -75,5 +79,28 @@ class ProgramController {
                 HttpStatus.CREATED,
                 ProgramApplyResponse.class,
                 () -> ProgramApplyResponse.from(programApplyService.apply(memberId, programId)));
+    }
+
+    @Operation(
+            summary = "행사 빈자리 알림 신청",
+            description = "로그인한 인증 회원이 행사의 빈자리 알림을 신청한다. 새로 신청하면 201, 이미 신청한 상태이면 200이고 본문은 없다. "
+                    + "남은 자리가 있어도 신청을 저장한다. 신청은 회원이 해제할 때까지 남고, 자리가 돌아올 때마다 알림을 보낸다. "
+                    + "행사가 없으면 404 NOT_FOUND, 취소된 행사이거나 신청 마감 시각 이후이면 409 PROGRAM_INVALID_STATE이다.")
+    @PostMapping("/api/programs/{programId}/vacancy-alerts")
+    ResponseEntity<Void> subscribeVacancyAlert(
+            @PathVariable long programId, @AuthenticationPrincipal LoginMember loginMember) {
+        boolean created = programVacancyAlertService.subscribe(loginMember.memberId(), programId);
+        return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK)
+                .build();
+    }
+
+    @Operation(
+            summary = "행사 빈자리 알림 해제",
+            description =
+                    "로그인한 인증 회원이 행사의 빈자리 알림 신청을 해제한다. 신청한 적이 없어도, 행사가 취소·마감됐어도 204이다. " + "행사가 없으면 404 NOT_FOUND이다.")
+    @DeleteMapping("/api/programs/{programId}/vacancy-alerts")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void unsubscribeVacancyAlert(@PathVariable long programId, @AuthenticationPrincipal LoginMember loginMember) {
+        programVacancyAlertService.unsubscribe(loginMember.memberId(), programId);
     }
 }

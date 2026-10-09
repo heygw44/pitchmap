@@ -38,4 +38,7 @@ final class NotificationPayloads {
 
     /** 행사 신청 만료 이벤트. 결제 기한이 지나 만료된 신청의 신청자에게 알린다. */
     record ProgramApplicationExpired(long applicationId, long memberId, long programId) {}
+
+    /** 행사 빈자리 이벤트. 빈자리 알림을 신청한 memberIds 전원에게 알린다. */
+    record ProgramSeatReleased(long programId, List<Long> memberIds) {}
 }

@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 // 선착순 신청과 결제 통합 테스트들이 함께 쓰는 JDBC 데이터 준비와 조회 도구다. 서비스를 거치지 않고 행을 직접 넣어, 원하는 상태에서 시작한다.
@@ -147,6 +148,41 @@ public final class ProgramApplyFixture {
                 Integer.class,
                 programId,
                 memberId);
+    }
+
+    /** 빈자리 알림 신청 행을 직접 저장한다. */
+    public void saveVacancyAlert(long programId, long memberId) {
+        jdbc.update(
+                "INSERT INTO program_vacancy_alert (program_id, member_id, created_at) VALUES (?, ?, ?)",
+                programId,
+                memberId,
+                utc(NOW));
+    }
+
+    public int vacancyAlertCount(long programId, long memberId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM program_vacancy_alert WHERE program_id = ? AND member_id = ?",
+                Integer.class,
+                programId,
+                memberId);
+    }
+
+    /** 빈자리 알림 신청의 알림 시각이다. 아직 알리지 않았으면 null이다. */
+    public LocalDateTime vacancyAlertNotifiedAt(long programId, long memberId) {
+        return jdbc.queryForObject(
+                "SELECT notified_at FROM program_vacancy_alert WHERE program_id = ? AND member_id = ?",
+                LocalDateTime.class,
+                programId,
+                memberId);
+    }
+
+    /** 행사의 빈자리 이벤트 payload 목록이다. 이벤트가 없으면 빈 목록이다. */
+    public List<String> seatReleasedPayloads(long programId) {
+        return jdbc.queryForList(
+                "SELECT payload FROM outbox_event WHERE event_type = 'PROGRAM_SEAT_RELEASED'"
+                        + " AND aggregate_type = 'PROGRAM' AND aggregate_id = ?",
+                String.class,
+                programId);
     }
 
     private static LocalDateTime utc(Instant instant) {

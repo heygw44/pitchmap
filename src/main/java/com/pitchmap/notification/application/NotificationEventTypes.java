@@ -21,6 +21,7 @@ final class NotificationEventTypes {
     static final String PROGRAM_APPLICATION_CONFIRMED = "PROGRAM_APPLICATION_CONFIRMED";
     static final String PROGRAM_APPLICATION_CANCELED = "PROGRAM_APPLICATION_CANCELED";
     static final String PROGRAM_APPLICATION_EXPIRED = "PROGRAM_APPLICATION_EXPIRED";
+    static final String PROGRAM_SEAT_RELEASED = "PROGRAM_SEAT_RELEASED";
 
     /** 회원이 이메일 수신 여부를 정할 수 있는 알림 종류다. 설정 화면에 이 순서대로 보여 준다. */
     static final List<String> EMAIL_CONFIGURABLE = List.of(
@@ -36,7 +37,8 @@ final class NotificationEventTypes {
             SANCTION_CONFIRMED,
             PROGRAM_APPLICATION_CONFIRMED,
             PROGRAM_APPLICATION_CANCELED,
-            PROGRAM_APPLICATION_EXPIRED);
+            PROGRAM_APPLICATION_EXPIRED,
+            PROGRAM_SEAT_RELEASED);
 
     /** 회원이 설정을 저장하지 않은 알림 종류의 이메일 수신 여부다. 기본은 받는 것이다. */
     static final boolean DEFAULT_EMAIL_ENABLED = true;
