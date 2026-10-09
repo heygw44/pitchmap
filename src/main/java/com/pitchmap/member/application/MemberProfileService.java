@@ -27,4 +27,16 @@ public class MemberProfileService {
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
         return MemberProfile.from(member);
     }
+
+    /**
+     * 호출하면 탈퇴한 회원을 포함해 회원의 공개 가능한 정보를 돌려준다. 탈퇴한 회원의 닉네임은 이미 {@code 탈퇴회원_{id}}로 바뀌어 있고
+     * 자기 신고 값은 비어 있다. 베이스캠프 멤버 목록처럼 다른 화면 안에 회원이 끼어 보이는 곳에서 쓴다. 회원 프로필 화면처럼
+     * 탈퇴한 회원이 드러나면 안 되는 곳은 {@link #find}를 쓴다. 없는 회원이면 {@code NOT_FOUND}로 실패한다.
+     */
+    @Transactional(readOnly = true)
+    public MemberProfile findIncludingWithdrawn(long memberId) {
+        Member member =
+                memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        return MemberProfile.from(member);
+    }
 }

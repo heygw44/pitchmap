@@ -5,6 +5,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 
 import com.pitchmap.basecamp.application.BasecampSanctionCleanupService;
+import com.pitchmap.basecamp.domain.RemovalCause;
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.testsupport.TestSequence;
@@ -12,6 +13,7 @@ import com.pitchmap.member.infra.MemberJpaRepository;
 import com.pitchmap.notification.application.OutboxProperties;
 import com.pitchmap.notification.application.OutboxPublisher;
 import com.pitchmap.program.application.ProgramSanctionCleanupService;
+import com.pitchmap.program.domain.ProgramCancelReason;
 import com.pitchmap.trust.domain.SanctionType;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -61,7 +63,7 @@ class SanctionFollowUpReliabilityIntegrationTest {
         long targetId = fixture.saveVerifiedMember(TestSequence.nickname());
         doThrow(new IllegalStateException("simulated cleanup failure"))
                 .when(cleanupService)
-                .cleanUp(targetId);
+                .cleanUp(targetId, RemovalCause.SANCTION);
 
         sanctionConfirmService.confirm(
                 new SanctionConfirmCommand(targetId, null, SanctionType.PERMANENT, "금전 요구", adminId));
@@ -98,7 +100,7 @@ class SanctionFollowUpReliabilityIntegrationTest {
         long targetId = fixture.saveVerifiedMember(TestSequence.nickname());
         doThrow(new IllegalStateException("simulated program cleanup failure"))
                 .when(programCleanupService)
-                .cleanUp(targetId);
+                .cleanUp(targetId, ProgramCancelReason.SANCTIONED);
 
         sanctionConfirmService.confirm(
                 new SanctionConfirmCommand(targetId, null, SanctionType.PERMANENT, "금전 요구", adminId));

@@ -50,7 +50,7 @@ public class BasecampApplicationListService {
     }
 
     private BasecampApplicationItem toItem(BasecampApplicationRow row) {
-        MemberTrustProfile profile = memberProfileQueryService.find(row.applicantId());
+        MemberTrustProfile profile = memberProfileQueryService.findIncludingWithdrawn(row.applicantId());
         return new BasecampApplicationItem(
                 row.applicationId(),
                 row.status().name(),

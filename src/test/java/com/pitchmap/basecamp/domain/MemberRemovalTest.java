@@ -13,7 +13,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class SanctionRemovalTest {
+class MemberRemovalTest {
 
     private static final Instant LATER = BasecampBuilder.NOW.plus(Duration.ofHours(1));
 
@@ -22,9 +22,9 @@ class SanctionRemovalTest {
     void leaderSanctionedCancelsBasecamp() {
         Basecamp basecamp = aBasecamp().inState(BasecampStatus.RECRUITING);
 
-        SanctionRemoval removal = basecamp.removeSanctionedMember(LEADER_ID, LATER);
+        MemberRemoval removal = basecamp.removeMember(LEADER_ID, RemovalCause.SANCTION, LATER);
 
-        assertThat(removal).isEqualTo(SanctionRemoval.LEADER_CANCELED);
+        assertThat(removal).isEqualTo(MemberRemoval.LEADER_CANCELED);
         assertThat(basecamp.getStatus()).isEqualTo(BasecampStatus.CANCELED);
         assertThat(basecamp.getCancelReason()).isEqualTo(CancelReason.LEADER_SANCTIONED);
         assertThat(basecamp.getCanceledAt()).isEqualTo(LATER);
@@ -37,9 +37,9 @@ class SanctionRemovalTest {
     void leaderOfConfirmedBasecampIsCanceled() {
         Basecamp basecamp = aBasecamp().inState(BasecampStatus.CONFIRMED);
 
-        SanctionRemoval removal = basecamp.removeSanctionedMember(LEADER_ID, LATER);
+        MemberRemoval removal = basecamp.removeMember(LEADER_ID, RemovalCause.SANCTION, LATER);
 
-        assertThat(removal).isEqualTo(SanctionRemoval.LEADER_CANCELED);
+        assertThat(removal).isEqualTo(MemberRemoval.LEADER_CANCELED);
         assertThat(basecamp.getStatus()).isEqualTo(BasecampStatus.CANCELED);
     }
 
@@ -49,9 +49,9 @@ class SanctionRemovalTest {
         Basecamp basecamp = aBasecamp().inState(BasecampStatus.CONFIRMED);
         Instant withinWindow = DEFAULT_START_DATE.atStartOfDay(Basecamp.KOREA).toInstant();
 
-        SanctionRemoval removal = basecamp.removeSanctionedMember(MEMBER_ID, withinWindow);
+        MemberRemoval removal = basecamp.removeMember(MEMBER_ID, RemovalCause.SANCTION, withinWindow);
 
-        assertThat(removal).isEqualTo(SanctionRemoval.MEMBER_LEFT);
+        assertThat(removal).isEqualTo(MemberRemoval.MEMBER_LEFT);
         BasecampMember member = memberOf(basecamp, MEMBER_ID);
         assertThat(member.getStatus()).isEqualTo(BasecampMemberStatus.LEFT);
         assertThat(member.isEarlyLeave()).isFalse();
@@ -65,9 +65,9 @@ class SanctionRemovalTest {
         Basecamp basecamp = aBasecamp().autoClosed();
         assertThat(basecamp.getStatus()).isEqualTo(BasecampStatus.CLOSED);
 
-        SanctionRemoval removal = basecamp.removeSanctionedMember(MEMBER_ID, LATER);
+        MemberRemoval removal = basecamp.removeMember(MEMBER_ID, RemovalCause.SANCTION, LATER);
 
-        assertThat(removal).isEqualTo(SanctionRemoval.MEMBER_LEFT);
+        assertThat(removal).isEqualTo(MemberRemoval.MEMBER_LEFT);
         assertThat(basecamp.getStatus()).isEqualTo(BasecampStatus.RECRUITING);
         assertThat(basecamp.headcount()).isEqualTo(2);
     }
@@ -77,9 +77,9 @@ class SanctionRemovalTest {
     void pendingApplicantApplicationIsCanceled() {
         Basecamp basecamp = aBasecamp().inState(BasecampStatus.RECRUITING);
 
-        SanctionRemoval removal = basecamp.removeSanctionedMember(APPLICANT_ID, LATER);
+        MemberRemoval removal = basecamp.removeMember(APPLICANT_ID, RemovalCause.SANCTION, LATER);
 
-        assertThat(removal).isEqualTo(SanctionRemoval.APPLICATION_CANCELED);
+        assertThat(removal).isEqualTo(MemberRemoval.APPLICATION_CANCELED);
         assertThat(basecamp.relationOf(APPLICANT_ID)).isEqualTo(BasecampRelation.NONE);
         assertThat(applicationOf(basecamp, APPLICANT_ID).getStatus()).isEqualTo(BasecampApplicationStatus.CANCELED);
         assertThat(basecamp.headcount()).isEqualTo(2);
@@ -89,13 +89,13 @@ class SanctionRemovalTest {
     @DisplayName("[SN-13] 이미 빠진 멤버나 상관없는 회원에게는 아무것도 바꾸지 않고, 두 번째 호출도 변화가 없다")
     void idempotentForAlreadyRemovedOrUnrelated() {
         Basecamp basecamp = aBasecamp().inState(BasecampStatus.RECRUITING);
-        basecamp.removeSanctionedMember(MEMBER_ID, LATER);
+        basecamp.removeMember(MEMBER_ID, RemovalCause.SANCTION, LATER);
         Instant updatedAt = basecamp.getUpdatedAt();
 
-        assertThat(basecamp.removeSanctionedMember(MEMBER_ID, LATER.plusSeconds(60)))
-                .isEqualTo(SanctionRemoval.NOTHING);
-        assertThat(basecamp.removeSanctionedMember(OUTSIDER_ID, LATER.plusSeconds(60)))
-                .isEqualTo(SanctionRemoval.NOTHING);
+        assertThat(basecamp.removeMember(MEMBER_ID, RemovalCause.SANCTION, LATER.plusSeconds(60)))
+                .isEqualTo(MemberRemoval.NOTHING);
+        assertThat(basecamp.removeMember(OUTSIDER_ID, RemovalCause.SANCTION, LATER.plusSeconds(60)))
+                .isEqualTo(MemberRemoval.NOTHING);
 
         assertThat(basecamp.getUpdatedAt()).isEqualTo(updatedAt);
     }
@@ -106,11 +106,58 @@ class SanctionRemovalTest {
         Basecamp canceled = aBasecamp().inState(BasecampStatus.CANCELED);
         Basecamp completed = aBasecamp().inState(BasecampStatus.COMPLETED);
 
-        assertThat(canceled.removeSanctionedMember(LEADER_ID, LATER)).isEqualTo(SanctionRemoval.NOTHING);
+        assertThat(canceled.removeMember(LEADER_ID, RemovalCause.SANCTION, LATER))
+                .isEqualTo(MemberRemoval.NOTHING);
         assertThat(canceled.getCancelReason()).isEqualTo(CancelReason.LEADER);
-        assertThat(completed.removeSanctionedMember(MEMBER_ID, LATER)).isEqualTo(SanctionRemoval.NOTHING);
+        assertThat(completed.removeMember(MEMBER_ID, RemovalCause.SANCTION, LATER))
+                .isEqualTo(MemberRemoval.NOTHING);
         assertThat(memberOf(completed, MEMBER_ID).isActive()).isTrue();
         assertThat(completed.getStatus()).isEqualTo(BasecampStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("[F-12][PV-02] 캠프 리더가 탈퇴하면 베이스캠프를 LEADER_WITHDRAWN으로 취소하고 대기 신청을 만료시킨다")
+    void leaderWithdrawnCancelsBasecamp() {
+        Basecamp basecamp = aBasecamp().inState(BasecampStatus.RECRUITING);
+
+        MemberRemoval removal = basecamp.removeMember(LEADER_ID, RemovalCause.WITHDRAWAL, LATER);
+
+        assertThat(removal).isEqualTo(MemberRemoval.LEADER_CANCELED);
+        assertThat(basecamp.getStatus()).isEqualTo(BasecampStatus.CANCELED);
+        assertThat(basecamp.getCancelReason()).isEqualTo(CancelReason.LEADER_WITHDRAWN);
+        assertThat(applicationOf(basecamp, APPLICANT_ID).getStatus()).isEqualTo(BasecampApplicationStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("[PV-02] 멤버가 탈퇴하면 LEFT가 되고 임박 탈퇴로 세지 않으며, 자동 마감한 베이스캠프는 다시 모집한다")
+    void withdrawnMemberLeavesWithoutEarlyLeave() {
+        Basecamp confirmed = aBasecamp().inState(BasecampStatus.CONFIRMED);
+        Instant withinWindow = DEFAULT_START_DATE.atStartOfDay(Basecamp.KOREA).toInstant();
+        Basecamp autoClosed = aBasecamp().autoClosed();
+
+        MemberRemoval removal = confirmed.removeMember(MEMBER_ID, RemovalCause.WITHDRAWAL, withinWindow);
+        autoClosed.removeMember(MEMBER_ID, RemovalCause.WITHDRAWAL, LATER);
+
+        assertThat(removal).isEqualTo(MemberRemoval.MEMBER_LEFT);
+        assertThat(memberOf(confirmed, MEMBER_ID).getStatus()).isEqualTo(BasecampMemberStatus.LEFT);
+        assertThat(memberOf(confirmed, MEMBER_ID).isEarlyLeave()).isFalse();
+        assertThat(confirmed.getStatus()).isEqualTo(BasecampStatus.CONFIRMED);
+        assertThat(autoClosed.getStatus()).isEqualTo(BasecampStatus.RECRUITING);
+    }
+
+    @Test
+    @DisplayName("[PV-02] 대기 중인 신청자가 탈퇴하면 신청이 CANCELED가 되고, 끝난 베이스캠프는 바꾸지 않는다")
+    void withdrawnApplicantIsCanceledAndFinishedUntouched() {
+        Basecamp basecamp = aBasecamp().inState(BasecampStatus.RECRUITING);
+        Basecamp canceled = aBasecamp().inState(BasecampStatus.CANCELED);
+
+        MemberRemoval removal = basecamp.removeMember(APPLICANT_ID, RemovalCause.WITHDRAWAL, LATER);
+
+        assertThat(removal).isEqualTo(MemberRemoval.APPLICATION_CANCELED);
+        assertThat(applicationOf(basecamp, APPLICANT_ID).getStatus()).isEqualTo(BasecampApplicationStatus.CANCELED);
+        assertThat(canceled.removeMember(LEADER_ID, RemovalCause.WITHDRAWAL, LATER))
+                .isEqualTo(MemberRemoval.NOTHING);
+        assertThat(canceled.getCancelReason()).isEqualTo(CancelReason.LEADER);
     }
 
     private static BasecampApplication applicationOf(Basecamp basecamp, long applicantId) {

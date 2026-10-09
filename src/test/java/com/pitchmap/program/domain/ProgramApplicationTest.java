@@ -23,12 +23,26 @@ class ProgramApplicationTest {
         ProgramApplication application = application(ProgramApplicationStatus.PENDING_PAYMENT);
         Instant cancelAt = NOW.plus(Duration.ofMinutes(3));
 
-        application.cancelBySanction(cancelAt);
+        application.cancelByMemberRemoval(ProgramCancelReason.SANCTIONED, cancelAt);
 
         assertThat(application.getStatus()).isEqualTo(ProgramApplicationStatus.CANCELED);
         assertThat(application.getCancelReason()).isEqualTo(ProgramCancelReason.SANCTIONED);
         assertThat(application.getCanceledAt()).isEqualTo(cancelAt);
         assertThat(application.getUpdatedAt()).isEqualTo(cancelAt);
+    }
+
+    @Test
+    @DisplayName("[PV-02] 결제 대기 신청은 탈퇴로 취소되면 사유 WITHDRAWN이 기록되고, 제재나 탈퇴가 아닌 사유는 받지 않는다")
+    void cancelsPendingByWithdrawal() {
+        ProgramApplication application = application(ProgramApplicationStatus.PENDING_PAYMENT);
+
+        assertThatThrownBy(() -> application.cancelByMemberRemoval(ProgramCancelReason.USER, NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+        application.cancelByMemberRemoval(ProgramCancelReason.WITHDRAWN, NOW);
+
+        assertThat(application.getStatus()).isEqualTo(ProgramApplicationStatus.CANCELED);
+        assertThat(application.getCancelReason()).isEqualTo(ProgramCancelReason.WITHDRAWN);
+        assertThat(application.getCanceledAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -39,7 +53,7 @@ class ProgramApplicationTest {
         }) {
             ProgramApplication application = application(status);
 
-            assertThatThrownBy(() -> application.cancelBySanction(NOW))
+            assertThatThrownBy(() -> application.cancelByMemberRemoval(ProgramCancelReason.SANCTIONED, NOW))
                     .isInstanceOfSatisfying(
                             ProgramException.class,
                             e -> assertThat(e.getErrorCode()).isEqualTo(ProgramErrorCode.PROGRAM_INVALID_STATE));

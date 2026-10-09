@@ -97,8 +97,8 @@ public class BasecampMember {
         this.updatedAt = now;
     }
 
-    // 제재 때문에 빠지는 멤버는 본인의 뜻으로 나가는 것이 아니다. 그래서 출발이 임박했어도 임박 탈퇴로 세지 않는다.
-    void removeBySanction(Instant now) {
+    // 제재를 받거나 회원 탈퇴 때문에 빠지는 멤버는 베이스캠프에서 스스로 나가는 것이 아니다. 그래서 출발이 임박했어도 임박 탈퇴로 세지 않는다.
+    void removeByCleanup(Instant now) {
         this.status = BasecampMemberStatus.LEFT;
         this.earlyLeave = false;
         this.leftAt = now;

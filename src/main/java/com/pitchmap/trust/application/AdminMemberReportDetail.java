@@ -7,6 +7,7 @@ import java.util.List;
 /**
  * 관리자 신고 상세. companionReview는 후기 신고일 때만 있고 회원 신고이면 null이다.
  * handledBy, handledAt, resultNote는 처리 전이면 null이다.
+ * 처리가 끝난 지 1년이 지나면 정리 작업이 content와 resultNote, 제재 이력의 reason을 지우므로 이 값들도 null일 수 있다.
  *
  * @param sanctionHistory 신고 대상 회원의 제재 이력(최신순). 기각된 신고가 만든 임시 정지는 뺀다
  */

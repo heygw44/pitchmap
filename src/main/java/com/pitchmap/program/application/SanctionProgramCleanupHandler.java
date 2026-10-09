@@ -2,6 +2,7 @@ package com.pitchmap.program.application;
 
 import com.pitchmap.common.outbox.OutboxEventHandler;
 import com.pitchmap.common.outbox.OutboxMessage;
+import com.pitchmap.program.domain.ProgramCancelReason;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,6 +31,6 @@ class SanctionProgramCleanupHandler implements OutboxEventHandler {
     // 이벤트의 aggregate ID가 제재를 받은 회원 ID라서 payload는 읽지 않는다.
     @Override
     public void handle(OutboxMessage message) {
-        cleanupService.cleanUp(message.aggregateId());
+        cleanupService.cleanUp(message.aggregateId(), ProgramCancelReason.SANCTIONED);
     }
 }
