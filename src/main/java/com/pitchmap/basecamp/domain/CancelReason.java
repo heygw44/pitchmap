@@ -4,5 +4,6 @@ package com.pitchmap.basecamp.domain;
 public enum CancelReason {
     LEADER,
     NOT_ENOUGH_MEMBERS,
-    LEADER_SANCTIONED
+    LEADER_SANCTIONED,
+    LEADER_WITHDRAWN
 }

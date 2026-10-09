@@ -106,15 +106,19 @@ public class ProgramApplication {
     }
 
     /**
-     * 호출하면 신청자가 이용 정지를 받아 결제 대기 신청을 CANCELED(사유 SANCTIONED)로 바꾸고 취소 시각을 now로 적는다.
-     * 결제 대기가 아닌 신청은 PROGRAM_INVALID_STATE를 던진다. 던지면 신청은 바뀌지 않는다.
+     * 호출하면 신청자가 이용 정지를 받았거나 탈퇴해서 결제 대기 신청을 CANCELED로 바꾸고 취소 이유를 reason으로, 취소 시각을 now로 적는다.
+     * reason은 {@link ProgramCancelReason#SANCTIONED}나 {@link ProgramCancelReason#WITHDRAWN}이어야 하고, 다른 값이면
+     * {@link IllegalArgumentException}을 던진다. 결제 대기가 아닌 신청은 PROGRAM_INVALID_STATE를 던진다. 던지면 신청은 바뀌지 않는다.
      */
-    public void cancelBySanction(Instant now) {
+    public void cancelByMemberRemoval(ProgramCancelReason reason, Instant now) {
+        if (reason != ProgramCancelReason.SANCTIONED && reason != ProgramCancelReason.WITHDRAWN) {
+            throw new IllegalArgumentException("제재나 탈퇴가 아닌 취소 이유입니다: " + reason);
+        }
         if (status != ProgramApplicationStatus.PENDING_PAYMENT) {
             throw new ProgramException(ProgramErrorCode.PROGRAM_INVALID_STATE);
         }
         this.status = ProgramApplicationStatus.CANCELED;
-        this.cancelReason = ProgramCancelReason.SANCTIONED;
+        this.cancelReason = reason;
         this.canceledAt = now;
         this.updatedAt = now;
     }

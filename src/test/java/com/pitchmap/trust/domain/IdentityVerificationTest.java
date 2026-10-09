@@ -3,6 +3,7 @@ package com.pitchmap.trust.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.Year;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +87,39 @@ class IdentityVerificationTest {
         assertThatThrownBy(() -> new CiHash("ABC")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new CiHash("A".repeat(64))).isInstanceOf(IllegalArgumentException.class);
         assertThat(CI_HASH.toString()).doesNotContain("aaaa");
+    }
+
+    @Test
+    @DisplayName("[PV-04][PV-05] 탈퇴하면 출생연도와 성별을 지우고 CI 해시는 남기며 보관 기한과 수정 시각을 적는다")
+    void withdrawErasesBirthYearAndGenderAndKeepsCiHash() {
+        IdentityVerification verification = verificationBornIn(1995);
+        Instant withdrawnAt = NOW.plus(Duration.ofDays(3));
+        Instant retainedUntil = IdentityVerification.ciRetainedUntil(withdrawnAt, false);
+
+        verification.withdraw(retainedUntil, withdrawnAt);
+
+        assertThat(verification.getBirthYear()).isNull();
+        assertThat(verification.getGender()).isNull();
+        assertThat(verification.getCiHash()).isEqualTo(CI_HASH);
+        assertThat(verification.getCiRetainedUntil()).isEqualTo(retainedUntil);
+        assertThat(verification.getUpdatedAt()).isEqualTo(withdrawnAt);
+        assertThat(verification.isAdult(THIS_YEAR)).isFalse();
+    }
+
+    @Test
+    @DisplayName("[PV-05] CI 해시 보관 기한은 제재 이력이 없으면 30일, 있으면 365일 뒤다")
+    void ciRetentionDependsOnSanctionHistory() {
+        assertThat(IdentityVerification.ciRetainedUntil(NOW, false)).isEqualTo(NOW.plus(Duration.ofDays(30)));
+        assertThat(IdentityVerification.ciRetainedUntil(NOW, true)).isEqualTo(NOW.plus(Duration.ofDays(365)));
+    }
+
+    @Test
+    @DisplayName("[PV-05] 보관 기한이나 수정 시각이 null이면 탈퇴 처리할 수 없다")
+    void withdrawRejectsNull() {
+        IdentityVerification verification = verificationBornIn(1995);
+
+        assertThatThrownBy(() -> verification.withdraw(null, NOW)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> verification.withdraw(NOW, null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static IdentityVerification verificationBornIn(int birthYear) {

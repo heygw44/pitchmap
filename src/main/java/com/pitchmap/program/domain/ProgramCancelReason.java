@@ -8,6 +8,8 @@ public enum ProgramCancelReason {
     EXPIRED,
     /** 회원이 제재를 받아 취소됐다. */
     SANCTIONED,
+    /** 회원이 탈퇴해서 취소됐다. */
+    WITHDRAWN,
     /** 관리자가 행사를 취소해서 함께 취소됐다. */
     PROGRAM_CANCELED
 }

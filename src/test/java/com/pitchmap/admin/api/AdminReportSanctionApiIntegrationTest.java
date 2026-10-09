@@ -14,6 +14,7 @@ import com.pitchmap.trust.application.CompanionReviewQueryService;
 import com.pitchmap.trust.application.MemberReportCommand;
 import com.pitchmap.trust.application.MemberReportFixture;
 import com.pitchmap.trust.application.MemberReportService;
+import com.pitchmap.trust.application.ReportContentCleanupService;
 import com.pitchmap.trust.application.SanctionConfirmCommand;
 import com.pitchmap.trust.application.SanctionConfirmService;
 import com.pitchmap.trust.domain.ReportKind;
@@ -23,6 +24,8 @@ import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +73,9 @@ class AdminReportSanctionApiIntegrationTest {
 
     @Autowired
     private SanctionConfirmService sanctionConfirmService;
+
+    @Autowired
+    private ReportContentCleanupService reportContentCleanupService;
 
     @Autowired
     private CompanionReviewQueryService companionReviewQueryService;
@@ -189,6 +195,37 @@ class AdminReportSanctionApiIntegrationTest {
         assertThat(statuses).containsExactly("ACTIVE", "ACTIVE");
         assertThat(actionedDetail).bodyJson().extractingPath("$.status").isEqualTo("IN_REVIEW");
         assertThat(dismissedDetail).bodyJson().extractingPath("$.status").isEqualTo("DISMISSED");
+    }
+
+    @Test
+    @DisplayName("[F-21][PV-07] 정리 작업이 내용을 지운 신고의 상세는 200이고 content, resultNote, 제재 이력의 reason이 null이다")
+    void detailIsOkAfterContentCleanup() {
+        long reportId = insertReport("NO_SHOW", "ACTIONED", BASE);
+        jdbc.update(
+                "UPDATE member_report SET handled_at = ?, result_note = '메모' WHERE id = ?",
+                LocalDateTime.ofInstant(BASE, ZoneOffset.UTC),
+                reportId);
+        sanctionConfirmService.confirm(new SanctionConfirmCommand(targetId, null, SanctionType.WARNING, "욕설", adminId));
+        jdbc.update(
+                "UPDATE sanction SET starts_at = ? WHERE member_id = ?",
+                LocalDateTime.ofInstant(BASE, ZoneOffset.UTC),
+                targetId);
+        clock.advance(Duration.ofDays(400));
+
+        reportContentCleanupService.clearExpiredContent();
+        MvcTestResult result = get(REPORTS + "/" + reportId);
+
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.content").isNull();
+        assertThat(result).bodyJson().extractingPath("$.resultNote").isNull();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.sanctionHistory[0].reason")
+                .isNull();
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.sanctionHistory[0].type")
+                .isEqualTo("WARNING");
     }
 
     @Test

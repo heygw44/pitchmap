@@ -7,6 +7,7 @@ import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import com.pitchmap.notification.application.OutboxPublisher;
+import com.pitchmap.program.domain.ProgramCancelReason;
 import com.pitchmap.trust.application.SanctionConfirmCommand;
 import com.pitchmap.trust.application.SanctionConfirmService;
 import com.pitchmap.trust.domain.SanctionType;
@@ -67,7 +68,7 @@ class ProgramSanctionCleanupIntegrationTest {
         long otherConfirmed = fixture.saveApplication(programC, other, "CONFIRMED");
 
         // when
-        cleanupService.cleanUp(member);
+        cleanupService.cleanUp(member, ProgramCancelReason.SANCTIONED);
 
         // then
         assertThat(fixture.applicationStatus(pendingA)).isEqualTo("CANCELED");
@@ -102,7 +103,7 @@ class ProgramSanctionCleanupIntegrationTest {
         fixture.saveApplication(programId, member, "PENDING_PAYMENT");
         fixture.saveVacancyAlert(programId, waiting);
 
-        cleanupService.cleanUp(member);
+        cleanupService.cleanUp(member, ProgramCancelReason.SANCTIONED);
 
         List<String> payloads = fixture.seatReleasedPayloads(programId);
         assertThat(payloads).hasSize(1);
@@ -118,13 +119,13 @@ class ProgramSanctionCleanupIntegrationTest {
         long programB = fixture.saveProgram(3, false);
         long pending = fixture.saveApplication(programA, member, "PENDING_PAYMENT");
         long confirmed = fixture.saveApplication(programB, member, "CONFIRMED");
-        cleanupService.cleanUp(member);
+        cleanupService.cleanUp(member, ProgramCancelReason.SANCTIONED);
         LocalDateTime firstReviewAt = reviewRequestedAt(confirmed);
         LocalDateTime firstCanceledAt = jdbc.queryForObject(
                 "SELECT canceled_at FROM program_application WHERE id = ?", LocalDateTime.class, pending);
 
         clock.advance(Duration.ofHours(1));
-        cleanupService.cleanUp(member);
+        cleanupService.cleanUp(member, ProgramCancelReason.SANCTIONED);
 
         assertThat(fixture.outboxCount("PROGRAM_APPLICATION_CANCELED", pending)).isEqualTo(1);
         assertThat(reviewRequestedAt(confirmed)).isEqualTo(firstReviewAt);
