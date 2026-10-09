@@ -25,6 +25,7 @@ import com.pitchmap.program.application.ProgramListQuery;
 import com.pitchmap.program.application.ProgramPage;
 import com.pitchmap.program.application.ProgramQueryService;
 import com.pitchmap.program.application.ProgramSummary;
+import com.pitchmap.program.application.ProgramVacancyAlertService;
 import com.pitchmap.program.domain.ProgramErrorCode;
 import com.pitchmap.program.domain.ProgramException;
 import com.pitchmap.program.domain.ProgramPhase;
@@ -66,6 +67,9 @@ class ProgramControllerTest {
 
     @MockitoBean
     private ProgramApplyService programApplyService;
+
+    @MockitoBean
+    private ProgramVacancyAlertService programVacancyAlertService;
 
     @MockitoBean
     private IdempotencyRecordJpaRepository idempotencyRecordRepository;
@@ -238,6 +242,67 @@ class ProgramControllerTest {
         assertError(2L, HttpStatus.BAD_REQUEST, "PROGRAM_NOT_IN_APPLY_PERIOD");
         assertError(3L, HttpStatus.CONFLICT, "PROGRAM_SOLD_OUT");
         assertError(4L, HttpStatus.FORBIDDEN, "TRUST_LEVEL_INSUFFICIENT");
+    }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 빈자리 알림을 새로 신청하면 201, 이미 신청한 상태이면 200이고 본문은 없다")
+    void subscribeVacancyAlertReturnsCreatedOrOk() {
+        when(programVacancyAlertService.subscribe(4L, 9L)).thenReturn(true);
+        when(programVacancyAlertService.subscribe(4L, 10L)).thenReturn(false);
+
+        MvcTestResult created = vacancyAlertPost(9L).with(member(4L)).exchange();
+        MvcTestResult existing = vacancyAlertPost(10L).with(member(4L)).exchange();
+
+        assertThat(created).hasStatus(HttpStatus.CREATED);
+        assertThat(created).body().isEmpty();
+        assertThat(existing).hasStatus(HttpStatus.OK);
+        assertThat(existing).body().isEmpty();
+    }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 빈자리 알림을 해제하면 204이다")
+    void unsubscribeVacancyAlertReturnsNoContent() {
+        MvcTestResult result = mvc.delete()
+                .uri("/api/programs/9/vacancy-alerts")
+                .with(csrf())
+                .with(member(4L))
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.NO_CONTENT);
+        verify(programVacancyAlertService).unsubscribe(4L, 9L);
+    }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 로그인하지 않고 빈자리 알림을 신청하거나 해제하면 401 AUTHENTICATION_REQUIRED이다")
+    void vacancyAlertRequiresLogin() {
+        MvcTestResult subscribe = vacancyAlertPost(9L).exchange();
+        MvcTestResult unsubscribe =
+                mvc.delete().uri("/api/programs/9/vacancy-alerts").with(csrf()).exchange();
+
+        assertThat(subscribe).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(subscribe).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
+        assertThat(unsubscribe).hasStatus(HttpStatus.UNAUTHORIZED);
+        verifyNoInteractions(programVacancyAlertService);
+    }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 서비스가 던진 NOT_FOUND와 PROGRAM_INVALID_STATE를 404와 409로 응답한다")
+    void subscribeVacancyAlertMapsServiceErrors() {
+        when(programVacancyAlertService.subscribe(4L, 1L)).thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+        when(programVacancyAlertService.subscribe(4L, 2L))
+                .thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_INVALID_STATE));
+
+        MvcTestResult notFound = vacancyAlertPost(1L).with(member(4L)).exchange();
+        MvcTestResult invalidState = vacancyAlertPost(2L).with(member(4L)).exchange();
+
+        assertThat(notFound).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(notFound).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+        assertThat(invalidState).hasStatus(HttpStatus.CONFLICT);
+        assertThat(invalidState).bodyJson().extractingPath("$.code").isEqualTo("PROGRAM_INVALID_STATE");
+    }
+
+    private MockMvcTester.MockMvcRequestBuilder vacancyAlertPost(long programId) {
+        return mvc.post().uri("/api/programs/" + programId + "/vacancy-alerts").with(csrf());
     }
 
     private void assertError(long programId, HttpStatus status, String code) {

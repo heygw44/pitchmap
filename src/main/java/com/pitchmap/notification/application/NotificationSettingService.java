@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationSettingService {
 
     /** 설정할 수 있는 알림 종류의 수다. 요청 목록 길이의 상한으로 쓴다. */
-    public static final int TYPE_COUNT = 13;
+    public static final int TYPE_COUNT = 14;
 
     private final NotificationSettingRepository notificationSettingRepository;
 

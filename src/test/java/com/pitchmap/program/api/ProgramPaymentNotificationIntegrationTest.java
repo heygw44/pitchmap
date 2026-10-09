@@ -149,6 +149,34 @@ class ProgramPaymentNotificationIntegrationTest {
         assertThat(fixture.applicationStatus(applicationId)).isEqualTo("EXPIRED");
     }
 
+    @Test
+    @DisplayName("[F-20][PG-07] 신청을 취소하고 이벤트를 발행하면 빈자리 알림을 신청한 회원의 알림함에 빈자리 알림이 생긴다")
+    void seatReleasedNotifiesSubscriberAfterPublish() {
+        // given
+        Member subscriber = memberRepository.saveAndFlush(
+                aMember().passwordHash(passwordEncoder.encode(PASSWORD)).build());
+        Cookie subscriberSession = login(subscriber);
+        long applicationId = fixture.saveApplication(programId, applicant.getId(), "PENDING_PAYMENT");
+        fixture.saveVacancyAlert(programId, subscriber.getId());
+
+        // when
+        MvcTestResult canceled = mvc.post()
+                .uri("/api/program-applications/" + applicationId + "/cancel")
+                .with(csrf())
+                .cookie(session)
+                .exchange();
+        outboxPublisher.publishPending();
+
+        // then
+        assertThat(canceled).hasStatus(HttpStatus.OK);
+        MvcTestResult inbox =
+                mvc.get().uri("/api/me/notifications").cookie(subscriberSession).exchange();
+        assertThat(inbox).hasStatus(HttpStatus.OK);
+        assertThat(inbox).bodyJson().extractingPath("$.content.length()").isEqualTo(1);
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].type").isEqualTo("PROGRAM_SEAT_RELEASED");
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].link").isEqualTo("/programs/" + programId);
+    }
+
     private Cookie login(Member member) {
         MvcTestResult result = mvc.post()
                 .uri("/api/auth/login")

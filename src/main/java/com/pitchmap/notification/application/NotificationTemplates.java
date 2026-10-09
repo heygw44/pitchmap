@@ -150,6 +150,18 @@ final class NotificationTemplates {
                 programLink(payload.programId())));
     }
 
+    /** 호출하면 빈자리 알림을 신청한 회원마다 알림을 하나씩 만든다. */
+    static List<NotificationDraft> programSeatReleased(NotificationPayloads.ProgramSeatReleased payload) {
+        return payload.memberIds().stream()
+                .map(memberId -> new NotificationDraft(
+                        memberId,
+                        NotificationEventTypes.PROGRAM_SEAT_RELEASED,
+                        "행사 빈자리 알림",
+                        "신청한 행사에 빈자리가 생겼습니다. 자리는 먼저 신청한 회원에게 돌아갑니다.",
+                        programLink(payload.programId())))
+                .toList();
+    }
+
     private static String sanctionBody(NotificationPayloads.SanctionConfirmed payload) {
         return switch (payload.sanctionType()) {
             case "WARNING" -> "경고를 받았습니다.";

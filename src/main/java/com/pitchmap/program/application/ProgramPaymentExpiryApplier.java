@@ -1,6 +1,10 @@
 package com.pitchmap.program.application;
 
+import com.pitchmap.common.error.BusinessException;
+import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.outbox.OutboxEventRecorder;
+import com.pitchmap.program.domain.Program;
+import com.pitchmap.program.domain.ProgramRepository;
 import com.pitchmap.program.infra.ExpiryTarget;
 import com.pitchmap.program.infra.ProgramPaymentExpiryMapper;
 import java.time.Instant;
@@ -20,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>결제, 본인 취소, 행사 취소, 다른 서버의 만료와 겹쳐도 한 번만 처리하도록 엔티티를 읽지 않고 상태와 기한을 건 UPDATE로 바꾼다.
  * 다른 트랜잭션이 같은 행을 잠그고 있으면 UPDATE가 기다린 뒤 최신 커밋 값으로 조건을 다시 평가한다.
  * 그래서 결제가 먼저 확정했다면 영향받은 행이 0이고 이 메서드는 아무것도 기록하지 않는다.
+ * 만료가 성립하면 신청자에게 알리는 이벤트와 함께, 돌아온 자리를 빈자리 알림 신청자에게 알리는 이벤트도 기록한다.
  */
 @Slf4j
 @Component
@@ -28,6 +33,8 @@ public class ProgramPaymentExpiryApplier {
 
     private final ProgramPaymentExpiryMapper expiryMapper;
     private final OutboxEventRecorder outboxEventRecorder;
+    private final ProgramRepository programRepository;
+    private final ProgramSeatReleaseRecorder seatReleaseRecorder;
 
     /**
      * 호출하면 결제 기한이 now 이하인 결제 대기 신청을 만료로 바꾸고, 신청자에게 알릴 이벤트를 같은 트랜잭션에서 기록한 뒤 true를 돌려준다.
@@ -44,6 +51,11 @@ public class ProgramPaymentExpiryApplier {
                 target.applicationId(),
                 new ProgramApplicationEvents.ExpiredPayload(
                         target.applicationId(), target.memberId(), target.programId()));
+        // 행사 행은 잠그지 않고 읽기만 한다. 관리자의 행사 취소가 행사 행을 먼저 잠그므로 여기서 잠그면 잠금 순환이 생길 수 있다.
+        Program program = programRepository
+                .findById(target.programId())
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        seatReleaseRecorder.record(program, now);
         log.info("program application expired applicationId={} memberId={}", target.applicationId(), target.memberId());
         return true;
     }
