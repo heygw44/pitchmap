@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.program.infra.ProgramPaymentExpiryMapper">
+
+    <!-- 마지막으로 읽은 ID 뒤부터 읽어서, 처리하지 못하고 남은 신청이 있어도 같은 행을 다시 읽지 않는다.
+         기한 정각부터 만료이므로 payment_due_at이 now와 같은 신청도 포함한다. -->
+    <select id="selectDueTargets" resultType="com.pitchmap.program.infra.ExpiryTarget">
+        SELECT id AS application_id,
+               member_id AS member_id,
+               program_id AS program_id
+        FROM program_application
+        WHERE status = 'PENDING_PAYMENT'
+          AND payment_due_at &lt;= #{now}
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <update id="expireIfDue">
+        UPDATE program_application
+        SET status = 'EXPIRED',
+            cancel_reason = 'EXPIRED',
+            canceled_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{id}
+          AND status = 'PENDING_PAYMENT'
+          AND payment_due_at &lt;= #{now}
+    </update>
+
+</mapper>

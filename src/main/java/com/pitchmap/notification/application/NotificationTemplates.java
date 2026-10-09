@@ -140,6 +140,16 @@ final class NotificationTemplates {
                 programLink(payload.programId())));
     }
 
+    /** 호출하면 결제 기한이 지나 행사 신청이 만료됐다고 신청자에게 알리는 알림을 만든다. */
+    static List<NotificationDraft> programApplicationExpired(NotificationPayloads.ProgramApplicationExpired payload) {
+        return List.of(new NotificationDraft(
+                payload.memberId(),
+                NotificationEventTypes.PROGRAM_APPLICATION_EXPIRED,
+                "행사 신청 만료",
+                "결제 기한이 지나 행사 신청이 취소됐습니다.",
+                programLink(payload.programId())));
+    }
+
     private static String sanctionBody(NotificationPayloads.SanctionConfirmed payload) {
         return switch (payload.sanctionType()) {
             case "WARNING" -> "경고를 받았습니다.";

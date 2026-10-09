@@ -35,4 +35,7 @@ final class NotificationPayloads {
     /** 행사 신청 취소 이벤트. reason은 USER(본인 취소) 또는 PROGRAM_CANCELED(행사 취소)이고, refunded는 결제를 환불했는지 여부다. */
     record ProgramApplicationCanceled(
             long applicationId, long memberId, long programId, String reason, boolean refunded) {}
+
+    /** 행사 신청 만료 이벤트. 결제 기한이 지나 만료된 신청의 신청자에게 알린다. */
+    record ProgramApplicationExpired(long applicationId, long memberId, long programId) {}
 }

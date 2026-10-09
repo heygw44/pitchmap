@@ -5,11 +5,13 @@ import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
+import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.member.application.EmailVerificationService;
 import com.pitchmap.member.domain.Member;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import com.pitchmap.notification.application.OutboxPublisher;
 import com.pitchmap.program.application.ProgramApplyFixture;
+import com.pitchmap.program.application.ProgramPaymentExpiryService;
 import jakarta.servlet.http.Cookie;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,9 @@ class ProgramPaymentNotificationIntegrationTest {
 
     @Autowired
     private OutboxPublisher outboxPublisher;
+
+    @Autowired
+    private ProgramPaymentExpiryService paymentExpiryService;
 
     private ProgramApplyFixture fixture;
     private Member applicant;
@@ -119,6 +124,29 @@ class ProgramPaymentNotificationIntegrationTest {
         assertThat(inbox).bodyJson().extractingPath("$.content[0].type").isEqualTo("PROGRAM_APPLICATION_CANCELED");
         assertThat(inbox).bodyJson().extractingPath("$.content[0].body").isEqualTo("행사 신청을 취소했습니다. 결제한 금액은 환불됩니다.");
         assertThat(inbox).bodyJson().extractingPath("$.content[0].link").isEqualTo("/programs/" + programId);
+    }
+
+    @Test
+    @DisplayName("[F-19][F-20][PG-05] 결제 기한이 지나 만료되고 이벤트를 발행하면 신청자의 알림함에 행사 신청 만료 알림이 1건 생긴다")
+    void expiryNotifiesApplicantAfterPublish() {
+        // given
+        long applicationId = fixture.saveApplication(
+                programId, applicant.getId(), "PENDING_PAYMENT", MutableClock.DEFAULT_INSTANT.minusSeconds(60));
+
+        // when
+        paymentExpiryService.run();
+        outboxPublisher.publishPending();
+
+        // then
+        MvcTestResult inbox =
+                mvc.get().uri("/api/me/notifications").cookie(session).exchange();
+        assertThat(inbox).hasStatus(HttpStatus.OK);
+        assertThat(inbox).bodyJson().extractingPath("$.content.length()").isEqualTo(1);
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].type").isEqualTo("PROGRAM_APPLICATION_EXPIRED");
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].title").isEqualTo("행사 신청 만료");
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].body").isEqualTo("결제 기한이 지나 행사 신청이 취소됐습니다.");
+        assertThat(inbox).bodyJson().extractingPath("$.content[0].link").isEqualTo("/programs/" + programId);
+        assertThat(fixture.applicationStatus(applicationId)).isEqualTo("EXPIRED");
     }
 
     private Cookie login(Member member) {

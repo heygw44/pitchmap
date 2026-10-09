@@ -627,7 +627,8 @@ export type NotificationType =
   | 'MEMBER_REPORT_RESOLVED'
   | 'SANCTION_CONFIRMED'
   | 'PROGRAM_APPLICATION_CONFIRMED'
-  | 'PROGRAM_APPLICATION_CANCELED';
+  | 'PROGRAM_APPLICATION_CANCELED'
+  | 'PROGRAM_APPLICATION_EXPIRED';
 
 export interface NotificationItem {
   notificationId: number;

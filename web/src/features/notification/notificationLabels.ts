@@ -14,6 +14,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'SANCTION_CONFIRMED',
   'PROGRAM_APPLICATION_CONFIRMED',
   'PROGRAM_APPLICATION_CANCELED',
+  'PROGRAM_APPLICATION_EXPIRED',
 ];
 
 export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
@@ -29,4 +30,5 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   SANCTION_CONFIRMED: '내게 제재가 확정됐을 때',
   PROGRAM_APPLICATION_CONFIRMED: '행사 신청이 결제로 확정됐을 때',
   PROGRAM_APPLICATION_CANCELED: '행사 신청이 취소됐을 때',
+  PROGRAM_APPLICATION_EXPIRED: '행사 신청이 결제 기한이 지나 만료됐을 때',
 };
