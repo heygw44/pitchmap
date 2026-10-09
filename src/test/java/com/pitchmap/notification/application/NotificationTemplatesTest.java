@@ -274,4 +274,15 @@ class NotificationTemplatesTest {
                         new NotificationPayloads.ProgramApplicationCanceled(1L, 2L, 9L, "UNKNOWN", false)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("[F-19][F-20][PG-05] 행사 신청 만료 알림은 신청자에게만 가고 링크는 행사 화면이다")
+    void programApplicationExpiredNotifiesApplicant() {
+        List<NotificationDraft> drafts = NotificationTemplates.programApplicationExpired(
+                new NotificationPayloads.ProgramApplicationExpired(1L, 2L, 9L));
+
+        assertThat(drafts)
+                .containsExactly(new NotificationDraft(
+                        2L, "PROGRAM_APPLICATION_EXPIRED", "행사 신청 만료", "결제 기한이 지나 행사 신청이 취소됐습니다.", "/programs/9"));
+    }
 }
