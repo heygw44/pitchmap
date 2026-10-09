@@ -1,6 +1,7 @@
 package com.pitchmap.program.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pitchmap.common.testsupport.MutableClock;
@@ -251,6 +252,81 @@ class ProgramTest {
         program.cancel(NOW);
 
         assertThat(program.phaseAt(open)).isEqualTo(ProgramPhase.CANCELED);
+    }
+
+    @Test
+    @DisplayName("[F-18][PG-03] 신청 시작 직전은 PROGRAM_NOT_IN_APPLY_PERIOD, 신청 시작 시각부터 마감 직전까지는 통과한다")
+    void applicableFromOpenUntilJustBeforeClose() {
+        Program program = create(details());
+        Instant open = program.getApplyOpenAt();
+        Instant close = program.getApplyCloseAt();
+
+        assertThatThrownBy(() -> program.requireApplicableAt(open.minusNanos(1000)))
+                .isInstanceOfSatisfying(
+                        ProgramException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ProgramErrorCode.PROGRAM_NOT_IN_APPLY_PERIOD));
+        assertThatCode(() -> program.requireApplicableAt(open)).doesNotThrowAnyException();
+        assertThatCode(() -> program.requireApplicableAt(close.minusNanos(1000)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("[F-18][PG-03] 신청 마감 시각부터는 PROGRAM_NOT_IN_APPLY_PERIOD이다")
+    void notApplicableFromCloseAt() {
+        Program program = create(details());
+
+        assertThatThrownBy(() -> program.requireApplicableAt(program.getApplyCloseAt()))
+                .isInstanceOfSatisfying(
+                        ProgramException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ProgramErrorCode.PROGRAM_NOT_IN_APPLY_PERIOD));
+    }
+
+    @Test
+    @DisplayName("[F-18] 취소된 행사는 신청 기간 안이어도 PROGRAM_INVALID_STATE이다")
+    void canceledProgramIsInvalidState() {
+        Program program = create(details());
+        program.cancel(NOW);
+
+        assertThatThrownBy(() -> program.requireApplicableAt(program.getApplyOpenAt()))
+                .isInstanceOfSatisfying(
+                        ProgramException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ProgramErrorCode.PROGRAM_INVALID_STATE));
+    }
+
+    @Test
+    @DisplayName("[F-18][PG-04] 결제 기한은 신청 시각에 결제 기한(분)을 더한 시각이다")
+    void paymentDueAtAddsDeadlineMinutes() {
+        Program program = create(detail("제목", "설명", "장소", 20, 30000, 45));
+
+        assertThat(program.paymentDueAt(NOW)).isEqualTo(NOW.plus(Duration.ofMinutes(45)));
+    }
+
+    @Test
+    @DisplayName("[F-18][PG-02] 숙박 행사는 신뢰 단계 1 이상만, 숙박 없는 행사는 단계 0도 신청할 수 있다")
+    void overnightRequiresTrustLevelOne() {
+        Program overnight = create(details());
+        Program dayTrip = create(withOvernight(false));
+
+        assertThat(overnight.isTrustLevelSufficient(0)).isFalse();
+        assertThat(overnight.isTrustLevelSufficient(1)).isTrue();
+        assertThat(dayTrip.isTrustLevelSufficient(0)).isTrue();
+    }
+
+    private static ProgramDetails withOvernight(boolean overnight) {
+        ProgramDetails base = details();
+        return new ProgramDetails(
+                base.title(),
+                base.description(),
+                base.spotId(),
+                base.locationText(),
+                base.startAt(),
+                base.endAt(),
+                base.capacity(),
+                base.fee(),
+                base.applyOpenAt(),
+                base.applyCloseAt(),
+                base.paymentDeadlineMinutes(),
+                overnight);
     }
 
     private static Program create(ProgramDetails details) {

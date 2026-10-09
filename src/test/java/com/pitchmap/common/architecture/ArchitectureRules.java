@@ -49,6 +49,7 @@ public final class ArchitectureRules {
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
             "admin", Set.of("trust", "program", "spot", "member"),
             "basecamp", Set.of("trust", "spot"),
+            "program", Set.of("trust"),
             "review", Set.of("spot"),
             "spot", Set.of("weather"),
             "publicdata", Set.of("spot"),

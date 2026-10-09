@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ public class Program {
     public static final int PAYMENT_DEADLINE_MINUTES_MIN = 1;
     public static final int PAYMENT_DEADLINE_MINUTES_MAX = 1440;
     public static final int DEFAULT_PAYMENT_DEADLINE_MINUTES = 15;
+    public static final int MIN_TRUST_LEVEL_FOR_OVERNIGHT = 1;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -184,6 +186,28 @@ public class Program {
     /** 호출하면 now 시점의 공개 진행 단계를 돌려준다. */
     public ProgramPhase phaseAt(Instant now) {
         return ProgramPhase.of(status, applyOpenAt, applyCloseAt, now);
+    }
+
+    /**
+     * 호출하면 now에 신청을 받는 행사인지 검사한다. 취소된 행사이면 PROGRAM_INVALID_STATE, 신청 시작 전이거나 마감 뒤이면
+     * PROGRAM_NOT_IN_APPLY_PERIOD를 던진다.
+     */
+    public void requireApplicableAt(Instant now) {
+        switch (phaseAt(now)) {
+            case CANCELED -> throw new ProgramException(ProgramErrorCode.PROGRAM_INVALID_STATE);
+            case UPCOMING, CLOSED -> throw new ProgramException(ProgramErrorCode.PROGRAM_NOT_IN_APPLY_PERIOD);
+            case OPEN -> {}
+        }
+    }
+
+    /** 호출하면 신뢰 단계가 trustLevel인 회원이 이 행사에 신청할 자격이 있는지 돌려준다. 숙박 행사만 단계 1 이상을 요구한다. */
+    public boolean isTrustLevelSufficient(int trustLevel) {
+        return !overnight || trustLevel >= MIN_TRUST_LEVEL_FOR_OVERNIGHT;
+    }
+
+    /** 호출하면 now에 신청한 회원의 결제 기한을 돌려준다. */
+    public Instant paymentDueAt(Instant now) {
+        return now.plus(Duration.ofMinutes(paymentDeadlineMinutes));
     }
 
     // 고친 뒤의 값을 영속 상태가 아닌 임시 객체에 모아서, 검사에 실패하면 이 행사를 건드리지 않게 한다.
