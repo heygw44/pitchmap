@@ -50,4 +50,26 @@ public interface ProgramApplicationJpaRepository
             """)
     int cancelActiveByProgram(
             @Param("programId") long programId, @Param("reason") ProgramCancelReason reason, @Param("now") Instant now);
+
+    @Override
+    @Query("""
+            select a.id from ProgramApplication a
+            where a.memberId = :memberId
+              and a.status = com.pitchmap.program.domain.ProgramApplicationStatus.PENDING_PAYMENT
+            order by a.id
+            """)
+    List<Long> findPendingPaymentIdsByMember(@Param("memberId") long memberId);
+
+    // 확인 요청 시각이 비어 있는 확정 신청만 조건으로 걸어, 같은 문장을 다시 실행해도 처음 기록한 시각이 바뀌지 않게 한다.
+    @Override
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update ProgramApplication a
+            set a.reviewRequestedAt = :now,
+                a.updatedAt = :now
+            where a.memberId = :memberId
+              and a.status = com.pitchmap.program.domain.ProgramApplicationStatus.CONFIRMED
+              and a.reviewRequestedAt is null
+            """)
+    int requestReviewForConfirmed(@Param("memberId") long memberId, @Param("now") Instant now);
 }

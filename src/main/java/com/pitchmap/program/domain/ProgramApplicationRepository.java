@@ -24,4 +24,13 @@ public interface ProgramApplicationRepository {
      * 이 쿼리로 바꾼 신청의 엔티티는 같은 트랜잭션에서 계속 쓰지 않는다.
      */
     int cancelActiveByProgram(long programId, ProgramCancelReason reason, Instant now);
+
+    /** 호출하면 memberId인 회원의 결제 대기 신청 ID를 ID 순서로 돌려준다. 잠금은 잡지 않는다. */
+    List<Long> findPendingPaymentIdsByMember(long memberId);
+
+    /**
+     * 호출하면 memberId인 회원의 확정 신청 중 아직 확인 요청 시각이 없는 신청에 확인 요청 시각을 now로 적고, 바꾼 신청 수를 돌려준다.
+     * 이미 시각이 있는 신청은 건드리지 않으므로 다시 호출해도 처음 시각이 남는다. 이 쿼리로 바꾼 신청의 엔티티는 같은 트랜잭션에서 계속 쓰지 않는다.
+     */
+    int requestReviewForConfirmed(long memberId, Instant now);
 }

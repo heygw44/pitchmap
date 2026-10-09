@@ -14,4 +14,5 @@ public record ProgramApplicantRow(
         Instant confirmedAt,
         Instant canceledAt,
         ProgramCancelReason cancelReason,
+        Instant reviewRequestedAt,
         Instant createdAt) {}

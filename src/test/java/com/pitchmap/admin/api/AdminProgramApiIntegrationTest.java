@@ -13,6 +13,7 @@ import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -250,6 +251,18 @@ class AdminProgramApiIntegrationTest {
         assertThat(all).bodyJson().doesNotHavePath("$.content[0].member.email");
         assertThat(all).bodyJson().extractingPath("$.content[0].status").isEqualTo("PENDING_PAYMENT");
         assertThat(all).bodyJson().extractingPath("$.content[0].cancelReason").isNull();
+        assertThat(all)
+                .bodyJson()
+                .extractingPath("$.content[0].reviewRequestedAt")
+                .isNull();
+        jdbc.update(
+                "UPDATE program_application SET review_requested_at = ? WHERE id = ?",
+                LocalDateTime.of(2026, 10, 5, 4, 0),
+                second);
+        assertThat(get(ADMIN_PROGRAMS + "/" + programId + "/applications"))
+                .bodyJson()
+                .extractingPath("$.content[1].reviewRequestedAt")
+                .isEqualTo("2026-10-05T04:00:00Z");
         assertThat(unknown).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(get(ADMIN_PROGRAMS + "/999999/applications")).hasStatus(HttpStatus.NOT_FOUND);
     }

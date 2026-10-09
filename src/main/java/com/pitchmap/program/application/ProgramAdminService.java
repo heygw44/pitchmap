@@ -250,6 +250,7 @@ public class ProgramAdminService {
                 row.confirmedAt(),
                 row.canceledAt(),
                 row.cancelReason() == null ? null : row.cancelReason().name(),
+                row.reviewRequestedAt(),
                 row.createdAt());
     }
 }

@@ -255,7 +255,8 @@ class NotificationTemplatesTest {
         "USER, false, 행사 신청을 취소했습니다.",
         "USER, true, 행사 신청을 취소했습니다. 결제한 금액은 환불됩니다.",
         "PROGRAM_CANCELED, false, 행사가 취소되어 신청이 취소됐습니다.",
-        "PROGRAM_CANCELED, true, 행사가 취소되어 신청이 취소됐습니다. 결제한 금액은 환불됩니다."
+        "PROGRAM_CANCELED, true, 행사가 취소되어 신청이 취소됐습니다. 결제한 금액은 환불됩니다.",
+        "SANCTIONED, false, 이용 제재로 행사 신청이 취소됐습니다."
     })
     @DisplayName("[F-19][F-20] 행사 신청 취소 알림 본문은 취소 사유로 나뉘고, 환불했으면 환불 문장이 붙는다")
     void programApplicationCanceledBodyDependsOnReasonAndRefund(String reason, boolean refunded, String body) {

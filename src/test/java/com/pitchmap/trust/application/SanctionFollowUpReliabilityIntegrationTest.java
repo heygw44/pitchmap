@@ -11,6 +11,7 @@ import com.pitchmap.common.testsupport.TestSequence;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import com.pitchmap.notification.application.OutboxProperties;
 import com.pitchmap.notification.application.OutboxPublisher;
+import com.pitchmap.program.application.ProgramSanctionCleanupService;
 import com.pitchmap.trust.domain.SanctionType;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +26,9 @@ class SanctionFollowUpReliabilityIntegrationTest {
 
     @MockitoBean
     private BasecampSanctionCleanupService cleanupService;
+
+    @MockitoBean
+    private ProgramSanctionCleanupService programCleanupService;
 
     @Autowired
     private SanctionConfirmService sanctionConfirmService;
@@ -46,7 +50,7 @@ class SanctionFollowUpReliabilityIntegrationTest {
 
     @AfterEach
     void resetMock() {
-        reset(cleanupService);
+        reset(cleanupService, programCleanupService);
     }
 
     @Test
@@ -63,8 +67,8 @@ class SanctionFollowUpReliabilityIntegrationTest {
                 new SanctionConfirmCommand(targetId, null, SanctionType.PERMANENT, "금전 요구", adminId));
         int processed = outboxPublisher.publishPending();
 
-        // 베이스캠프 정리 이벤트와 제재 알림 이벤트를 모두 집는다. 정리만 실패한다.
-        assertThat(processed).isEqualTo(2);
+        // 베이스캠프 정리·행사 신청 정리·제재 알림 이벤트를 모두 집는다. 베이스캠프 정리만 실패한다.
+        assertThat(processed).isEqualTo(3);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sanction WHERE member_id = ?", Integer.class, targetId))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT status FROM member WHERE id = ?", String.class, targetId))
@@ -83,6 +87,42 @@ class SanctionFollowUpReliabilityIntegrationTest {
                         "SELECT status FROM outbox_event WHERE event_type = ?",
                         String.class,
                         SanctionEvents.BASECAMP_CLEANUP_EVENT_TYPE))
+                .isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    @DisplayName("[SN-14][NFR-04] 행사 신청 정리가 실패해도 제재와 회원 정지는 유지되고, 아웃박스 행은 PENDING으로 남아 재시도 뒤 처리된다")
+    void programCleanupFailureKeepsSanctionAndRetriesEvent() {
+        CompanionReviewFixture fixture = new CompanionReviewFixture(jdbc, memberRepository);
+        long adminId = fixture.saveVerifiedMember(TestSequence.nickname());
+        long targetId = fixture.saveVerifiedMember(TestSequence.nickname());
+        doThrow(new IllegalStateException("simulated program cleanup failure"))
+                .when(programCleanupService)
+                .cleanUp(targetId);
+
+        sanctionConfirmService.confirm(
+                new SanctionConfirmCommand(targetId, null, SanctionType.PERMANENT, "금전 요구", adminId));
+        int processed = outboxPublisher.publishPending();
+
+        assertThat(processed).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sanction WHERE member_id = ?", Integer.class, targetId))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM member WHERE id = ?", String.class, targetId))
+                .isEqualTo("SUSPENDED");
+        Map<String, Object> event = jdbc.queryForMap(
+                "SELECT status, attempt_count FROM outbox_event WHERE event_type = ?",
+                SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE);
+        assertThat(event.get("status")).isEqualTo("PENDING");
+        assertThat(event.get("attempt_count")).isEqualTo(1);
+
+        reset(programCleanupService);
+        clock.advance(outboxProperties.retryDelay());
+        outboxPublisher.publishPending();
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT status FROM outbox_event WHERE event_type = ?",
+                        String.class,
+                        SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE))
                 .isEqualTo("PUBLISHED");
     }
 }

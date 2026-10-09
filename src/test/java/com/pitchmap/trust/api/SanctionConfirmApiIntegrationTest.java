@@ -112,6 +112,7 @@ class SanctionConfirmApiIntegrationTest {
         assertThat(basecampStatus(appliedBasecamp)).isEqualTo("RECRUITING");
         assertThat(basecampStatus(unrelatedBasecamp)).isEqualTo("RECRUITING");
         assertThat(eventStatus("SANCTION_BASECAMP_CLEANUP")).isEqualTo("PUBLISHED");
+        assertThat(eventStatus("SANCTION_PROGRAM_CLEANUP")).isEqualTo("PUBLISHED");
         assertThat(memberIdsOf("BASECAMP_CANCELED", ledBasecamp)).containsExactly(ledMember);
         assertThat(memberIdsOf("BASECAMP_MEMBER_CHANGED", joinedBasecamp))
                 .containsExactly(fixture.leaderIdOf(joinedBasecamp), otherMember);
@@ -130,6 +131,10 @@ class SanctionConfirmApiIntegrationTest {
         assertThat(basecampStatus(ledBasecamp)).isEqualTo("RECRUITING");
         assertThat(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'SANCTION_BASECAMP_CLEANUP'",
+                        Integer.class))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM outbox_event WHERE event_type = 'SANCTION_PROGRAM_CLEANUP'",
                         Integer.class))
                 .isZero();
         assertThat(eventStatus("SANCTION_CONFIRMED")).isEqualTo("PUBLISHED");
