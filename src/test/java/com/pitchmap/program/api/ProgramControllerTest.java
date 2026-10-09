@@ -1,30 +1,42 @@
 package com.pitchmap.program.api;
 
+import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
+import com.pitchmap.common.idempotency.IdempotencyExecutor;
+import com.pitchmap.common.idempotency.IdempotencyRecordJpaRepository;
 import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.common.security.SecurityConfig;
+import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.trace.TraceIdFilter;
+import com.pitchmap.program.application.ProgramApplyResult;
+import com.pitchmap.program.application.ProgramApplyService;
 import com.pitchmap.program.application.ProgramDetail;
 import com.pitchmap.program.application.ProgramListQuery;
 import com.pitchmap.program.application.ProgramPage;
 import com.pitchmap.program.application.ProgramQueryService;
 import com.pitchmap.program.application.ProgramSummary;
+import com.pitchmap.program.domain.ProgramErrorCode;
+import com.pitchmap.program.domain.ProgramException;
 import com.pitchmap.program.domain.ProgramPhase;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -35,7 +47,13 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(ProgramController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityConfig.class})
+@Import({
+    GlobalExceptionHandler.class,
+    TraceIdFilter.class,
+    SecurityConfig.class,
+    IdempotencyExecutor.class,
+    ProgramControllerTest.ClockConfig.class
+})
 class ProgramControllerTest {
 
     private static final Instant AT = Instant.parse("2026-11-01T01:00:00Z");
@@ -45,6 +63,12 @@ class ProgramControllerTest {
 
     @MockitoBean
     private ProgramQueryService programQueryService;
+
+    @MockitoBean
+    private ProgramApplyService programApplyService;
+
+    @MockitoBean
+    private IdempotencyRecordJpaRepository idempotencyRecordRepository;
 
     @Test
     @DisplayName("[F-17] 로그인하지 않아도 행사 목록을 조회하고, status와 page를 서비스에 넘긴다")
@@ -128,6 +152,116 @@ class ProgramControllerTest {
 
         assertThat(result).hasStatus(HttpStatus.NOT_FOUND);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("[F-18] 인증 회원이 신청하면 201과 신청 ID, 상태, 결제 기한, 금액을 응답한다")
+    void applyReturnsCreated() {
+        when(idempotencyRecordRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(programApplyService.apply(4L, 9L)).thenReturn(new ProgramApplyResult(70L, "PENDING_PAYMENT", AT, 30000));
+
+        MvcTestResult result = applyRequest(9L, "key-1").with(member(4L)).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        assertThat(result).bodyJson().extractingPath("$.applicationId").isEqualTo(70);
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("PENDING_PAYMENT");
+        assertThat(result).bodyJson().extractingPath("$.paymentDueAt").isEqualTo("2026-11-01T01:00:00Z");
+        assertThat(result).bodyJson().extractingPath("$.amount").isEqualTo(30000);
+    }
+
+    @Test
+    @DisplayName("[F-18][NFR-03] Idempotency-Key 헤더가 없으면 400 IDEMPOTENCY_KEY_REQUIRED이고 서비스를 부르지 않는다")
+    void applyRequiresIdempotencyKey() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/programs/9/applications")
+                .with(csrf())
+                .with(member(4L))
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("IDEMPOTENCY_KEY_REQUIRED");
+        verifyNoInteractions(programApplyService);
+    }
+
+    @Test
+    @DisplayName("[F-18] 로그인하지 않고 신청하면 401 AUTHENTICATION_REQUIRED이다")
+    void applyRequiresLogin() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/programs/9/applications")
+                .header("Idempotency-Key", "key-1")
+                .with(csrf())
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("[F-18][TR-03] 이메일 인증 전의 회원이 신청하면 403 MEMBER_NOT_VERIFIED이다")
+    void applyRejectsUnverifiedMember() {
+        LoginMember unverified = new LoginMember(4L, "USER", false);
+        RequestPostProcessor principal = authentication(UsernamePasswordAuthenticationToken.authenticated(
+                unverified, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+
+        MvcTestResult result = applyRequest(9L, "key-1").with(principal).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("MEMBER_NOT_VERIFIED");
+        verifyNoInteractions(programApplyService);
+    }
+
+    @Test
+    @DisplayName("[F-18] CSRF 토큰 없이 신청하면 403이다")
+    void applyRequiresCsrf() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/programs/9/applications")
+                .header("Idempotency-Key", "key-1")
+                .with(member(4L))
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+        verifyNoInteractions(programApplyService);
+    }
+
+    @Test
+    @DisplayName("[F-18] 서비스가 던진 오류 코드를 상태 코드와 함께 응답한다")
+    void applyMapsServiceErrors() {
+        when(idempotencyRecordRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(programApplyService.apply(4L, 1L)).thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+        when(programApplyService.apply(4L, 2L))
+                .thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_NOT_IN_APPLY_PERIOD));
+        when(programApplyService.apply(4L, 3L)).thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_SOLD_OUT));
+        when(programApplyService.apply(4L, 4L))
+                .thenThrow(new BusinessException(CommonErrorCode.TRUST_LEVEL_INSUFFICIENT));
+
+        assertError(1L, HttpStatus.NOT_FOUND, "NOT_FOUND");
+        assertError(2L, HttpStatus.BAD_REQUEST, "PROGRAM_NOT_IN_APPLY_PERIOD");
+        assertError(3L, HttpStatus.CONFLICT, "PROGRAM_SOLD_OUT");
+        assertError(4L, HttpStatus.FORBIDDEN, "TRUST_LEVEL_INSUFFICIENT");
+    }
+
+    private void assertError(long programId, HttpStatus status, String code) {
+        MvcTestResult result =
+                applyRequest(programId, "key-" + programId).with(member(4L)).exchange();
+
+        assertThat(result).hasStatus(status);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo(code);
+    }
+
+    private MockMvcTester.MockMvcRequestBuilder applyRequest(long programId, String key) {
+        return mvc.post()
+                .uri("/api/programs/" + programId + "/applications")
+                .header("Idempotency-Key", key)
+                .with(csrf());
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ClockConfig {
+
+        @Bean
+        Clock clock() {
+            return MutableClock.atDefaultInstant();
+        }
     }
 
     private static ProgramDetail detail(ProgramDetail.MyApplication mine) {

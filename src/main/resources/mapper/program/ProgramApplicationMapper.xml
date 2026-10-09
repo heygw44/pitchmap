@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.program.infra.ProgramApplicationMapper">
+
+    <!-- 남은 자리 확인과 신청 INSERT를 한 문장으로 처리한다. 확인과 INSERT를 따로 하면 그 사이에 다른 신청이 끼어들 수 있다.
+         서브쿼리가 같은 테이블의 행을 읽으며 공유 잠금을 거는데, 호출하는 서비스가 먼저 행사 행을 쓰기 잠금으로 잡아서
+         같은 행사의 신청 INSERT는 한 번에 하나만 이 문장에 들어온다. 그래서 공유 잠금끼리 서로 기다리는 교착 상태가 생기지 않는다. -->
+    <insert id="insertIfSeatAvailable" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO program_application (program_id, member_id, status, payment_due_at, created_at, updated_at)
+        SELECT p.id, #{memberId}, 'PENDING_PAYMENT', #{paymentDueAt}, #{now}, #{now}
+        FROM program p
+        WHERE p.id = #{programId}
+          AND (SELECT COUNT(*)
+               FROM program_application a
+               WHERE a.program_id = p.id
+                 AND a.status IN ('PENDING_PAYMENT', 'CONFIRMED')) &lt; p.capacity
+    </insert>
+
+    <select id="existsActive" resultType="boolean">
+        SELECT EXISTS (SELECT 1
+                       FROM program_application
+                       WHERE program_id = #{programId}
+                         AND member_id = #{memberId}
+                         AND status IN ('PENDING_PAYMENT', 'CONFIRMED'))
+    </select>
+</mapper>
