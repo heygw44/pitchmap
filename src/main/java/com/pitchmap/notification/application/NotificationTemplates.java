@@ -127,6 +127,7 @@ final class NotificationTemplates {
         String body = switch (payload.reason()) {
             case "USER" -> "행사 신청을 취소했습니다.";
             case "PROGRAM_CANCELED" -> "행사가 취소되어 신청이 취소됐습니다.";
+            case "SANCTIONED" -> "이용 제재로 행사 신청이 취소됐습니다.";
             default -> throw new IllegalArgumentException("알 수 없는 행사 신청 취소 사유입니다: " + payload.reason());
         };
         if (payload.refunded()) {

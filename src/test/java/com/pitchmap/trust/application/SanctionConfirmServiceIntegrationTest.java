@@ -73,9 +73,16 @@ class SanctionConfirmServiceIntegrationTest {
         assertThat(event.get("status")).isEqualTo("PENDING");
         assertThat(event.get("aggregate_type")).isEqualTo("MEMBER");
         assertThat(event.get("aggregate_id")).isEqualTo(targetId);
-        // 경고와 7일 정지의 제재 알림 이벤트 2건과 정지의 베이스캠프 정리 이벤트 1건이다.
-        assertThat(count("outbox_event")).isEqualTo(3);
+        // 경고와 7일 정지의 제재 알림 이벤트 2건과 정지의 베이스캠프 정리·행사 신청 정리 이벤트 1건씩이다.
+        assertThat(count("outbox_event")).isEqualTo(4);
         assertThat(countEvents(SanctionEvents.BASECAMP_CLEANUP_EVENT_TYPE)).isEqualTo(1);
+        assertThat(countEvents(SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE)).isEqualTo(1);
+        Map<String, Object> programEvent = jdbc.queryForMap(
+                "SELECT status, aggregate_type, aggregate_id FROM outbox_event WHERE event_type = ?",
+                SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE);
+        assertThat(programEvent.get("status")).isEqualTo("PENDING");
+        assertThat(programEvent.get("aggregate_type")).isEqualTo("MEMBER");
+        assertThat(programEvent.get("aggregate_id")).isEqualTo(targetId);
         assertThat(countEvents(SanctionEvents.NOTIFICATION_EVENT_TYPE)).isEqualTo(2);
     }
 
@@ -91,6 +98,7 @@ class SanctionConfirmServiceIntegrationTest {
                 .isEqualTo("UNVERIFIED");
         assertThat(count("outbox_event")).isEqualTo(1);
         assertThat(countEvents(SanctionEvents.BASECAMP_CLEANUP_EVENT_TYPE)).isZero();
+        assertThat(countEvents(SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE)).isZero();
         assertThat(countEvents(SanctionEvents.NOTIFICATION_EVENT_TYPE)).isEqualTo(1);
     }
 

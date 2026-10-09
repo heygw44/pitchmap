@@ -50,6 +50,9 @@ public class ProgramApplication {
     @Enumerated(EnumType.STRING)
     private ProgramCancelReason cancelReason;
 
+    @Column(name = "review_requested_at")
+    private Instant reviewRequestedAt;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -100,5 +103,19 @@ public class ProgramApplication {
         this.canceledAt = now;
         this.updatedAt = now;
         return wasConfirmed;
+    }
+
+    /**
+     * 호출하면 신청자가 이용 정지를 받아 결제 대기 신청을 CANCELED(사유 SANCTIONED)로 바꾸고 취소 시각을 now로 적는다.
+     * 결제 대기가 아닌 신청은 PROGRAM_INVALID_STATE를 던진다. 던지면 신청은 바뀌지 않는다.
+     */
+    public void cancelBySanction(Instant now) {
+        if (status != ProgramApplicationStatus.PENDING_PAYMENT) {
+            throw new ProgramException(ProgramErrorCode.PROGRAM_INVALID_STATE);
+        }
+        this.status = ProgramApplicationStatus.CANCELED;
+        this.cancelReason = ProgramCancelReason.SANCTIONED;
+        this.canceledAt = now;
+        this.updatedAt = now;
     }
 }

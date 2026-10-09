@@ -18,6 +18,37 @@ class ProgramApplicationTest {
     private static final Instant REFUND_DEADLINE = NOW.plus(Duration.ofDays(4));
 
     @Test
+    @DisplayName("[F-16][SN-14] 결제 대기 신청은 제재로 취소되면 사유 SANCTIONED와 취소 시각이 기록된다")
+    void cancelsPendingBySanction() {
+        ProgramApplication application = application(ProgramApplicationStatus.PENDING_PAYMENT);
+        Instant cancelAt = NOW.plus(Duration.ofMinutes(3));
+
+        application.cancelBySanction(cancelAt);
+
+        assertThat(application.getStatus()).isEqualTo(ProgramApplicationStatus.CANCELED);
+        assertThat(application.getCancelReason()).isEqualTo(ProgramCancelReason.SANCTIONED);
+        assertThat(application.getCanceledAt()).isEqualTo(cancelAt);
+        assertThat(application.getUpdatedAt()).isEqualTo(cancelAt);
+    }
+
+    @Test
+    @DisplayName("[F-16][SN-14] 결제 대기가 아닌 신청을 제재로 취소하면 PROGRAM_INVALID_STATE이고 신청은 바뀌지 않는다")
+    void rejectsSanctionCancelOutsidePending() {
+        for (ProgramApplicationStatus status : new ProgramApplicationStatus[] {
+            ProgramApplicationStatus.CONFIRMED, ProgramApplicationStatus.CANCELED, ProgramApplicationStatus.EXPIRED
+        }) {
+            ProgramApplication application = application(status);
+
+            assertThatThrownBy(() -> application.cancelBySanction(NOW))
+                    .isInstanceOfSatisfying(
+                            ProgramException.class,
+                            e -> assertThat(e.getErrorCode()).isEqualTo(ProgramErrorCode.PROGRAM_INVALID_STATE));
+            assertThat(application.getStatus()).isEqualTo(status);
+            assertThat(application.getCancelReason()).isNull();
+        }
+    }
+
+    @Test
     @DisplayName("[F-19][PG-04] 결제 기한 직전에 결제하면 확정되고 확정 시각이 기록된다")
     void confirmsJustBeforeDue() {
         ProgramApplication application = application(ProgramApplicationStatus.PENDING_PAYMENT);

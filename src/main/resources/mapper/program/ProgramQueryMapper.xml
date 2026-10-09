@@ -85,6 +85,7 @@
                a.confirmed_at AS confirmed_at,
                a.canceled_at AS canceled_at,
                a.cancel_reason AS cancel_reason,
+               a.review_requested_at AS review_requested_at,
                a.created_at AS created_at
         FROM program_application a
         JOIN member m ON m.id = a.member_id

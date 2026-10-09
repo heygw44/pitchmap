@@ -331,6 +331,8 @@ class AdminReportSanctionApiIntegrationTest {
                 .isEqualTo("PERMANENT:4:" + reportId + ":" + adminId + ":ACTIVE");
         assertThat(count("outbox_event WHERE event_type = 'SANCTION_BASECAMP_CLEANUP'"))
                 .isEqualTo(1);
+        assertThat(count("outbox_event WHERE event_type = 'SANCTION_PROGRAM_CLEANUP'"))
+                .isEqualTo(1);
         Map<String, Object> payload = resolvedPayload();
         assertThat(payload).containsOnlyKeys("reportId", "reporterId", "result");
         assertThat(payload.get("result")).isEqualTo("ACTIONED");

@@ -23,6 +23,7 @@ public record AdminProgramApplicantPageResponse(List<ApplicantResponse> content,
             Instant confirmedAt,
             Instant canceledAt,
             String cancelReason,
+            Instant reviewRequestedAt,
             Instant createdAt) {
 
         static ApplicantResponse from(ProgramApplicantItem item) {
@@ -34,6 +35,7 @@ public record AdminProgramApplicantPageResponse(List<ApplicantResponse> content,
                     item.confirmedAt(),
                     item.canceledAt(),
                     item.cancelReason(),
+                    item.reviewRequestedAt(),
                     item.createdAt());
         }
     }

@@ -11,6 +11,7 @@ public record ProgramApplicantItem(
         Instant confirmedAt,
         Instant canceledAt,
         String cancelReason,
+        Instant reviewRequestedAt,
         Instant createdAt) {
 
     public record Applicant(long memberId, String nickname) {}

@@ -773,7 +773,15 @@ class AdminControllersTest {
     @DisplayName("[F-17] 신청자 목록은 회원 ID와 닉네임만 담아 응답하고 status를 서비스에 넘긴다")
     void applicationsReturnsApplicants() {
         var item = new ProgramApplicantItem(
-                7L, new ProgramApplicantItem.Applicant(5L, "신청자"), "CANCELED", AT, null, AT, "PROGRAM_CANCELED", AT);
+                7L,
+                new ProgramApplicantItem.Applicant(5L, "신청자"),
+                "CANCELED",
+                AT,
+                null,
+                AT,
+                "PROGRAM_CANCELED",
+                AT,
+                AT);
         when(programAdminService.applications(eq(9L), any(ProgramApplicantQuery.class)))
                 .thenReturn(new ProgramApplicantPage(List.of(item), 0, 20, true));
 
