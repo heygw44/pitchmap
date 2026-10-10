@@ -167,6 +167,8 @@ function PostMeta({ post }: { post: CommunityPostDetail }) {
       <time dateTime={post.createdAt} title={formatKstDateTime(post.createdAt)}>
         {formatRelativeKst(post.createdAt)}
       </time>
+      <span aria-hidden="true">·</span>
+      <span className="tabular-nums">조회 {post.viewCount}</span>
       {edited && (
         <>
           <span aria-hidden="true">·</span>

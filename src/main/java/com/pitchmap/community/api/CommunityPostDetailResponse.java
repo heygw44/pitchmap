@@ -18,6 +18,7 @@ public record CommunityPostDetailResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL) LinkedSpot spot,
         long likeCount,
         long commentCount,
+        long viewCount,
         Instant createdAt,
         Instant updatedAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) Boolean likedByMe) {
@@ -37,6 +38,7 @@ public record CommunityPostDetailResponse(
                 LinkedSpot.of(item),
                 item.likeCount(),
                 item.commentCount(),
+                item.viewCount(),
                 item.createdAt(),
                 item.updatedAt(),
                 item.likedByMe());

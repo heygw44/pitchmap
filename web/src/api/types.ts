@@ -874,6 +874,8 @@ interface CommunityPostBase {
   spot?: CommunityPostSpot;
   likeCount: number;
   commentCount: number;
+  // 작성자가 아닌 사람이 상세를 연 횟수
+  viewCount: number;
   createdAt: string;
 }
 

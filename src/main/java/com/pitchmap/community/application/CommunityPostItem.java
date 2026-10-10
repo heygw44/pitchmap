@@ -15,6 +15,7 @@ import java.util.List;
  * @param images 상세에서 글 안 순서대로 담은 이미지. 목록이거나 이미지가 없으면 빈 목록
  * @param likeCount 좋아요 수
  * @param commentCount ACTIVE인 댓글과 답글의 수
+ * @param viewCount 조회수
  * @param likedByMe 조회한 회원이 좋아요를 눌렀는지. 조회하는 회원이 없으면 null
  */
 public record CommunityPostItem(
@@ -30,6 +31,7 @@ public record CommunityPostItem(
         List<CommunityPostImage> images,
         long likeCount,
         long commentCount,
+        long viewCount,
         Instant createdAt,
         Instant updatedAt,
         Boolean likedByMe) {
@@ -48,8 +50,30 @@ public record CommunityPostItem(
                 images,
                 row.likeCount(),
                 row.commentCount(),
+                row.viewCount(),
                 row.createdAt(),
                 row.updatedAt(),
                 row.likedByMe());
+    }
+
+    /** 호출하면 조회수만 1 더한 복사본을 돌려준다. 방금 센 조회를 응답에 반영할 때 쓴다. */
+    CommunityPostItem withOneMoreView() {
+        return new CommunityPostItem(
+                postId,
+                title,
+                text,
+                authorId,
+                authorNickname,
+                spotId,
+                spotName,
+                thumbnailUrl,
+                imageCount,
+                images,
+                likeCount,
+                commentCount,
+                viewCount + 1,
+                createdAt,
+                updatedAt,
+                likedByMe);
     }
 }

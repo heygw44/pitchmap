@@ -37,11 +37,22 @@ public class CommunityPostQueryService {
     /**
      * 호출하면 postId인 글 한 건을 본문 전체와 이미지 목록과 함께 돌려준다. viewerId가 null이 아니면 그 회원이 좋아요를 눌렀는지(likedByMe)도 담는다.
      * 글이 없거나 ACTIVE가 아니면 NOT_FOUND로 거부한다.
+     *
+     * <p>조회한 사람이 작성자가 아니면(비회원 포함) 조회수를 1 올리고, 올린 값을 응답에 담는다. 작성자가 자기 글을 열 때는 세지 않는다. 같은 사람이
+     * 다시 열어도 그때마다 센다.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public CommunityPostItem detail(long postId, Long viewerId) {
-        return communityPostItemReader
+        CommunityPostItem item = communityPostItemReader
                 .findDetail(postId, viewerId)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        if (viewerId != null && viewerId == item.authorId()) {
+            return item;
+        }
+        // 읽은 뒤 글이 숨겨졌으면 0행이 바뀐다. 이때는 이미 읽은 글을 그대로 돌려준다.
+        if (communityPostMapper.incrementViewCount(postId) == 0) {
+            return item;
+        }
+        return item.withOneMoreView();
     }
 }
