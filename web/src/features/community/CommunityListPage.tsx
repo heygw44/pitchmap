@@ -279,7 +279,7 @@ function SearchBar({ searchType, keyword, onSearch }: SearchBarProps) {
             setText(event.target.value);
             setError(null);
           }}
-          placeholder="검색어 2자 이상"
+          placeholder="2자 이상"
           className="min-w-0 flex-1"
         />
         <Button type="submit" variant="secondary">
