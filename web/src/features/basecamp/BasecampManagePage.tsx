@@ -23,6 +23,7 @@ import type { ChoiceOption } from '../../components/ChoiceGroup';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { Notice } from '../../components/Notice';
+import { BackLink } from '../../components/BackLink';
 import { PageCard, PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
 import { TextField } from '../../components/TextField';
@@ -336,7 +337,7 @@ export function BasecampManagePage({ basecampId }: { basecampId: number }) {
   }
 
   return (
-    <PageLayout title="베이스캠프 관리">
+    <PageLayout title="베이스캠프 관리" breadcrumb={<BackLink to={`/basecamps/${basecampId}`}>베이스캠프</BackLink>}>
       <div aria-busy={authenticated && current === null} className="flex flex-col gap-4">
         {body}
       </div>

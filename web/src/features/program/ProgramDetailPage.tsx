@@ -12,6 +12,8 @@ import {
 } from '../../api/programs';
 import type { ProgramDetail } from '../../api/types';
 import { Link } from '../../app/router';
+import { ProgramAside } from './ProgramAside';
+import { BackLink } from '../../components/BackLink';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
@@ -103,29 +105,31 @@ export function ProgramDetailPage({ programId }: { programId: number }) {
     );
   }
 
+  const detail = current !== null && 'detail' in current ? current.detail : null;
+  const meta = detail ? (
+    <div className="flex flex-wrap items-center gap-1">
+      <Badge tone={PROGRAM_STATUS_META[detail.status].tone}>{PROGRAM_STATUS_META[detail.status].label}</Badge>
+      {detail.overnight && <Badge tone="earth">숙박</Badge>}
+      <span className="text-sm text-ink-muted">{detail.locationText}</span>
+    </div>
+  ) : undefined;
+
   return (
-    <PageLayout title="공식 행사">
-      <Link to="/programs" className="inline-flex min-h-11 items-center self-start text-forest underline underline-offset-2">
-        행사 목록
-      </Link>
+    <PageLayout
+      title={detail?.title ?? '공식 행사'}
+      breadcrumb={<BackLink to="/programs">공식 행사</BackLink>}
+      meta={meta}
+      aside={<ProgramAside signedIn={session.status === 'authenticated'} />}
+    >
       <div aria-busy={current === null}>{body}</div>
     </PageLayout>
   );
 }
 
 function DetailContent({ detail, onChanged }: { detail: ProgramDetail; onChanged: () => void }) {
-  const status = PROGRAM_STATUS_META[detail.status];
   return (
     <div className="flex flex-col gap-4">
       <article className="flex flex-col gap-3 rounded-control border border-contour bg-card p-5">
-        <header className="flex flex-col gap-2">
-          <h2 className="font-serif text-xl font-semibold text-ink">{detail.title}</h2>
-          <div className="flex flex-wrap gap-1">
-            <Badge tone={status.tone}>{status.label}</Badge>
-            {detail.overnight && <Badge tone="earth">숙박</Badge>}
-          </div>
-        </header>
-
         {detail.status === 'CANCELED' && (
           <Notice tone="danger" title="운영자가 행사를 취소했어요">
             <p>신청했던 분께는 취소 알림을 보냈어요. 결제한 금액은 환불돼요.</p>

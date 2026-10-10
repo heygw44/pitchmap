@@ -1,32 +1,25 @@
 import type { ReactNode } from 'react';
-import { BottomTabBar } from '../app/layout/BottomTabBar';
-import { SiteFooter } from '../app/layout/SiteFooter';
-import { SiteHeader } from '../app/layout/SiteHeader';
-import { AnnouncementBar } from '../features/program/AnnouncementBar';
+import { HubLayout } from './HubLayout';
 
 type PageLayoutProps = {
   title: string;
-  // 표나 목록을 넓게 보여 줄 화면에서 켠다. 기본은 한 열(sm) 폭이다.
+  // 표나 목록을 넓게 보여 줄 화면에서 켠다. 기본은 좁은 한 열(max-w-2xl)이다.
   wide?: boolean;
+  description?: string;
+  breadcrumb?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  tabs?: ReactNode;
+  aside?: ReactNode;
   children: ReactNode;
 };
 
-// 지도가 없는 화면(내 정보, 회원 프로필, 행사)의 틀이다. 위에 알림 띠와 머리글, 가운데 한 열에 제목과 카드, 아래에 바닥글을 둔다.
-// 모바일에서는 하단 탭이 화면 아래를 덮으므로 그 높이만큼 아래 여백을 둔다.
-export function PageLayout({ title, wide = false, children }: PageLayoutProps) {
+// 지도가 없는 화면(내 정보, 회원 프로필, 행사 등)의 틀이다. 목록 중심 화면과 같은 머리글 띠(HubLayout)를 쓴다.
+export function PageLayout({ wide = false, children, ...rest }: PageLayoutProps) {
   return (
-    <div className="flex min-h-dvh flex-col bg-paper pb-(--bottom-nav-h)">
-      <AnnouncementBar />
-      <SiteHeader />
-      <div className="flex-1 bg-paper bg-contour">
-        <main className={`mx-auto flex ${wide ? 'max-w-screen-lg' : 'max-w-screen-sm'} flex-col gap-4 px-4 py-8`}>
-          <h1 className="font-serif text-xl font-semibold text-ink">{title}</h1>
-          {children}
-        </main>
-      </div>
-      <SiteFooter />
-      <BottomTabBar />
-    </div>
+    <HubLayout width={wide ? 'wide' : 'narrow'} {...rest}>
+      {children}
+    </HubLayout>
   );
 }
 
