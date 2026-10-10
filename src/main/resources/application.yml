@@ -129,3 +129,10 @@ pitchmap:
       # 파일은 저장소에 커밋하지 않는다. 적재 서비스는 파일 이름 끝의 _YYYYMMDD.tsv에서 기준일을 읽는다.
       # 값이 없으면 앱은 뜨지만 적재를 실행하면 실패로 기록된다.
       file: ${PUBLICDATA_PARK_BOUNDARY_FILE:}
+  community:
+    image:
+      # 이미지 저장소 종류다. fake는 로컬 개발용으로 파일을 저장하지 않고, s3는 실제 S3 버킷에 사전 서명 URL을 발급한다.
+      # 운영(prod 프로필)은 s3로 덮어쓴다. 로컬에서 s3를 쓰려면 AWS 자격 증명을 기본 방식(환경 변수나 프로필)으로 준비한다.
+      storage: ${COMMUNITY_IMAGE_STORAGE:fake}
+      # 업로드 버킷 이름이다. 비밀값이 아니다. storage가 s3인데 비어 있으면 앱이 시작하지 않는다.
+      bucket: ${UPLOAD_BUCKET:}

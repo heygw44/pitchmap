@@ -86,6 +86,7 @@ class CommunityPostApiIntegrationTest {
                   "category": "GEAR",
                   "title": "텐트 후기",
                   "content": "가볍다",
+                  "images": [],
                   "author": { "memberId": %d, "nickname": "새벽능선" },
                   "spot": { "spotId": %d, "name": "능선 끝 평지" },
                   "likeCount": 0,
@@ -118,6 +119,7 @@ class CommunityPostApiIntegrationTest {
                     "excerpt": "바다가 좋았다",
                     "author": { "memberId": %d, "nickname": "새벽능선" },
                     "spot": { "spotId": %d, "name": "능선 끝 평지" },
+                    "imageCount": 0,
                     "likeCount": 0,
                   "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"

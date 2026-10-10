@@ -5,6 +5,7 @@ import com.pitchmap.community.application.CommunityPostReviseCommand;
 import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.domain.CommunityPost;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 
 /**
  * 글 수정 요청이다. 모든 필드가 선택이고, 필드를 빼는 것과 {@code null}을 보내는 것의 뜻이 다르다.
@@ -35,17 +36,23 @@ public record CommunityPostUpdateRequest(
         PatchField<String> content,
 
         @Schema(implementation = Long.class, description = "연결할 장소 ID. null로 보내면 장소 연결을 끊는다.")
-        PatchField<Long> spotId) {
+        PatchField<Long> spotId,
+
+        @Schema(
+                implementation = Long[].class,
+                description = "붙일 이미지 ID. 보내면 글의 이미지를 배열 순서대로 통째로 바꾸고, 빈 배열은 이미지를 모두 뗀다. null로 보내면 400이다.")
+        PatchField<List<Long>> imageIds) {
 
     public CommunityPostUpdateRequest {
         category = absentIfNull(category);
         title = absentIfNull(title);
         content = absentIfNull(content);
         spotId = absentIfNull(spotId);
+        imageIds = absentIfNull(imageIds);
     }
 
     CommunityPostReviseCommand toCommand() {
-        return new CommunityPostReviseCommand(category, title, content, spotId);
+        return new CommunityPostReviseCommand(category, title, content, spotId, imageIds);
     }
 
     private static <T> PatchField<T> absentIfNull(PatchField<T> field) {

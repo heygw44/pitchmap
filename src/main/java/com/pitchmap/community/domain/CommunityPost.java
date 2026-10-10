@@ -121,6 +121,12 @@ public class CommunityPost {
         this.updatedAt = now;
     }
 
+    /** 호출하면 수정 시각을 now로 한다. 글 필드는 그대로이고 붙은 이미지만 바뀐 수정에 쓴다. */
+    public void markEdited(Instant now) {
+        requireNow(now);
+        this.updatedAt = now;
+    }
+
     /** 호출하면 글을 DELETED로 바꾼다. 행은 남는다. 이미 DELETED이면 아무것도 하지 않는다. */
     public void delete(Instant now) {
         requireNow(now);
