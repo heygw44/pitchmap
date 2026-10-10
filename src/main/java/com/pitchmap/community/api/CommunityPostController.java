@@ -37,7 +37,7 @@ class CommunityPostController {
                     + "category(EXPERIENCE, GEAR, FREE)와 spotId는 선택이고, 보내면 그 조건에 맞는 글만 준다. "
                     + "spotId로 거를 때는 그 장소가 지금 지도에 보이는지 따지지 않는다. "
                     + "각 항목은 postId, 카테고리(category), 제목(title), 본문 앞 100자(excerpt), 작성자(memberId, nickname), "
-                    + "연결한 장소(spotId, name), 작성 시각(createdAt)이다. "
+                    + "연결한 장소(spotId, name), 좋아요 수(likeCount), 댓글 수(commentCount), 작성 시각(createdAt)이다. "
                     + "작성자는 회원 ID와 닉네임만 주고, 탈퇴한 회원이면 익명 닉네임이 나온다. "
                     + "연결한 장소가 없거나 지도에 보이는(ACTIVE) 상태가 아니면 spot 필드를 뺀다. "
                     + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. "
@@ -53,11 +53,13 @@ class CommunityPostController {
             summary = "커뮤니티 글 상세",
             description = "글 한 건을 본문 전체와 함께 돌려준다. 로그인하지 않아도 조회할 수 있다. "
                     + "필드는 postId, category, title, content, 작성자(memberId, nickname), 연결한 장소(spotId, name), "
-                    + "작성 시각(createdAt), 수정 시각(updatedAt)이다. 연결한 장소가 없거나 지도에 보이지 않으면 spot 필드를 뺀다. "
+                    + "좋아요 수(likeCount), 댓글 수(commentCount), 작성 시각(createdAt), 수정 시각(updatedAt)이다. 연결한 장소가 없거나 지도에 보이지 않으면 spot 필드를 뺀다. "
+                    + "로그인한 회원에게는 그 회원이 좋아요를 눌렀는지(likedByMe)도 주고, 로그인하지 않았으면 이 필드를 뺀다. "
                     + "글이 없거나 ACTIVE가 아니면(삭제, 숨김, 검토 대기) 404 NOT_FOUND로 응답한다.")
     @GetMapping("/api/community/posts/{postId}")
-    CommunityPostDetailResponse detail(@PathVariable long postId) {
-        return CommunityPostDetailResponse.from(communityPostQueryService.detail(postId));
+    CommunityPostDetailResponse detail(@AuthenticationPrincipal LoginMember loginMember, @PathVariable long postId) {
+        Long viewerId = loginMember == null ? null : loginMember.memberId();
+        return CommunityPostDetailResponse.from(communityPostQueryService.detail(postId, viewerId));
     }
 
     @Operation(

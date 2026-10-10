@@ -10,7 +10,9 @@ import java.time.Instant;
  * @param text 목록에서는 본문 앞 100자, 상세에서는 본문 전체
  * @param spotId 연결한 장소가 없거나 ACTIVE가 아니면 null
  * @param spotName spotId가 null이면 null
+ * @param likeCount 좋아요 수
  * @param commentCount ACTIVE인 댓글과 답글의 수
+ * @param likedByMe 조회한 회원이 좋아요를 눌렀는지. 조회하는 회원이 없으면 null
  */
 public record CommunityPostItem(
         long postId,
@@ -21,9 +23,11 @@ public record CommunityPostItem(
         String authorNickname,
         Long spotId,
         String spotName,
+        long likeCount,
         long commentCount,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Boolean likedByMe) {
 
     static CommunityPostItem from(CommunityPostRow row) {
         return new CommunityPostItem(
@@ -35,8 +39,10 @@ public record CommunityPostItem(
                 row.authorNickname(),
                 row.spotId(),
                 row.spotName(),
+                row.likeCount(),
                 row.commentCount(),
                 row.createdAt(),
-                row.updatedAt());
+                row.updatedAt(),
+                row.likedByMe());
     }
 }

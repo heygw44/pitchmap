@@ -88,6 +88,7 @@ class CommunityPostApiIntegrationTest {
                   "content": "가볍다",
                   "author": { "memberId": %d, "nickname": "새벽능선" },
                   "spot": { "spotId": %d, "name": "능선 끝 평지" },
+                  "likeCount": 0,
                   "commentCount": 0,
                   "createdAt": "2026-10-05T03:00:00Z",
                   "updatedAt": "2026-10-05T03:00:00Z"
@@ -117,7 +118,8 @@ class CommunityPostApiIntegrationTest {
                     "excerpt": "바다가 좋았다",
                     "author": { "memberId": %d, "nickname": "새벽능선" },
                     "spot": { "spotId": %d, "name": "능선 끝 평지" },
-                    "commentCount": 0,
+                    "likeCount": 0,
+                  "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": false

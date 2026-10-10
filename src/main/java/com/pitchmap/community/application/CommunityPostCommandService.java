@@ -63,7 +63,7 @@ public class CommunityPostCommandService {
         // 고친 내용을 MyBatis로 읽기 전에 DB에 반영한다.
         communityPostRepository.flush();
         return communityPostMapper
-                .selectActiveById(postId)
+                .selectActiveById(postId, memberId)
                 .map(CommunityPostItem::from)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
     }

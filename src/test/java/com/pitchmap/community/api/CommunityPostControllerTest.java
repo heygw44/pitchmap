@@ -56,9 +56,21 @@ class CommunityPostControllerTest {
     private static final Instant CREATED_AT = Instant.parse("2026-10-05T03:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-05T04:00:00Z");
     private static final CommunityPostItem ITEM = new CommunityPostItem(
-            9L, CommunityCategory.GEAR, "텐트 후기", "가볍다", 31L, "새벽능선", 101L, "능선 끝 평지", 3L, CREATED_AT, UPDATED_AT);
+            9L,
+            CommunityCategory.GEAR,
+            "텐트 후기",
+            "가볍다",
+            31L,
+            "새벽능선",
+            101L,
+            "능선 끝 평지",
+            5L,
+            3L,
+            CREATED_AT,
+            UPDATED_AT,
+            null);
     private static final CommunityPostItem ITEM_WITHOUT_SPOT = new CommunityPostItem(
-            10L, CommunityCategory.FREE, "안녕", "반가워요", 31L, "새벽능선", null, null, 0L, CREATED_AT, CREATED_AT);
+            10L, CommunityCategory.FREE, "안녕", "반가워요", 31L, "새벽능선", null, null, 0L, 0L, CREATED_AT, CREATED_AT, null);
 
     @Autowired
     private MockMvcTester mvc;
@@ -70,7 +82,7 @@ class CommunityPostControllerTest {
     private CommunityPostQueryService communityPostQueryService;
 
     @Test
-    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 댓글 수는 있고 이미지·좋아요 필드는 없다")
+    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 좋아요 수와 댓글 수는 있고 이미지 필드와 likedByMe는 없다")
     void anonymousReadsPostList() {
         // given
         when(communityPostQueryService.list(null, null, 0, 20))
@@ -90,7 +102,8 @@ class CommunityPostControllerTest {
                     "excerpt": "가볍다",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
                     "spot": { "spotId": 101, "name": "능선 끝 평지" },
-                    "commentCount": 3,
+                    "likeCount": 5,
+                  "commentCount": 3,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": true
@@ -118,7 +131,8 @@ class CommunityPostControllerTest {
                     "title": "안녕",
                     "excerpt": "반가워요",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
-                    "commentCount": 0,
+                    "likeCount": 0,
+                  "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": false
@@ -162,10 +176,10 @@ class CommunityPostControllerTest {
     }
 
     @Test
-    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 상세를 조회하면 본문과 수정 시각을 받는다")
+    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 상세를 조회하면 본문과 수정 시각을 받고 likedByMe 필드는 없다")
     void anonymousReadsDetail() {
         // given
-        when(communityPostQueryService.detail(9L)).thenReturn(ITEM);
+        when(communityPostQueryService.detail(9L, null)).thenReturn(ITEM);
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS + "/9").exchange();
@@ -180,6 +194,7 @@ class CommunityPostControllerTest {
                   "content": "가볍다",
                   "author": { "memberId": 31, "nickname": "새벽능선" },
                   "spot": { "spotId": 101, "name": "능선 끝 평지" },
+                  "likeCount": 5,
                   "commentCount": 3,
                   "createdAt": "2026-10-05T03:00:00Z",
                   "updatedAt": "2026-10-05T04:00:00Z"
@@ -188,10 +203,41 @@ class CommunityPostControllerTest {
     }
 
     @Test
+    @DisplayName("[F-29][CM-05] 인증 회원이 글 상세를 조회하면 자기 회원 ID로 조회하고 likedByMe를 받는다")
+    void verifiedMemberReadsDetailWithLikedByMe() {
+        // given
+        CommunityPostItem liked = new CommunityPostItem(
+                9L,
+                CommunityCategory.GEAR,
+                "텐트 후기",
+                "가볍다",
+                31L,
+                "새벽능선",
+                null,
+                null,
+                5L,
+                3L,
+                CREATED_AT,
+                UPDATED_AT,
+                true);
+        when(communityPostQueryService.detail(9L, MEMBER_ID)).thenReturn(liked);
+
+        // when
+        MvcTestResult result = mvc.get().uri(POSTS + "/9").with(verified()).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.likedByMe").isEqualTo(true);
+        assertThat(result).bodyJson().extractingPath("$.likeCount").isEqualTo(5);
+        verify(communityPostQueryService).detail(9L, MEMBER_ID);
+    }
+
+    @Test
     @DisplayName("[F-29][CM-03] 서비스가 던진 NOT_FOUND를 글 상세에서 404로 응답한다")
     void detailOfMissingPostIsNotFound() {
         // given
-        when(communityPostQueryService.detail(anyLong())).thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
+        when(communityPostQueryService.detail(anyLong(), any()))
+                .thenThrow(new BusinessException(CommonErrorCode.NOT_FOUND));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS + "/9").exchange();
