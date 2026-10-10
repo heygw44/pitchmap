@@ -62,6 +62,17 @@
 }
 
 @layer base {
+  /* 모바일 하단 탭의 높이다. 하단 탭이 없는 lg부터는 0이라서, 이 값을 빼거나 더하는 자리가 데스크톱에서는 그대로다 */
+  :root {
+    --bottom-nav-h: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 64rem) {
+    :root {
+      --bottom-nav-h: 0px;
+    }
+  }
+
   html {
     background-color: var(--color-paper);
     color: var(--color-ink);

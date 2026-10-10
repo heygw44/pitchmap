@@ -34,6 +34,11 @@ public class SecurityConfig {
         "/api/basecamps/*",
         "/api/programs",
         "/api/programs/*",
+        "/api/community/posts",
+        "/api/community/posts/*",
+        "/api/community/posts/*/comments",
+        "/api/community/posts/*/reports",
+        "/api/community/comments/*/reports",
     };
 
     private static final String[] PUBLIC_POST_PATTERNS = {
@@ -53,6 +58,11 @@ public class SecurityConfig {
         "/api/bakjis/*/confirmations",
         "/api/bakjis/*/reports",
         "/api/spots/*/reviews",
+        "/api/community/posts",
+        "/api/community/images",
+        "/api/community/posts/*/comments",
+        "/api/community/posts/*/reports",
+        "/api/community/comments/*/reports",
         "/api/basecamps",
         "/api/basecamps/*/close",
         "/api/basecamps/*/reopen",
@@ -70,15 +80,25 @@ public class SecurityConfig {
         "/api/program-applications/*/cancel",
     };
 
-    private static final String[] VERIFIED_PUT_PATTERNS = {"/api/basecamps/*/contact"};
+    private static final String[] VERIFIED_PUT_PATTERNS = {
+        "/api/basecamps/*/contact", "/api/community/posts/*/like",
+    };
 
     private static final String[] VERIFIED_PATCH_PATTERNS = {
-        "/api/me", "/api/bakjis/*", "/api/reviews/*", "/api/basecamps/*",
+        "/api/me",
+        "/api/bakjis/*",
+        "/api/reviews/*",
+        "/api/basecamps/*",
+        "/api/community/posts/*",
+        "/api/community/comments/*",
     };
 
     private static final String[] VERIFIED_DELETE_PATTERNS = {
         "/api/bakjis/*",
         "/api/reviews/*",
+        "/api/community/posts/*",
+        "/api/community/comments/*",
+        "/api/community/posts/*/like",
         "/api/basecamps/*/applications/me",
         "/api/basecamps/*/members/me",
         "/api/programs/*/vacancy-alerts",

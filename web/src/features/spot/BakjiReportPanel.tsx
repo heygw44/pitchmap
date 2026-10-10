@@ -369,7 +369,7 @@ function SubmittedView({ result }: { result: BakjiSubmissionResponse }) {
         <Link to={`/spots/${result.spotId}`} className={PRIMARY_LINK_CLASS}>
           제보한 박지 보기
         </Link>
-        <Link to="/" className={SECONDARY_LINK_CLASS}>
+        <Link to="/map" className={SECONDARY_LINK_CLASS}>
           지도로
         </Link>
       </div>

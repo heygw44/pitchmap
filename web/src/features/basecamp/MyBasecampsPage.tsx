@@ -3,12 +3,15 @@ import { fetchMyBasecamps } from '../../api/basecamps';
 import { toUserMessage } from '../../api/errors';
 import type { MyBasecampItem, MyBasecampRelation } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
+import { BackLink } from '../../components/BackLink';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { ListPanel } from '../../components/HubLayout';
 import { Notice } from '../../components/Notice';
 import { PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
+import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatLocalDate } from '../../lib/datetime';
 import { withNext } from '../member/nextPath';
@@ -95,24 +98,20 @@ export function MyBasecampsPage() {
   }
 
   return (
-    <PageLayout title="내 베이스캠프">
-      <div role="group" aria-label="관계" className="flex flex-wrap gap-2">
-        {FILTERS.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            aria-pressed={filter === item.value}
-            onClick={() => setFilter(item.value)}
-            className={
-              filter === item.value
-                ? 'inline-flex min-h-11 items-center rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
-                : 'inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-3 text-base text-ink hover:bg-paper-deep'
-            }
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+    <PageLayout
+      title="내 베이스캠프"
+      description="열었거나 합류했거나 신청한 베이스캠프를 모아 보여 줘요."
+      breadcrumb={<BackLink to="/me">내 정보</BackLink>}
+      actions={
+        <Link
+          to="/basecamps"
+          className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"
+        >
+          베이스캠프 찾기
+        </Link>
+      }
+      tabs={<UnderlineTabs label="관계" options={FILTERS} value={filter} onChange={setFilter} />}
+    >
       <div aria-busy={authenticated && current === null} className="flex flex-col gap-3">
         {!authenticated || current === null ? (
           showSkeleton ? <Skeleton className="h-24 w-full" /> : null
@@ -146,11 +145,11 @@ export function MyBasecampsPage() {
                 }
               />
             ) : (
-              <ul className="flex flex-col gap-3">
+              <ListPanel>
                 {current.items.map((item) => (
                   <BasecampCard key={`${item.basecampId}-${item.myRelation}`} item={item} />
                 ))}
-              </ul>
+              </ListPanel>
             )}
             {current.hasNext && (
               <div>
@@ -172,7 +171,7 @@ function BasecampCard({ item }: { item: MyBasecampItem }) {
     <li>
       <Link
         to={`/basecamps/${item.basecampId}`}
-        className="flex flex-col gap-1 rounded-control border border-contour bg-card p-4 hover:bg-paper-deep"
+        className="flex flex-col gap-1 p-4 hover:bg-paper-deep"
       >
         <span className="font-serif text-lg text-ink">{item.title}</span>
         <span className="text-sm text-ink-muted">{item.spot.name}</span>

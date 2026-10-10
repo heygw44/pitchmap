@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.program.infra.ProgramQueryMapper">
+
+    <!-- 남은 자리는 정원에서 정원을 차지하는 신청(결제 대기, 확정)의 수를 뺀 값이다. 신청이 정원보다 많아도 응답이 음수가 되지 않게 0에서 멈춘다. -->
+    <sql id="remainingSeats">
+        GREATEST(
+            p.capacity - (SELECT COUNT(*)
+                          FROM program_application a
+                          WHERE a.program_id = p.id
+                            AND a.status IN ('PENDING_PAYMENT', 'CONFIRMED')),
+            0)
+    </sql>
+
+    <!-- 단계는 저장하지 않고 신청 시작·마감 시각과 now를 비교해서 가른다. 시작 시각이 같으면 ID 순서로 정렬해서, 페이지를 넘겨도 같은 행사가
+         두 번 나오거나 빠지지 않게 한다. (start_at, id) 인덱스를 그대로 따라 읽는다. -->
+    <select id="selectList" resultType="com.pitchmap.program.infra.ProgramListRow">
+        SELECT p.id AS program_id,
+               p.title AS title,
+               p.location_text AS location_text,
+               p.spot_id AS spot_id,
+               p.start_at AS start_at,
+               p.end_at AS end_at,
+               p.apply_open_at AS apply_open_at,
+               p.apply_close_at AS apply_close_at,
+               p.capacity AS capacity,
+               <include refid="remainingSeats"/> AS remaining_seats,
+               p.fee AS fee,
+               p.overnight AS overnight,
+               p.status AS status
+        FROM program p
+        WHERE p.status = 'SCHEDULED'
+        <if test="phase == 'UPCOMING'">
+            AND #{now} &lt; p.apply_open_at
+        </if>
+        <if test="phase == 'OPEN'">
+            AND p.apply_open_at &lt;= #{now}
+            AND #{now} &lt; p.apply_close_at
+        </if>
+        <if test="phase == 'CLOSED'">
+            AND p.apply_close_at &lt;= #{now}
+        </if>
+        ORDER BY p.start_at, p.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectDetail" resultType="com.pitchmap.program.infra.ProgramDetailRow">
+        SELECT p.id AS program_id,
+               p.title AS title,
+               p.description AS description,
+               p.location_text AS location_text,
+               p.spot_id AS spot_id,
+               p.start_at AS start_at,
+               p.end_at AS end_at,
+               p.apply_open_at AS apply_open_at,
+               p.apply_close_at AS apply_close_at,
+               p.capacity AS capacity,
+               <include refid="remainingSeats"/> AS remaining_seats,
+               p.fee AS fee,
+               p.payment_deadline_minutes AS payment_deadline_minutes,
+               p.overnight AS overnight,
+               p.status AS status
+        FROM program p
+        WHERE p.id = #{programId}
+    </select>
+
+    <select id="selectLatestApplication" resultType="com.pitchmap.program.infra.MyApplicationRow">
+        SELECT a.id AS application_id,
+               a.status AS status,
+               a.payment_due_at AS payment_due_at
+        FROM program_application a
+        WHERE a.program_id = #{programId}
+          AND a.member_id = #{memberId}
+        ORDER BY a.id DESC
+        LIMIT 1
+    </select>
+
+    <!-- 신청 ID는 신청한 순서대로 커지므로 ID 순서가 곧 신청 순서다. 회원 테이블에서는 닉네임만 읽는다. -->
+    <select id="selectApplicants" resultType="com.pitchmap.program.infra.ProgramApplicantRow">
+        SELECT a.id AS application_id,
+               a.member_id AS member_id,
+               m.nickname AS nickname,
+               a.status AS status,
+               a.payment_due_at AS payment_due_at,
+               a.confirmed_at AS confirmed_at,
+               a.canceled_at AS canceled_at,
+               a.cancel_reason AS cancel_reason,
+               a.review_requested_at AS review_requested_at,
+               a.created_at AS created_at
+        FROM program_application a
+        JOIN member m ON m.id = a.member_id
+        WHERE a.program_id = #{programId}
+        <if test="status != null">
+            AND a.status = #{status}
+        </if>
+        ORDER BY a.id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 신청 ID는 신청한 순서대로 커지므로 ID 내림차순이 곧 최근 신청부터다. 행사 정보는 신청 시점이 아니라 지금 값을 조인한다. -->
+    <select id="selectMyApplications" resultType="com.pitchmap.program.infra.MyProgramApplicationRow">
+        SELECT a.id AS application_id,
+               a.status AS status,
+               a.payment_due_at AS payment_due_at,
+               a.confirmed_at AS confirmed_at,
+               a.canceled_at AS canceled_at,
+               a.cancel_reason AS cancel_reason,
+               a.created_at AS created_at,
+               p.id AS program_id,
+               p.title AS title,
+               p.location_text AS location_text,
+               p.start_at AS start_at,
+               p.end_at AS end_at,
+               p.fee AS fee,
+               p.status AS program_status,
+               p.apply_open_at AS apply_open_at,
+               p.apply_close_at AS apply_close_at
+        FROM program_application a
+        JOIN program p ON p.id = a.program_id
+        WHERE a.member_id = #{memberId}
+        <if test="status != null">
+            AND a.status = #{status}
+        </if>
+        ORDER BY a.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="existsActiveSpot" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM spot s WHERE s.id = #{spotId} AND s.status = 'ACTIVE')
+    </select>
+
+</mapper>

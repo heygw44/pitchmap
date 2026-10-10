@@ -80,7 +80,8 @@ public class BasecampDetailQueryService {
                 .filter(member -> member.memberId() == basecamp.getLeaderId())
                 .findFirst()
                 .orElseGet(() -> toDetailMember(
-                        memberProfileQueryService.find(basecamp.getLeaderId()), BasecampMemberRole.LEADER));
+                        memberProfileQueryService.findIncludingWithdrawn(basecamp.getLeaderId()),
+                        BasecampMemberRole.LEADER));
     }
 
     private List<BasecampDetail.DetailMember> readMembers(Basecamp basecamp) {
@@ -94,7 +95,7 @@ public class BasecampDetailQueryService {
     }
 
     private BasecampDetail.DetailMember toDetailMember(BasecampMember member) {
-        return toDetailMember(memberProfileQueryService.find(member.getMemberId()), member.getRole());
+        return toDetailMember(memberProfileQueryService.findIncludingWithdrawn(member.getMemberId()), member.getRole());
     }
 
     private static BasecampDetail.DetailMember toDetailMember(MemberTrustProfile profile, BasecampMemberRole role) {

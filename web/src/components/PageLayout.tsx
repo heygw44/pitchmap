@@ -1,25 +1,25 @@
 import type { ReactNode } from 'react';
-import { Link } from '../app/router';
+import { HubLayout } from './HubLayout';
 
 type PageLayoutProps = {
   title: string;
-  // 표나 목록을 넓게 보여 줄 화면에서 켠다. 기본은 한 열(sm) 폭이다.
+  // 표나 목록을 넓게 보여 줄 화면에서 켠다. 기본은 좁은 한 열(max-w-2xl)이다.
   wide?: boolean;
+  description?: string;
+  breadcrumb?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  tabs?: ReactNode;
+  aside?: ReactNode;
   children: ReactNode;
 };
 
-// 지도가 없는 화면(내 정보, 회원 프로필)의 틀이다. 가운데 한 열에 서비스 이름과 제목을 두고, 내용은 카드 여러 개로 나눈다.
-export function PageLayout({ title, wide = false, children }: PageLayoutProps) {
+// 지도가 없는 화면(내 정보, 회원 프로필, 행사 등)의 틀이다. 목록 중심 화면과 같은 머리글 띠(HubLayout)를 쓴다.
+export function PageLayout({ wide = false, children, ...rest }: PageLayoutProps) {
   return (
-    <div className="min-h-dvh bg-paper bg-contour">
-      <main className={`mx-auto flex ${wide ? 'max-w-screen-lg' : 'max-w-screen-sm'} flex-col gap-4 px-4 py-10`}>
-        <Link to="/" className="self-start font-serif text-2xl font-semibold text-forest-deep">
-          피치맵
-        </Link>
-        <h1 className="font-serif text-xl font-semibold text-ink">{title}</h1>
-        {children}
-      </main>
-    </div>
+    <HubLayout width={wide ? 'wide' : 'narrow'} {...rest}>
+      {children}
+    </HubLayout>
   );
 }
 

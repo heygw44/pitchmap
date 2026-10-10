@@ -56,6 +56,11 @@ public class SanctionConfirmApplier {
                     SanctionEvents.AGGREGATE_TYPE,
                     memberId,
                     new SanctionEvents.Payload(memberId, sanction.getId()));
+            outboxEventRecorder.record(
+                    SanctionEvents.PROGRAM_CLEANUP_EVENT_TYPE,
+                    SanctionEvents.AGGREGATE_TYPE,
+                    memberId,
+                    new SanctionEvents.Payload(memberId, sanction.getId()));
         }
         outboxEventRecorder.record(
                 SanctionEvents.NOTIFICATION_EVENT_TYPE,

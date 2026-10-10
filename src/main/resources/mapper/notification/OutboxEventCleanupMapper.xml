@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.notification.infra.OutboxEventCleanupMapper">
+
+    <delete id="deletePublishedBefore">
+        DELETE FROM outbox_event
+        WHERE status = 'PUBLISHED'
+          AND published_at &lt; #{cutoff}
+        LIMIT #{limit}
+    </delete>
+</mapper>

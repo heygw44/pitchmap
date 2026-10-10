@@ -12,6 +12,9 @@ pitchmap:
   outbox:
     # 테스트가 발행 시점을 직접 정하려고 publishPending()을 호출한다. 그래서 주기적으로 도는 발행기는 끈다.
     publisher-enabled: false
+    cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
   member:
     unverified-cleanup:
       # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
@@ -19,13 +22,37 @@ pitchmap:
     reset-throttle-cleanup:
       # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
       enabled: false
+    login-history-cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
+  idempotency:
+    cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
   basecamp:
     auto-transition:
       # 자동 처리를 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
       enabled: false
+  program:
+    payment-expiry:
+      # 만료 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
   trust:
     sanction-expiry:
       # 만료 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
+    ci-retention-cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
+    report-content-cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
+      enabled: false
+  community:
+    image:
+      # 테스트는 AWS에 접속하지 않는다. 통합 테스트는 테스트용 저장소 빈을 따로 쓴다.
+      storage: fake
+    image-cleanup:
+      # 정리 작업을 테스트가 직접 호출한다. 그래서 정해진 시각에 도는 스케줄러는 끈다.
       enabled: false
   weather:
     kma:

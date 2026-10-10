@@ -81,3 +81,22 @@ export function daysUntilKst(iso: string, now: Date = new Date()): number {
   const today = Date.parse(`${todayKst(now)}T00:00:00+09:00`);
   return Math.round((target - today) / MS_PER_DAY);
 }
+
+// 예: 방금, 5분 전, 3시간 전, 10월 7일, 2025년 10월 7일. 하루가 지난 글은 한국 날짜 기준으로 적는다.
+export function formatRelativeKst(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso);
+  const diffMinutes = Math.floor((now.getTime() - then.getTime()) / 60000);
+  if (diffMinutes < 1) return '방금';
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  const thenDate = KST_DATE.format(then);
+  if (thenDate === todayKst(now)) return `${Math.floor(diffMinutes / 60)}시간 전`;
+  const { month, day } = kstParts(iso);
+  if (thenDate.slice(0, 4) === todayKst(now).slice(0, 4)) return `${month}월 ${day}일`;
+  return `${thenDate.slice(0, 4)}년 ${month}월 ${day}일`;
+}
+
+// 목록의 날짜 칸에 쓰는 한국 시간 기준 월, 일, 요일이다. 예: 11월, 7, 토
+export function kstDateBlock(iso: string): { month: string; day: string; weekday: string } {
+  const { month, day, weekday } = kstParts(iso);
+  return { month: `${month}월`, day: day ?? '', weekday: weekday ?? '' };
+}

@@ -176,7 +176,7 @@ export function IdentityVerificationPage() {
             <p>만 19세가 되는 해의 1월 1일부터 성인으로 봐요. 그때까지는 신뢰 단계가 0이에요.</p>
           </Notice>
         )}
-        <Link to={next ?? '/'} replace className={linkButtonClass}>
+        <Link to={next ?? '/map'} replace className={linkButtonClass}>
           {next ? '보던 화면으로 가기' : '지도로 가기'}
         </Link>
       </AuthLayout>

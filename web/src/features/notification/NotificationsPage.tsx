@@ -9,15 +9,15 @@ import {
 import { toUserMessage } from '../../api/errors';
 import type { NotificationItem, NotificationSetting, NotificationType } from '../../api/types';
 import { navigate, useLocation } from '../../app/router';
-import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Checkbox } from '../../components/Checkbox';
 import { EmptyState } from '../../components/EmptyState';
 import { Notice } from '../../components/Notice';
-import { PageCard, PageLayout } from '../../components/PageLayout';
+import { AsideSection, ListPanel } from '../../components/HubLayout';
+import { PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
-import { formatKstDateTime } from '../../lib/datetime';
+import { formatRelativeKst } from '../../lib/datetime';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import { NOTIFICATION_LABELS, NOTIFICATION_TYPES } from './notificationLabels';
@@ -27,6 +27,8 @@ import { refreshUnreadCount } from './unreadCount';
 function isInternalPath(link: string): boolean {
   return link.startsWith('/') && !link.startsWith('//') && !link.includes('\\');
 }
+
+const DESCRIPTION = '베이스캠프와 행사 소식을 모아 보여 줘요.';
 
 export function NotificationsPage() {
   const session = useSession();
@@ -43,15 +45,14 @@ export function NotificationsPage() {
   }, [session.status, pathname, search]);
 
   if (session.status !== 'authenticated' || !session.me) {
-    return <PageLayout title="알림">{showSkeleton ? <Skeleton className="h-40 w-full" /> : null}</PageLayout>;
+    return (
+      <PageLayout title="알림" description={DESCRIPTION}>
+        {showSkeleton ? <Skeleton className="h-40 w-full" /> : null}
+      </PageLayout>
+    );
   }
 
-  return (
-    <PageLayout title="알림">
-      <NotificationList />
-      <EmailSettingsCard />
-    </PageLayout>
-  );
+  return <NotificationList />;
 }
 
 type ListState = {
@@ -153,11 +154,30 @@ function NotificationList() {
     }
   }
 
-  if (state === null) return showSkeleton ? <Skeleton className="h-40 w-full" /> : null;
+  if (state === null) {
+    return (
+      <PageLayout title="알림" description={DESCRIPTION} aside={<EmailSettingsCard />}>
+        {showSkeleton ? <Skeleton className="h-40 w-full" /> : null}
+      </PageLayout>
+    );
+  }
 
   const hasUnread = state.items.some((item) => item.readAt === null);
 
   return (
+    <PageLayout
+      title="알림"
+      description={DESCRIPTION}
+      wide
+      aside={<EmailSettingsCard />}
+      actions={
+        hasUnread ? (
+          <Button variant="secondary" loading={markingAll} onClick={() => void readAll()}>
+            모두 읽음
+          </Button>
+        ) : undefined
+      }
+    >
     <section className="flex flex-col gap-3" aria-label="알림 목록">
       {(state.error || actionError) && (
         <div role="alert" className="flex flex-col gap-3">
@@ -173,21 +193,14 @@ function NotificationList() {
           )}
         </div>
       )}
-      {hasUnread && (
-        <div>
-          <Button variant="secondary" loading={markingAll} onClick={() => void readAll()}>
-            모두 읽음
-          </Button>
-        </div>
-      )}
       {state.items.length === 0 && !state.error ? (
         <EmptyState title="알림이 없어요" description="합류 신청, 신고 처리 같은 소식이 생기면 여기에 보여요." />
       ) : (
-        <ul className="flex flex-col rounded-control border border-contour bg-card">
+        <ListPanel>
           {state.items.map((item) => (
             <NotificationRow key={item.notificationId} item={item} onOpen={() => void open(item)} />
           ))}
-        </ul>
+        </ListPanel>
       )}
       {state.hasNext && (
         <div>
@@ -197,6 +210,7 @@ function NotificationList() {
         </div>
       )}
     </section>
+    </PageLayout>
   );
 }
 
@@ -204,18 +218,25 @@ function NotificationRow({ item, onOpen }: { item: NotificationItem; onOpen: () 
   const unread = item.readAt === null;
   // 제목과 본문은 서버가 만든 글자이지만 HTML로 넣지 않고 글자로만 그린다.
   return (
-    <li className="border-t border-contour first:border-t-0">
+    <li>
       <button
         type="button"
         onClick={onOpen}
-        className={`flex min-h-11 w-full flex-col gap-1 px-4 py-3 text-left ${unread ? 'bg-forest-soft' : 'bg-card hover:bg-paper-deep'}`}
+        className={`flex min-h-11 w-full items-start gap-3 px-4 py-3 text-left ${unread ? 'bg-forest-soft' : 'bg-card hover:bg-paper-deep'}`}
       >
-        <span className="flex flex-wrap items-center gap-2">
-          {unread && <Badge tone="sea">안 읽음</Badge>}
-          <span className={`text-base text-ink ${unread ? 'font-semibold' : ''}`}>{item.title}</span>
+        <span className="flex w-2 shrink-0 justify-center pt-2">
+          {unread && (
+            <>
+              <span aria-hidden="true" className="size-2 rounded-control bg-forest" />
+              <span className="sr-only">안 읽음</span>
+            </>
+          )}
         </span>
-        <span className="whitespace-pre-line break-words text-sm text-ink">{item.body}</span>
-        <span className="font-mono text-sm tabular-nums text-ink-muted">{formatKstDateTime(item.createdAt)}</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={`text-base text-ink ${unread ? 'font-semibold' : ''}`}>{item.title}</span>
+          <span className="whitespace-pre-line break-words text-sm text-ink">{item.body}</span>
+          <span className="font-mono text-sm tabular-nums text-ink-muted">{formatRelativeKst(item.createdAt)}</span>
+        </span>
       </button>
     </li>
   );
@@ -281,7 +302,7 @@ function EmailSettingsCard() {
   }
 
   return (
-    <PageCard title="이메일 수신 설정">
+    <AsideSection title="이메일 수신 설정">
       <p className="text-sm text-ink-muted">끄더라도 알림함에는 알림이 계속 쌓여요.</p>
       {state.status === 'loading' && <Skeleton className="h-40 w-full" />}
       {state.status === 'error' && (
@@ -329,6 +350,6 @@ function EmailSettingsCard() {
           </div>
         </>
       )}
-    </PageCard>
+    </AsideSection>
   );
 }

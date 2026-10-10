@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.community.infra.CommunityImageMapper">
+
+    <!-- 글 안 순서(display_order)는 글에 붙은 이미지에만 있고, 글마다 0부터 겹치지 않게 채운다. -->
+    <select id="selectByPostId" resultType="com.pitchmap.community.infra.CommunityImageRow">
+        SELECT id AS image_id, object_key
+        FROM community_image
+        WHERE post_id = #{postId}
+        ORDER BY display_order
+    </select>
+
+    <select id="selectUnattachedCreatedBefore" resultType="com.pitchmap.community.infra.CommunityImageRow">
+        SELECT id AS image_id, object_key
+        FROM community_image
+        WHERE post_id IS NULL
+          AND created_at &lt; #{createdBefore}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <!-- 읽은 뒤에 글에 붙은 이미지는 post_id가 NULL이 아니라서 지워지지 않는다. -->
+    <delete id="deleteIfUnattached">
+        DELETE FROM community_image
+        WHERE id = #{imageId}
+          AND post_id IS NULL
+    </delete>
+</mapper>

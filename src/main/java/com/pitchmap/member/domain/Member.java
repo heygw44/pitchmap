@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,11 +27,18 @@ public class Member {
     public static final int NICKNAME_MAX_LENGTH = 20;
     public static final int EMAIL_MAX_LENGTH = 254;
 
+    /** 탈퇴한 회원의 닉네임은 이 접두사 뒤에 회원 ID를 붙인 값이다. */
+    public static final String WITHDRAWN_NICKNAME_PREFIX = "탈퇴회원_";
+
+    // 가입이나 닉네임 변경으로 탈퇴 회원 닉네임을 미리 차지하지 못하게 막는다. 접두사 뒤에 숫자만 오는 닉네임이 대상이다.
+    private static final Pattern WITHDRAWN_NICKNAME_PATTERN =
+            Pattern.compile("^" + Pattern.quote(WITHDRAWN_NICKNAME_PREFIX) + "[0-9]+$");
+
     // 글자(Lo) 범주라서 범주 검사로는 걸러지지 않지만 화면에는 아무것도 그리지 않는 한글 채움 문자다.
     private static final Set<Integer> BLANK_LETTERS = Set.of(0x115F, 0x1160, 0x3164, 0xFFA0);
 
-    public static final String NICKNAME_RULE_MESSAGE =
-            "닉네임은 " + NICKNAME_MIN_LENGTH + "~" + NICKNAME_MAX_LENGTH + "자여야 합니다. 앞뒤 공백, 연속 공백, 보이지 않는 문자는 쓸 수 없습니다.";
+    public static final String NICKNAME_RULE_MESSAGE = "닉네임은 " + NICKNAME_MIN_LENGTH + "~" + NICKNAME_MAX_LENGTH
+            + "자여야 합니다. 앞뒤 공백, 연속 공백, 보이지 않는 문자는 쓸 수 없고, '" + WITHDRAWN_NICKNAME_PREFIX + "숫자' 형태도 쓸 수 없습니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -110,6 +118,26 @@ public class Member {
         }
         this.passwordHash = passwordHash;
         this.passwordChangedAt = now;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 회원을 탈퇴 상태로 바꾸고 개인정보를 지운다. 이메일, 비밀번호 해시, 스스로 밝힌 연령대와 성별을 비우고
+     * 닉네임을 {@code 탈퇴회원_{id}}로 바꾼다. 이 닉네임은 닉네임 규칙 검사를 거치지 않는다. 이미 탈퇴한 회원은 그대로 둔다.
+     * 이메일이 비면 같은 이메일로 다시 가입할 수 있다.
+     */
+    public void withdraw(Instant now) {
+        requireNow(now);
+        if (status == MemberStatus.WITHDRAWN) {
+            return;
+        }
+        this.email = null;
+        this.passwordHash = null;
+        this.selfAgeGroup = null;
+        this.selfGender = null;
+        this.nickname = WITHDRAWN_NICKNAME_PREFIX + id;
+        this.status = MemberStatus.WITHDRAWN;
+        this.withdrawnAt = now;
         this.updatedAt = now;
     }
 
@@ -225,6 +253,9 @@ public class Member {
      * 폭 없는 공백은 아예 무시한다. 그래서 그대로 두면 {@code hiker}에 NBSP를 붙인 닉네임이 {@code hiker}를 사칭하며 통과한다.
      * 이를 막으려고 일반 공백(U+0020)은 닉네임 가운데에 한 칸만 허용하고, 그 밖의 공백류·제어·서식 문자와 한글 채움 문자는 거부한다.
      * ZWJ(U+200D)도 서식 문자라서 ZWJ로 이은 이모지는 쓸 수 없다.
+     *
+     * <p>{@code 탈퇴회원_}과 숫자만으로 이뤄진 닉네임도 받지 않는다. 탈퇴한 회원의 닉네임이 이 모양이라서, 허용하면 다른 회원이 탈퇴한
+     * 회원인 척할 수 있고 탈퇴할 때 만든 닉네임과 겹칠 수 있다.
      */
     public static boolean isValidNickname(String nickname) {
         if (nickname == null) {
@@ -232,6 +263,9 @@ public class Member {
         }
         int length = nickname.codePointCount(0, nickname.length());
         if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) {
+            return false;
+        }
+        if (WITHDRAWN_NICKNAME_PATTERN.matcher(nickname).matches()) {
             return false;
         }
         boolean misplacedSpace = nickname.startsWith(" ") || nickname.endsWith(" ") || nickname.contains("  ");

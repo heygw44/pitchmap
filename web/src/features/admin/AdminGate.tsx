@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Link, navigate, useLocation } from '../../app/router';
+import { navigate, useLocation } from '../../app/router';
 import { EmptyState } from '../../components/EmptyState';
 import { PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
+import { UnderlineNav, UnderlineNavLink } from '../../components/UnderlineNav';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
@@ -45,24 +46,21 @@ export function AdminPage({ title, current, children }: { title: string; current
   }
 
   return (
-    <PageLayout title={title} wide>
-      <nav aria-label="관리자 메뉴" className="flex flex-wrap gap-2">
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            aria-current={item.to === current ? 'page' : undefined}
-            className={`inline-flex min-h-11 items-center rounded-control border px-4 font-semibold ${
-              item.to === current
-                ? 'border-forest bg-forest-soft text-forest-deep'
-                : 'border-ink-subtle bg-card text-ink hover:bg-paper-deep'
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      {children}
+    <PageLayout
+      title={title}
+      wide
+      tabs={
+        <UnderlineNav label="관리자 메뉴">
+          {NAV_ITEMS.map((item) => (
+            <UnderlineNavLink key={item.to} to={item.to} active={item.to === current}>
+              {item.label}
+            </UnderlineNavLink>
+          ))}
+        </UnderlineNav>
+      }
+    >
+      {/* 필터와 표도 등고선 무늬가 아니라 카드 바탕 위에 둔다. */}
+      <div className="flex min-w-0 flex-col gap-4 rounded-control border border-contour bg-card p-4">{children}</div>
     </PageLayout>
   );
 }

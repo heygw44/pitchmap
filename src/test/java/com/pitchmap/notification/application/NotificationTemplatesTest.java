@@ -238,4 +238,74 @@ class NotificationTemplatesTest {
         assertThatThrownBy(() -> NotificationTemplates.sanctionConfirmed(unknown))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("[F-19][F-20] 행사 신청 확정 알림은 신청자에게만 가고 링크는 행사 화면이다")
+    void programApplicationConfirmedNotifiesApplicant() {
+        List<NotificationDraft> drafts = NotificationTemplates.programApplicationConfirmed(
+                new NotificationPayloads.ProgramApplicationConfirmed(1L, 2L, 9L));
+
+        assertThat(drafts)
+                .containsExactly(new NotificationDraft(
+                        2L, "PROGRAM_APPLICATION_CONFIRMED", "행사 신청 확정", "결제가 끝나 행사 신청이 확정됐습니다.", "/programs/9"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "USER, false, 행사 신청을 취소했습니다.",
+        "USER, true, 행사 신청을 취소했습니다. 결제한 금액은 환불됩니다.",
+        "PROGRAM_CANCELED, false, 행사가 취소되어 신청이 취소됐습니다.",
+        "PROGRAM_CANCELED, true, 행사가 취소되어 신청이 취소됐습니다. 결제한 금액은 환불됩니다.",
+        "SANCTIONED, false, 이용 제재로 행사 신청이 취소됐습니다."
+    })
+    @DisplayName("[F-19][F-20] 행사 신청 취소 알림 본문은 취소 사유로 나뉘고, 환불했으면 환불 문장이 붙는다")
+    void programApplicationCanceledBodyDependsOnReasonAndRefund(String reason, boolean refunded, String body) {
+        List<NotificationDraft> drafts = NotificationTemplates.programApplicationCanceled(
+                new NotificationPayloads.ProgramApplicationCanceled(1L, 2L, 9L, reason, refunded));
+
+        assertThat(drafts)
+                .containsExactly(
+                        new NotificationDraft(2L, "PROGRAM_APPLICATION_CANCELED", "행사 신청 취소", body, "/programs/9"));
+    }
+
+    @Test
+    @DisplayName("[F-19][F-20] 모르는 행사 신청 취소 사유 이름이면 예외를 던진다")
+    void programApplicationCanceledRejectsUnknownReason() {
+        assertThatThrownBy(() -> NotificationTemplates.programApplicationCanceled(
+                        new NotificationPayloads.ProgramApplicationCanceled(1L, 2L, 9L, "UNKNOWN", false)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("[F-19][F-20][PG-05] 행사 신청 만료 알림은 신청자에게만 가고 링크는 행사 화면이다")
+    void programApplicationExpiredNotifiesApplicant() {
+        List<NotificationDraft> drafts = NotificationTemplates.programApplicationExpired(
+                new NotificationPayloads.ProgramApplicationExpired(1L, 2L, 9L));
+
+        assertThat(drafts)
+                .containsExactly(new NotificationDraft(
+                        2L, "PROGRAM_APPLICATION_EXPIRED", "행사 신청 만료", "결제 기한이 지나 행사 신청이 취소됐습니다.", "/programs/9"));
+    }
+
+    @Test
+    @DisplayName("[F-20][PG-07] 빈자리 알림은 대상 회원마다 한 건씩 만들고 링크는 행사 화면이다")
+    void programSeatReleasedNotifiesEachMember() {
+        List<NotificationDraft> drafts = NotificationTemplates.programSeatReleased(
+                new NotificationPayloads.ProgramSeatReleased(9L, List.of(2L, 3L)));
+
+        assertThat(drafts)
+                .containsExactly(
+                        new NotificationDraft(
+                                2L,
+                                "PROGRAM_SEAT_RELEASED",
+                                "행사 빈자리 알림",
+                                "신청한 행사에 빈자리가 생겼습니다. 자리는 먼저 신청한 회원에게 돌아갑니다.",
+                                "/programs/9"),
+                        new NotificationDraft(
+                                3L,
+                                "PROGRAM_SEAT_RELEASED",
+                                "행사 빈자리 알림",
+                                "신청한 행사에 빈자리가 생겼습니다. 자리는 먼저 신청한 회원에게 돌아갑니다.",
+                                "/programs/9"));
+    }
 }

@@ -625,7 +625,10 @@ export type NotificationType =
   | 'BASECAMP_COMPLETED'
   | 'BASECAMP_MEMBER_CHANGED'
   | 'MEMBER_REPORT_RESOLVED'
-  | 'SANCTION_CONFIRMED';
+  | 'SANCTION_CONFIRMED'
+  | 'PROGRAM_APPLICATION_CONFIRMED'
+  | 'PROGRAM_APPLICATION_CANCELED'
+  | 'PROGRAM_APPLICATION_EXPIRED';
 
 export interface NotificationItem {
   notificationId: number;
@@ -765,4 +768,184 @@ export interface AdminSpotSummary {
   reasonCounts: Record<BakjiReportReason, number>;
   recentReports: { reason: BakjiReportReason; content: string | null; createdAt: string }[];
   statusChangedAt: string;
+}
+
+// 공식 행사
+
+export type ProgramStatus = 'UPCOMING' | 'OPEN' | 'CLOSED' | 'CANCELED';
+
+export interface ProgramSummary {
+  programId: number;
+  title: string;
+  locationText: string;
+  // 지도 장소와 연결하지 않은 행사는 null이다.
+  spotId: number | null;
+  startAt: string;
+  endAt: string;
+  applyOpenAt: string;
+  applyCloseAt: string;
+  capacity: number;
+  remainingSeats: number;
+  fee: number;
+  overnight: boolean;
+  status: ProgramStatus;
+}
+
+export type ProgramApplicationStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'CANCELED' | 'EXPIRED';
+
+export interface ProgramMyApplication {
+  applicationId: number;
+  status: ProgramApplicationStatus;
+  paymentDueAt: string | null;
+}
+
+export interface ProgramDetail extends ProgramSummary {
+  description: string;
+  paymentDeadlineMinutes: number;
+  // 비로그인이거나 신청이 없으면 필드가 없다.
+  myApplication?: ProgramMyApplication;
+}
+
+export interface ProgramApplyResponse {
+  applicationId: number;
+  status: ProgramApplicationStatus;
+  paymentDueAt: string;
+  amount: number;
+}
+
+export interface ProgramPayResponse {
+  applicationId: number;
+  status: ProgramApplicationStatus;
+  paidAt: string;
+}
+
+export interface ProgramCancelResponse {
+  status: ProgramApplicationStatus;
+  refunded: boolean;
+}
+
+export type ProgramCancelReason = 'USER' | 'EXPIRED' | 'SANCTIONED' | 'PROGRAM_CANCELED' | 'WITHDRAWN';
+
+export interface MyProgramApplicationItem {
+  applicationId: number;
+  status: ProgramApplicationStatus;
+  paymentDueAt: string | null;
+  confirmedAt: string | null;
+  canceledAt: string | null;
+  cancelReason: ProgramCancelReason | null;
+  createdAt: string;
+  program: {
+    programId: number;
+    title: string;
+    locationText: string;
+    startAt: string;
+    endAt: string;
+    fee: number;
+    status: ProgramStatus;
+  };
+}
+
+// 커뮤니티
+
+export type CommunityCategory = 'EXPERIENCE' | 'GEAR' | 'FREE';
+
+export type CommunityReportReason = 'SPAM' | 'ABUSE' | 'ILLEGAL_CAMPING' | 'PRIVACY' | 'MONEY_SCAM' | 'OTHER';
+
+export interface CommunityAuthor {
+  memberId: number;
+  nickname: string;
+}
+
+// 연결한 장소가 ACTIVE일 때만 서버가 준다.
+export interface CommunityPostSpot {
+  spotId: number;
+  name: string;
+}
+
+interface CommunityPostBase {
+  postId: number;
+  category: CommunityCategory;
+  title: string;
+  author: CommunityAuthor;
+  spot?: CommunityPostSpot;
+  likeCount: number;
+  commentCount: number;
+  createdAt: string;
+}
+
+export interface CommunityPostSummary extends CommunityPostBase {
+  // 본문 앞 100자
+  excerpt: string;
+  thumbnailUrl?: string;
+  imageCount: number;
+}
+
+export interface CommunityPostImage {
+  imageId: number;
+  // 서버가 응답마다 새로 발급하는 사전 서명 URL이고 1시간 동안 쓸 수 있다.
+  url: string;
+}
+
+export interface CommunityPostDetail extends CommunityPostBase {
+  content: string;
+  images: CommunityPostImage[];
+  updatedAt: string;
+  // 로그인한 요청에만 있다.
+  likedByMe?: boolean;
+}
+
+export interface CommunityPostCreateRequest {
+  category: CommunityCategory;
+  title: string;
+  content: string;
+  spotId?: number;
+  imageIds: number[];
+}
+
+// 보내지 않은 필드는 그대로 두고, spotId: null은 장소 연결을 끊는다.
+export interface CommunityPostUpdateRequest {
+  category?: CommunityCategory;
+  title?: string;
+  content?: string;
+  spotId?: number | null;
+  imageIds?: number[];
+}
+
+// 삭제된 댓글은 보이는 답글이 있을 때만 deleted: true로 오고, author와 content는 빠진다.
+export interface CommunityComment {
+  commentId: number;
+  author?: CommunityAuthor;
+  content?: string;
+  deleted: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  replies: CommunityComment[];
+}
+
+export interface CommunityCommentCreateRequest {
+  content: string;
+  parentId?: number;
+}
+
+export interface CommunityLikeResponse {
+  liked: boolean;
+  likeCount: number;
+}
+
+export interface CommunityReportRequest {
+  reason: CommunityReportReason;
+  content?: string;
+}
+
+export interface CommunityImageUploadRequest {
+  contentType: string;
+  sizeBytes: number;
+}
+
+export interface CommunityImageUpload {
+  imageId: number;
+  uploadUrl: string;
+  method: 'PUT';
+  headers: Record<string, string>;
+  expiresAt: string;
 }

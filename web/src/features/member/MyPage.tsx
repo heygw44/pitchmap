@@ -11,6 +11,7 @@ import { Button } from '../../components/Button';
 import { ChoiceGroup } from '../../components/ChoiceGroup';
 import type { ChoiceOption } from '../../components/ChoiceGroup';
 import { Evidence } from '../../components/Evidence';
+import { AsideSection } from '../../components/HubLayout';
 import { Notice } from '../../components/Notice';
 import { PageCard, PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
@@ -35,8 +36,7 @@ const GENDER_OPTIONS: ReadonlyArray<ChoiceOption<GenderChoice>> = [
   { value: NOT_SET, label: '밝히지 않음' },
 ];
 
-const PAGE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep';
+const SHORTCUT_LINK_CLASS = 'inline-flex min-h-11 items-center text-base font-semibold text-forest hover:text-forest-strong';
 
 const UNVERIFIED_REASON = '이메일 인증을 마치면 고칠 수 있어요';
 
@@ -55,7 +55,7 @@ export function MyPage() {
 
   if (session.status !== 'authenticated' || !session.me) {
     return (
-      <PageLayout title="내 정보">
+      <PageLayout title="내 정보" description="계정과 신뢰 단계, 프로필을 관리해요.">
         {showSkeleton ? <Skeleton className="h-40 w-full" /> : null}
       </PageLayout>
     );
@@ -63,36 +63,61 @@ export function MyPage() {
 
   const me = session.me;
   return (
-    <PageLayout title="내 정보">
+    <PageLayout title="내 정보" description="계정과 신뢰 단계, 프로필을 관리해요." aside={<ShortcutAside me={me} onLogout={() => void session.logout()} />}>
       <AccountCard me={me} />
       <TrustCard me={me} />
       <SelfReportForm me={me} onSaved={() => void session.refresh().catch(() => null)} />
-      <div className="flex flex-wrap gap-2">
-        <Link to="/me/basecamps" className={PAGE_LINK_CLASS}>
-          내 베이스캠프
-        </Link>
-        <Link to="/me/companion-reviews" className={PAGE_LINK_CLASS}>
-          동행 후기
-        </Link>
-        <Link to="/me/notifications" className={PAGE_LINK_CLASS}>
-          알림
-        </Link>
-        {me.role === 'ADMIN' && (
-          <Link to="/admin/reports" className={PAGE_LINK_CLASS}>
-            관리자
-          </Link>
-        )}
-        <Link
-          to={`/members/${me.memberId}`}
-          className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"
-        >
-          다른 회원에게 보이는 내 프로필
-        </Link>
-        <Button variant="ghost" onClick={() => void session.logout()}>
-          로그아웃
-        </Button>
-      </div>
     </PageLayout>
+  );
+}
+
+function ShortcutAside({ me, onLogout }: { me: Me; onLogout: () => void }) {
+  return (
+    <AsideSection title="바로 가기">
+      <ul>
+        <li>
+          <Link to="/me/basecamps" className={SHORTCUT_LINK_CLASS}>
+            내 베이스캠프
+          </Link>
+        </li>
+        <li>
+          <Link to="/me/program-applications" className={SHORTCUT_LINK_CLASS}>
+            내 행사 신청
+          </Link>
+        </li>
+        <li>
+          <Link to="/me/companion-reviews" className={SHORTCUT_LINK_CLASS}>
+            동행 후기
+          </Link>
+        </li>
+        <li>
+          <Link to="/me/notifications" className={SHORTCUT_LINK_CLASS}>
+            알림
+          </Link>
+        </li>
+        {me.role === 'ADMIN' && (
+          <li>
+            <Link to="/admin/reports" className={SHORTCUT_LINK_CLASS}>
+              관리자
+            </Link>
+          </li>
+        )}
+        <li>
+          <Link to={`/members/${me.memberId}`} className={SHORTCUT_LINK_CLASS}>
+            다른 회원에게 보이는 내 프로필
+          </Link>
+        </li>
+      </ul>
+      <div>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex min-h-11 items-center text-base font-semibold text-forest hover:underline"
+        >
+          로그아웃
+        </button>
+      </div>
+    </AsideSection>
   );
 }
 

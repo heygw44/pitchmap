@@ -2,6 +2,12 @@ import { AdminReportDetailPage } from '../features/admin/AdminReportDetailPage';
 import { AdminReportsPage } from '../features/admin/AdminReportsPage';
 import { AdminSpotsPage } from '../features/admin/AdminSpotsPage';
 import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
+import { CommunityListPage } from '../features/community/CommunityListPage';
+import { CommunityPostDetailPage } from '../features/community/CommunityPostDetailPage';
+import { CommunityPostFormPage } from '../features/community/CommunityPostFormPage';
+import { MyProgramApplicationsPage } from '../features/program/MyProgramApplicationsPage';
+import { ProgramDetailPage } from '../features/program/ProgramDetailPage';
+import { ProgramListPage } from '../features/program/ProgramListPage';
 import { MyBasecampsPage } from '../features/basecamp/MyBasecampsPage';
 import { NotificationsPage } from '../features/notification/NotificationsPage';
 import { CompanionReviewsPage } from '../features/review/CompanionReviewsPage';
@@ -10,13 +16,15 @@ import { MemberProfilePage } from '../features/member/MemberProfilePage';
 import { MyPage } from '../features/member/MyPage';
 import { SignupPage } from '../features/member/SignupPage';
 import { VerifyEmailPage } from '../features/member/VerifyEmailPage';
+import { LandingPage } from '../features/landing/LandingPage';
 import { IdentityVerificationPage } from '../features/trust/IdentityVerificationPage';
 import { MapPage } from '../features/spot/MapPage';
 import NotFoundPage from './NotFoundPage';
 import type { RouteDef } from './router';
 
 export const routes: RouteDef[] = [
-  { path: '/', render: () => <MapPage /> },
+  { path: '/', render: () => <LandingPage /> },
+  { path: '/map', render: () => <MapPage /> },
   {
     path: '/spots/:spotId',
     // 장소 ID는 양의 정수만 있다. 그 밖의 값은 서버에 묻지 않고 없는 페이지로 보여 준다.
@@ -56,7 +64,37 @@ export const routes: RouteDef[] = [
       return basecampId === null ? <NotFoundPage /> : <BasecampManagePage key={basecampId} basecampId={basecampId} />;
     },
   },
+  { path: '/community', render: () => <CommunityListPage /> },
+  // '/community/new'가 '/community/:postId'보다 먼저 맞아야 하므로 이 경로를 앞에 둔다.
+  { path: '/community/new', render: () => <CommunityPostFormPage mode="create" /> },
+  {
+    path: '/community/:postId/edit',
+    render: (params) => {
+      const postId = toPositiveId(params.postId);
+      return postId === null ? (
+        <NotFoundPage />
+      ) : (
+        <CommunityPostFormPage key={postId} mode="edit" postId={postId} />
+      );
+    },
+  },
+  {
+    path: '/community/:postId',
+    render: (params) => {
+      const postId = toPositiveId(params.postId);
+      return postId === null ? <NotFoundPage /> : <CommunityPostDetailPage key={postId} postId={postId} />;
+    },
+  },
+  { path: '/programs', render: () => <ProgramListPage /> },
+  {
+    path: '/programs/:programId',
+    render: (params) => {
+      const programId = toPositiveId(params.programId);
+      return programId === null ? <NotFoundPage /> : <ProgramDetailPage key={programId} programId={programId} />;
+    },
+  },
   { path: '/me/basecamps', render: () => <MyBasecampsPage /> },
+  { path: '/me/program-applications', render: () => <MyProgramApplicationsPage /> },
   { path: '/me/companion-reviews', render: () => <CompanionReviewsPage /> },
   { path: '/me/notifications', render: () => <NotificationsPage /> },
   { path: '/admin/reports', render: () => <AdminReportsPage /> },

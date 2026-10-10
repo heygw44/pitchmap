@@ -86,6 +86,22 @@
           AND b.end_date &gt; #{today}
     </select>
 
+    <!-- 결제를 마친(CONFIRMED) 신청만 참가자로 센다. 결제 대기 신청은 기한이 지나면 만료되므로 예상 인원에 넣지 않는다.
+         당일 행사는 밤을 보내지 않으므로 숙박 행사만 읽는다. 종료 시각이 오늘 0시(한국 시각) 이전인 행사는 남은 밤이 없어서 SQL에서 미리 거른다. -->
+    <select id="selectConfirmedPrograms" resultType="com.pitchmap.spot.infra.SpotConfirmedProgramRow">
+        SELECT p.start_at AS start_at,
+               p.end_at AS end_at,
+               (SELECT COUNT(*)
+                FROM program_application a
+                WHERE a.program_id = p.id
+                  AND a.status = 'CONFIRMED') AS headcount
+        FROM program p
+        WHERE p.spot_id = #{spotId}
+          AND p.status = 'SCHEDULED'
+          AND p.overnight = TRUE
+          AND p.end_at &gt; #{from}
+    </select>
+
     <!-- 출발일이 같으면 ID 순서로 정렬해서 목록 순서가 조회할 때마다 바뀌지 않게 한다. -->
     <select id="selectRecruitingBasecamps" resultType="com.pitchmap.spot.infra.SpotRecruitingBasecampRow">
         SELECT b.id AS basecamp_id,

@@ -2,6 +2,7 @@ package com.pitchmap.trust.infra;
 
 import com.pitchmap.trust.domain.Sanction;
 import com.pitchmap.trust.domain.SanctionRepository;
+import com.pitchmap.trust.domain.SanctionStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +37,9 @@ public interface SanctionJpaRepository extends JpaRepository<Sanction, Long>, Sa
               and (s.endsAt is null or s.endsAt > :now)
             """)
     boolean existsActiveSuspension(@Param("memberId") long memberId, @Param("now") Instant now);
+
+    @Override
+    boolean existsByMemberIdAndStatusNot(long memberId, SanctionStatus status);
 
     @Override
     Optional<Sanction> findById(Long id);

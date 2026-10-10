@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.trust.infra.ReportContentCleanupMapper">
+
+    <!-- updated_at은 상태가 바뀐 시각이라서 내용을 지울 때 바꾸지 않는다. -->
+    <update id="clearHandledReportContent">
+        UPDATE member_report
+        SET content = NULL,
+            result_note = NULL
+        WHERE status IN ('ACTIONED', 'DISMISSED')
+          AND handled_at &lt;= #{cutoff}
+          AND (content IS NOT NULL OR result_note IS NOT NULL)
+        LIMIT #{limit}
+    </update>
+
+    <!--
+        경고는 만들 때부터 종료 시각이 없고 만료 작업도 바꾸지 않아서 해제되기 전까지 ACTIVE로 남는다.
+        그래서 경고는 상태와 상관없이 시작 시각으로 판단하고, 해제한 경고는 해제 시각 조건도 맞으면 지워진다.
+        영구 정지(PERMANENT)는 종료 시각이 없고 해제 전까지 ACTIVE라서 어느 조건에도 걸리지 않는다.
+    -->
+    <update id="clearFinishedSanctionReason">
+        UPDATE sanction
+        SET reason = NULL
+        WHERE reason IS NOT NULL
+          AND (
+                (status = 'EXPIRED' AND ends_at &lt;= #{cutoff})
+                OR (status = 'LIFTED' AND lifted_at &lt;= #{cutoff})
+                OR (type = 'WARNING' AND status &lt;&gt; 'LIFTED' AND starts_at &lt;= #{cutoff})
+              )
+        LIMIT #{limit}
+    </update>
+</mapper>

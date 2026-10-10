@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.community.infra.CommunityCommentMapper">
+
+    <!-- 작성자 닉네임은 조회할 때의 회원 값이다. 탈퇴한 회원은 member 행의 닉네임이 익명 값으로 바뀌어 있어서 그대로 내보낸다.
+         댓글 ID는 순서대로 커지므로 ID 오름차순이 곧 오래된 순이다. 그래서 작성 시각 정렬 없이 기본 키 순서로 읽는다. -->
+    <sql id="commentColumns">
+        c.id AS comment_id,
+        c.parent_id AS parent_id,
+        (c.status = 'ACTIVE') AS active,
+        c.member_id AS author_id,
+        m.nickname AS author_nickname,
+        c.content AS content,
+        c.created_at AS created_at,
+        c.updated_at AS updated_at
+    </sql>
+
+    <!-- 페이지는 최상위 댓글 단위로 센다. ACTIVE가 아닌 최상위 댓글은 보이는 답글이 있을 때만 읽어서, 자리만 남길 댓글만 페이지에 든다. -->
+    <select id="selectTopLevel" resultType="com.pitchmap.community.infra.CommunityCommentRow">
+        SELECT
+        <include refid="commentColumns"/>
+        FROM community_comment c
+        JOIN member m ON m.id = c.member_id
+        WHERE c.post_id = #{postId}
+          AND c.parent_id IS NULL
+          AND (c.status = 'ACTIVE'
+               OR EXISTS (SELECT 1
+                          FROM community_comment r
+                          WHERE r.parent_id = c.id
+                            AND r.status = 'ACTIVE'))
+        ORDER BY c.id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectActiveReplies" resultType="com.pitchmap.community.infra.CommunityCommentRow">
+        SELECT
+        <include refid="commentColumns"/>
+        FROM community_comment c
+        JOIN member m ON m.id = c.member_id
+        WHERE c.status = 'ACTIVE'
+          AND c.parent_id IN
+        <foreach collection="parentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY c.id ASC
+    </select>
+
+    <select id="selectById" resultType="com.pitchmap.community.infra.CommunityCommentRow">
+        SELECT
+        <include refid="commentColumns"/>
+        FROM community_comment c
+        JOIN member m ON m.id = c.member_id
+        WHERE c.id = #{commentId}
+    </select>
+
+</mapper>

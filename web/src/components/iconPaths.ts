@@ -14,7 +14,14 @@ export type IconName =
   | 'chevronLeft'
   | 'close'
   | 'info'
-  | 'bell';
+  | 'bell'
+  | 'map'
+  | 'calendar'
+  | 'user'
+  | 'chat'
+  | 'heart'
+  | 'image'
+  | 'arrowUp';
 
 export const ICON_PATHS: Record<IconName, string> = {
   tent:
@@ -50,4 +57,21 @@ export const ICON_PATHS: Record<IconName, string> = {
     '<path d="M6 17V11a6 6 0 0 1 12 0v6"/>' +
     '<path d="M4 17h16"/>' +
     '<path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  map: '<path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5z"/>' + '<path d="M9 4v13"/>' + '<path d="M15 6.5v13"/>',
+  calendar:
+    '<rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/>' +
+    '<path d="M3.5 10h17"/>' +
+    '<path d="M8 3v4"/>' +
+    '<path d="M16 3v4"/>',
+  user: '<circle cx="12" cy="8" r="4"/>' + '<path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  chat:
+    '<path d="M4 5.5h16a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/>' +
+    '<path d="M7.5 10h9"/>' +
+    '<path d="M7.5 13h5"/>',
+  heart: '<path d="M12 20.5 4.2 12.7a4.8 4.8 0 0 1 6.8-6.8l1 1 1-1a4.8 4.8 0 0 1 6.8 6.8z"/>',
+  image:
+    '<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/>' +
+    '<circle cx="9" cy="10" r="1.75"/>' +
+    '<path d="m3.5 17 5-4.5 4 3.5 3-2.5 5 4.5"/>',
+  arrowUp: '<path d="M12 19V5"/>' + '<path d="m5.5 11.5 6.5-6.5 6.5 6.5"/>',
 };

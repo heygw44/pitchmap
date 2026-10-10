@@ -84,7 +84,7 @@ export function SpotDetailPanel({ spotId, onBack }: SpotDetailPanelProps) {
         description="삭제됐거나 숨김 처리된 장소예요."
         action={
           <Link
-            to="/"
+            to="/map"
             className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"
           >
             목록으로
@@ -202,6 +202,26 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
               이 장소로 베이스캠프 열기
             </Link>
           )}
+        </div>
+      </section>
+
+      <section className={SECTION_CLASS} aria-labelledby="spot-community-title">
+        <h3 id="spot-community-title" className={SECTION_TITLE_CLASS}>
+          커뮤니티
+        </h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link
+            to={`/community?spotId=${detail.spotId}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep"
+          >
+            이 장소 관련 글 보기
+          </Link>
+          <Link
+            to={`/community/new?spotId=${detail.spotId}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep"
+          >
+            이 장소로 글쓰기
+          </Link>
         </div>
       </section>
 
