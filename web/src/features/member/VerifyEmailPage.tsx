@@ -67,7 +67,7 @@ export function VerifyEmailPage() {
     try {
       await verifyEmail(trimmed);
       await session.refresh();
-      navigate(next ?? '/', { replace: true });
+      navigate(next ?? '/map', { replace: true });
     } catch (error) {
       setSubmitting(false);
       if (error instanceof ApiError && CODE_ERROR_CODES[error.code]) {
@@ -131,7 +131,7 @@ export function VerifyEmailPage() {
       <AuthLayout title="이미 인증을 마쳤어요" footer={footer}>
         <p className="text-ink-muted">이메일 인증은 한 번만 하면 돼요.</p>
         <Link
-          to={next ?? '/'}
+          to={next ?? '/map'}
           replace
           className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-forest bg-forest px-4 font-semibold text-white hover:border-forest-strong hover:bg-forest-strong"
         >

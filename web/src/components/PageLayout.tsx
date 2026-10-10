@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
-import { Link } from '../app/router';
+import { BottomTabBar } from '../app/layout/BottomTabBar';
+import { SiteFooter } from '../app/layout/SiteFooter';
+import { SiteHeader } from '../app/layout/SiteHeader';
+import { AnnouncementBar } from '../features/program/AnnouncementBar';
 
 type PageLayoutProps = {
   title: string;
@@ -8,17 +11,21 @@ type PageLayoutProps = {
   children: ReactNode;
 };
 
-// 지도가 없는 화면(내 정보, 회원 프로필)의 틀이다. 가운데 한 열에 서비스 이름과 제목을 두고, 내용은 카드 여러 개로 나눈다.
+// 지도가 없는 화면(내 정보, 회원 프로필, 행사)의 틀이다. 위에 알림 띠와 머리글, 가운데 한 열에 제목과 카드, 아래에 바닥글을 둔다.
+// 모바일에서는 하단 탭이 화면 아래를 덮으므로 그 높이만큼 아래 여백을 둔다.
 export function PageLayout({ title, wide = false, children }: PageLayoutProps) {
   return (
-    <div className="min-h-dvh bg-paper bg-contour">
-      <main className={`mx-auto flex ${wide ? 'max-w-screen-lg' : 'max-w-screen-sm'} flex-col gap-4 px-4 py-10`}>
-        <Link to="/" className="self-start font-serif text-2xl font-semibold text-forest-deep">
-          피치맵
-        </Link>
-        <h1 className="font-serif text-xl font-semibold text-ink">{title}</h1>
-        {children}
-      </main>
+    <div className="flex min-h-dvh flex-col bg-paper pb-(--bottom-nav-h)">
+      <AnnouncementBar />
+      <SiteHeader />
+      <div className="flex-1 bg-paper bg-contour">
+        <main className={`mx-auto flex ${wide ? 'max-w-screen-lg' : 'max-w-screen-sm'} flex-col gap-4 px-4 py-8`}>
+          <h1 className="font-serif text-xl font-semibold text-ink">{title}</h1>
+          {children}
+        </main>
+      </div>
+      <SiteFooter />
+      <BottomTabBar />
     </div>
   );
 }
