@@ -39,9 +39,6 @@ public class CommunityPost {
     @Column(name = "member_id")
     private long memberId;
 
-    @Enumerated(EnumType.STRING)
-    private CommunityCategory category;
-
     private String title;
 
     private String content;
@@ -58,10 +55,8 @@ public class CommunityPost {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    private CommunityPost(
-            long memberId, CommunityCategory category, String title, String content, Long spotId, Instant now) {
+    private CommunityPost(long memberId, String title, String content, Long spotId, Instant now) {
         this.memberId = memberId;
-        this.category = category;
         this.title = title;
         this.content = content;
         this.spotId = spotId;
@@ -73,27 +68,26 @@ public class CommunityPost {
     /**
      * 호출하면 memberId인 회원이 쓴 글을 ACTIVE 상태로 만든다. spotId는 장소를 연결하지 않으면 {@code null}이다.
      *
-     * <p>category나 now가 null이거나, 제목이 공백뿐이거나 {@value #TITLE_MAX_LENGTH}자를 넘거나, 본문이 공백뿐이거나 {@value
+     * <p>now가 null이거나, 제목이 공백뿐이거나 {@value #TITLE_MAX_LENGTH}자를 넘거나, 본문이 공백뿐이거나 {@value
      * #CONTENT_MAX_LENGTH}자를 넘으면 {@link IllegalArgumentException}을 던진다.
      */
-    public static CommunityPost write(
-            long memberId, CommunityCategory category, String title, String content, Long spotId, Instant now) {
-        if (category == null || now == null) {
+    public static CommunityPost write(long memberId, String title, String content, Long spotId, Instant now) {
+        if (now == null) {
             throw new IllegalArgumentException("글을 만드는 데 필요한 값이 null입니다.");
         }
         requireValidTitle(title);
         requireValidContent(content);
-        return new CommunityPost(memberId, category, title, content, spotId, now);
+        return new CommunityPost(memberId, title, content, spotId, now);
     }
 
     /**
-     * 호출하면 null이 아닌 값만 바꾸고 수정 시각을 now로 한다. 셋 다 null이면 아무것도 바꾸지 않는다.
+     * 호출하면 null이 아닌 값만 바꾸고 수정 시각을 now로 한다. 둘 다 null이면 아무것도 바꾸지 않는다.
      *
      * <p>값이 규칙을 어기면 {@link IllegalArgumentException}을 던진다. 장소 연결은 {@link #changeSpot}으로 바꾼다.
      */
-    public void revise(CommunityCategory category, String title, String content, Instant now) {
+    public void revise(String title, String content, Instant now) {
         requireNow(now);
-        if (category == null && title == null && content == null) {
+        if (title == null && content == null) {
             return;
         }
         if (title != null) {
@@ -101,9 +95,6 @@ public class CommunityPost {
         }
         if (content != null) {
             requireValidContent(content);
-        }
-        if (category != null) {
-            this.category = category;
         }
         if (title != null) {
             this.title = title;

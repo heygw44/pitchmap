@@ -41,7 +41,6 @@ public class AdminCommunityQueryService {
         List<AdminCommunityPostSummary> content = pageRows.stream()
                 .map(row -> new AdminCommunityPostSummary(
                         row.postId(),
-                        row.category(),
                         row.title(),
                         row.content(),
                         new AdminCommunityAuthor(row.authorId(), row.authorNickname()),

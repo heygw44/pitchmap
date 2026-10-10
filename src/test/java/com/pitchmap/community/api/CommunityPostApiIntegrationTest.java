@@ -60,13 +60,11 @@ class CommunityPostApiIntegrationTest {
         long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
         Member author = fixture.saveMember("새벽능선");
         Cookie session = fixture.verifiedSession(author);
-        fixture.writePost(session, "FREE", "먼저 쓴 글", "첫 본문", null);
+        fixture.writePost(session, "먼저 쓴 글", "첫 본문", null);
 
         // when
         MvcTestResult created = fixture.send(
-                mvc.post().uri(POSTS),
-                session,
-                "{\"category\":\"GEAR\",\"title\":\"텐트 후기\",\"content\":\"가볍다\",\"spotId\":" + spotId + "}");
+                mvc.post().uri(POSTS), session, "{\"title\":\"텐트 후기\",\"content\":\"가볍다\",\"spotId\":" + spotId + "}");
         long postId = postIdOf(created);
         MvcTestResult list = mvc.get().uri(POSTS).exchange();
         MvcTestResult detail = mvc.get().uri(POSTS + "/" + postId).exchange();
@@ -83,7 +81,6 @@ class CommunityPostApiIntegrationTest {
         assertThat(detail).bodyJson().isStrictlyEqualTo("""
                 {
                   "postId": %d,
-                  "category": "GEAR",
                   "title": "텐트 후기",
                   "content": "가볍다",
                   "images": [],
@@ -103,7 +100,7 @@ class CommunityPostApiIntegrationTest {
         // given
         long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
         Member author = fixture.saveMember("새벽능선");
-        long postId = fixture.writePost(fixture.verifiedSession(author), "EXPERIENCE", "굴업도", "바다가 좋았다", spotId);
+        long postId = fixture.writePost(fixture.verifiedSession(author), "굴업도", "바다가 좋았다", spotId);
 
         // when
         MvcTestResult list = mvc.get().uri(POSTS).exchange();
@@ -114,7 +111,6 @@ class CommunityPostApiIntegrationTest {
                 {
                   "content": [{
                     "postId": %d,
-                    "category": "EXPERIENCE",
                     "title": "굴업도",
                     "excerpt": "바다가 좋았다",
                     "author": { "memberId": %d, "nickname": "새벽능선" },
@@ -137,7 +133,7 @@ class CommunityPostApiIntegrationTest {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
         String content = "가".repeat(100) + "나".repeat(50);
-        long postId = fixture.writePost(session, "FREE", "긴 글", content, null);
+        long postId = fixture.writePost(session, "긴 글", content, null);
 
         // when
         MvcTestResult list = mvc.get().uri(POSTS).exchange();
@@ -149,40 +145,35 @@ class CommunityPostApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-29] category와 spotId 필터가 맞는 글만 돌려주고, 두 조건을 함께 쓰면 둘 다 만족하는 글만 돌려준다")
-    void filtersByCategoryAndSpot() {
+    @DisplayName("[F-29] spotId로 거르면 그 장소에 연결한 글만 돌려주고, 거르지 않으면 모든 글을 한 목록으로 돌려준다")
+    void filtersBySpot() {
         // given
         long spotA = fixture.insertSpot("A 장소", "ACTIVE");
         long spotB = fixture.insertSpot("B 장소", "ACTIVE");
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long gearA = fixture.writePost(session, "GEAR", "장비 A", "본문", spotA);
-        long freeA = fixture.writePost(session, "FREE", "자유 A", "본문", spotA);
-        long gearB = fixture.writePost(session, "GEAR", "장비 B", "본문", spotB);
-        long gearNone = fixture.writePost(session, "GEAR", "장비 없음", "본문", null);
+        long firstA = fixture.writePost(session, "장소 A 첫 글", "본문", spotA);
+        long secondA = fixture.writePost(session, "장소 A 둘째 글", "본문", spotA);
+        long onB = fixture.writePost(session, "장소 B 글", "본문", spotB);
+        long noSpot = fixture.writePost(session, "장소 없는 글", "본문", null);
+        long emptySpot = fixture.insertSpot("글 없는 장소", "ACTIVE");
 
         // when
-        MvcTestResult byCategory = mvc.get().uri(POSTS + "?category=GEAR").exchange();
+        MvcTestResult all = mvc.get().uri(POSTS).exchange();
         MvcTestResult bySpot = mvc.get().uri(POSTS + "?spotId=" + spotA).exchange();
-        MvcTestResult both =
-                mvc.get().uri(POSTS + "?category=GEAR&spotId=" + spotA).exchange();
-        MvcTestResult none = mvc.get().uri(POSTS + "?category=EXPERIENCE").exchange();
+        MvcTestResult none = mvc.get().uri(POSTS + "?spotId=" + emptySpot).exchange();
 
         // then
-        assertThat(byCategory)
+        assertThat(all)
                 .bodyJson()
                 .extractingPath("$.content[*].postId")
                 .asList()
-                .containsExactly((int) gearNone, (int) gearB, (int) gearA);
+                .containsExactly((int) noSpot, (int) onB, (int) secondA, (int) firstA);
+        assertThat(all).bodyJson().doesNotHavePath("$.content[0].category");
         assertThat(bySpot)
                 .bodyJson()
                 .extractingPath("$.content[*].postId")
                 .asList()
-                .containsExactly((int) freeA, (int) gearA);
-        assertThat(both)
-                .bodyJson()
-                .extractingPath("$.content[*].postId")
-                .asList()
-                .containsExactly((int) gearA);
+                .containsExactly((int) secondA, (int) firstA);
         assertThat(none).bodyJson().extractingPath("$.content").asList().isEmpty();
     }
 
@@ -191,9 +182,9 @@ class CommunityPostApiIntegrationTest {
     void pagesNewestFirstWithHasNext() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long first = fixture.writePost(session, "FREE", "첫 글", "본문", null);
-        long second = fixture.writePost(session, "FREE", "둘째 글", "본문", null);
-        long third = fixture.writePost(session, "FREE", "셋째 글", "본문", null);
+        long first = fixture.writePost(session, "첫 글", "본문", null);
+        long second = fixture.writePost(session, "둘째 글", "본문", null);
+        long third = fixture.writePost(session, "셋째 글", "본문", null);
 
         // when
         MvcTestResult page0 = mvc.get().uri(POSTS + "?page=0&size=2").exchange();
@@ -217,18 +208,15 @@ class CommunityPostApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-29] 알 수 없는 category나 범위를 벗어난 size는 400 INVALID_INPUT이다")
-    void listRejectsUnknownCategoryAndBadSize() {
+    @DisplayName("[F-29] 범위를 벗어난 size는 400 INVALID_INPUT이다")
+    void listRejectsBadSize() {
         // when
-        MvcTestResult unknownCategory =
-                mvc.get().uri(POSTS + "?category=CAMPING").exchange();
         MvcTestResult tooBig = mvc.get().uri(POSTS + "?size=51").exchange();
         MvcTestResult zero = mvc.get().uri(POSTS + "?size=0").exchange();
 
         // then
-        assertThat(unknownCategory).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(unknownCategory).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         assertThat(tooBig).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(tooBig).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         assertThat(zero).hasStatus(HttpStatus.BAD_REQUEST);
     }
 
@@ -238,7 +226,7 @@ class CommunityPostApiIntegrationTest {
         // given
         long hidden = fixture.insertSpot("숨김 장소", "HIDDEN");
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        String template = "{\"category\":\"FREE\",\"title\":\"제목\",\"content\":\"본문\",\"spotId\":%d}";
+        String template = "{\"title\":\"제목\",\"content\":\"본문\",\"spotId\":%d}";
 
         // when
         MvcTestResult linkHidden = fixture.send(mvc.post().uri(POSTS), session, template.formatted(hidden));
@@ -258,7 +246,7 @@ class CommunityPostApiIntegrationTest {
         // given
         long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", spotId);
+        long postId = fixture.writePost(session, "제목", "본문", spotId);
         fixture.setSpotStatus(spotId, "HIDDEN");
 
         // when
@@ -281,17 +269,15 @@ class CommunityPostApiIntegrationTest {
         // given
         long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
         Cookie session = fixture.verifiedSession(fixture.saveMember("새벽능선"));
-        long postId = fixture.writePost(session, "GEAR", "제목", "본문", spotId);
+        long postId = fixture.writePost(session, "제목", "본문", spotId);
         clock.advance(Duration.ofHours(1));
 
         // when
-        MvcTestResult result = fixture.send(
-                mvc.patch().uri(POSTS + "/" + postId), session, "{\"title\":\"새 제목\",\"category\":\"FREE\"}");
+        MvcTestResult result = fixture.send(mvc.patch().uri(POSTS + "/" + postId), session, "{\"title\":\"새 제목\"}");
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
         assertThat(result).bodyJson().extractingPath("$.title").isEqualTo("새 제목");
-        assertThat(result).bodyJson().extractingPath("$.category").isEqualTo("FREE");
         assertThat(result).bodyJson().extractingPath("$.content").isEqualTo("본문");
         assertThat(result).bodyJson().extractingPath("$.spot.spotId").isEqualTo((int) spotId);
         assertThat(result).bodyJson().extractingPath("$.createdAt").isEqualTo("2026-10-05T03:00:00Z");
@@ -305,7 +291,7 @@ class CommunityPostApiIntegrationTest {
         long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
         long hidden = fixture.insertSpot("숨김 장소", "HIDDEN");
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", spotId);
+        long postId = fixture.writePost(session, "제목", "본문", spotId);
 
         // when
         MvcTestResult relinkHidden =
@@ -321,11 +307,11 @@ class CommunityPostApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("[F-29][CM-03] 빈 JSON 객체로 고치면 200이고 아무것도 바뀌지 않으며, category·title·content를 null로 보내면 400이다")
+    @DisplayName("[F-29][CM-03] 빈 JSON 객체로 고치면 200이고 아무것도 바뀌지 않으며, title·content를 null로 보내면 400이다")
     void patchEmptyObjectAndExplicitNulls() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         clock.advance(Duration.ofHours(1));
         String uri = POSTS + "/" + postId;
 
@@ -333,18 +319,15 @@ class CommunityPostApiIntegrationTest {
         MvcTestResult empty = fixture.send(mvc.patch().uri(uri), session, "{}");
         MvcTestResult nullTitle = fixture.send(mvc.patch().uri(uri), session, "{\"title\":null}");
         MvcTestResult nullContent = fixture.send(mvc.patch().uri(uri), session, "{\"content\":null}");
-        MvcTestResult nullCategory = fixture.send(mvc.patch().uri(uri), session, "{\"category\":null}");
         MvcTestResult blankTitle = fixture.send(mvc.patch().uri(uri), session, "{\"title\":\"   \"}");
         MvcTestResult longContent =
                 fixture.send(mvc.patch().uri(uri), session, "{\"content\":\"" + "가".repeat(10001) + "\"}");
-        MvcTestResult unknownCategory = fixture.send(mvc.patch().uri(uri), session, "{\"category\":\"CAMPING\"}");
 
         // then
         assertThat(empty).hasStatus(HttpStatus.OK);
         assertThat(empty).bodyJson().extractingPath("$.title").isEqualTo("제목");
         assertThat(empty).bodyJson().extractingPath("$.updatedAt").isEqualTo("2026-10-05T03:00:00Z");
-        for (MvcTestResult rejected :
-                new MvcTestResult[] {nullTitle, nullContent, nullCategory, blankTitle, longContent, unknownCategory}) {
+        for (MvcTestResult rejected : new MvcTestResult[] {nullTitle, nullContent, blankTitle, longContent}) {
             assertThat(rejected).hasStatus(HttpStatus.BAD_REQUEST);
             assertThat(rejected).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         }
@@ -360,7 +343,7 @@ class CommunityPostApiIntegrationTest {
         // given
         Cookie authorSession = fixture.verifiedSession(fixture.saveMember(null));
         Cookie otherSession = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(authorSession, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(authorSession, "제목", "본문", null);
         String uri = POSTS + "/" + postId;
 
         // when
@@ -384,7 +367,7 @@ class CommunityPostApiIntegrationTest {
     void deletedPostIsHiddenAndKeptAsRow() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         String uri = POSTS + "/" + postId;
 
         // when
@@ -411,8 +394,8 @@ class CommunityPostApiIntegrationTest {
         // given
         Cookie authorSession = fixture.verifiedSession(fixture.saveMember(null));
         Cookie otherSession = fixture.verifiedSession(fixture.saveMember(null));
-        long hiddenId = fixture.writePost(authorSession, "FREE", "숨김", "본문", null);
-        long pendingId = fixture.writePost(authorSession, "FREE", "검토 대기", "본문", null);
+        long hiddenId = fixture.writePost(authorSession, "숨김", "본문", null);
+        long pendingId = fixture.writePost(authorSession, "검토 대기", "본문", null);
         jdbc.update("UPDATE community_post SET status = 'HIDDEN' WHERE id = ?", hiddenId);
         jdbc.update("UPDATE community_post SET status = 'PENDING_REVIEW' WHERE id = ?", pendingId);
 
@@ -435,7 +418,7 @@ class CommunityPostApiIntegrationTest {
     void withdrawnAuthorShowsAnonymizedNickname() {
         // given
         Member author = fixture.saveMember("새벽능선");
-        long postId = fixture.writePost(fixture.verifiedSession(author), "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(fixture.verifiedSession(author), "제목", "본문", null);
         Member loaded = memberRepository.findById(author.getId()).orElseThrow();
         loaded.withdraw(MutableClock.DEFAULT_INSTANT);
         memberRepository.saveAndFlush(loaded);
@@ -458,7 +441,7 @@ class CommunityPostApiIntegrationTest {
     @DisplayName("[F-29][TR-03] 비로그인 쓰기는 401, 이메일 인증 전 회원의 쓰기는 403 MEMBER_NOT_VERIFIED이고 글은 저장되지 않는다")
     void writeRequiresVerifiedMember() {
         // given
-        String body = "{\"category\":\"FREE\",\"title\":\"제목\",\"content\":\"본문\"}";
+        String body = "{\"title\":\"제목\",\"content\":\"본문\"}";
         Member unverified = fixture.saveMember(null);
         Cookie unverifiedSession = loginOnly(unverified);
 

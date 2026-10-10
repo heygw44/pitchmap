@@ -59,7 +59,7 @@ class CommunityCommentApiIntegrationTest {
         Member author = fixture.saveMember("새벽능선");
         Member replier = fixture.saveMember("아침안개");
         Cookie authorSession = fixture.verifiedSession(author);
-        long postId = fixture.writePost(authorSession, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(authorSession, "제목", "본문", null);
         long commentId = fixture.writeComment(authorSession, postId, "좋은 글이에요", null);
 
         // when
@@ -98,8 +98,8 @@ class CommunityCommentApiIntegrationTest {
     void invalidParentIsRejected() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
-        long otherPostId = fixture.writePost(session, "FREE", "다른 글", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
+        long otherPostId = fixture.writePost(session, "다른 글", "본문", null);
         long parentId = fixture.writeComment(session, postId, "댓글", null);
         long replyId = fixture.writeComment(session, postId, "답글", parentId);
         long otherPostCommentId = fixture.writeComment(session, otherPostId, "다른 글 댓글", null);
@@ -130,7 +130,7 @@ class CommunityCommentApiIntegrationTest {
         // given
         Member replier = fixture.saveMember("아침안개");
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long commentId = fixture.writeComment(session, postId, "지울 댓글", null);
         long replyId = fixture.writeComment(fixture.verifiedSession(replier), postId, "남을 답글", commentId);
 
@@ -167,7 +167,7 @@ class CommunityCommentApiIntegrationTest {
     void deletingCommentWithoutRepliesRemovesItFromList() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long commentId = fixture.writeComment(session, postId, "지울 댓글", null);
         fixture.writeComment(session, postId, "남는 댓글", null);
 
@@ -189,7 +189,7 @@ class CommunityCommentApiIntegrationTest {
     void hiddenCommentFollowsSameRules() throws Exception {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long withReplyId = fixture.writeComment(session, postId, "숨길 댓글", null);
         long replyId = fixture.writeComment(session, postId, "답글", withReplyId);
         long withoutReplyId = fixture.writeComment(session, postId, "답글 없는 숨김 댓글", null);
@@ -221,7 +221,7 @@ class CommunityCommentApiIntegrationTest {
     void pagingCountsVisibleTopLevelCommentsOnly() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long first = fixture.writeComment(session, postId, "첫째", null);
         fixture.writeComment(session, postId, "첫째의 답글 1", first);
         fixture.writeComment(session, postId, "첫째의 답글 2", first);
@@ -259,7 +259,7 @@ class CommunityCommentApiIntegrationTest {
     void hasNextIsFalseWhenOnlyHiddenCommentRemains() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         fixture.writeComment(session, postId, "첫째", null);
         fixture.writeComment(session, postId, "둘째", null);
         long hidden = fixture.writeComment(session, postId, "숨길 댓글", null);
@@ -278,7 +278,7 @@ class CommunityCommentApiIntegrationTest {
     void authorRevisesComment() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long commentId = fixture.writeComment(session, postId, "처음", null);
         long replyId = fixture.writeComment(session, postId, "답글", commentId);
 
@@ -304,7 +304,7 @@ class CommunityCommentApiIntegrationTest {
     void reviseRejectsInvalidContent() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long commentId = fixture.writeComment(session, postId, "처음", null);
 
         // when
@@ -324,7 +324,7 @@ class CommunityCommentApiIntegrationTest {
         // given
         Cookie authorSession = fixture.verifiedSession(fixture.saveMember(null));
         Cookie otherSession = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(authorSession, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(authorSession, "제목", "본문", null);
         long commentId = fixture.writeComment(authorSession, postId, "내 댓글", null);
 
         // when
@@ -346,7 +346,7 @@ class CommunityCommentApiIntegrationTest {
         // given
         Cookie authorSession = fixture.verifiedSession(fixture.saveMember(null));
         Cookie otherSession = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(authorSession, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(authorSession, "제목", "본문", null);
         long deletedId = fixture.writeComment(authorSession, postId, "지울 댓글", null);
         long hiddenId = fixture.writeComment(authorSession, postId, "숨길 댓글", null);
         fixture.send(mvc.delete().uri(COMMENT_URI + deletedId), authorSession, null);
@@ -376,9 +376,9 @@ class CommunityCommentApiIntegrationTest {
     void commentsOfInactivePostAreNotFound() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long deletedPostId = fixture.writePost(session, "FREE", "지울 글", "본문", null);
+        long deletedPostId = fixture.writePost(session, "지울 글", "본문", null);
         long deletedPostCommentId = fixture.writeComment(session, deletedPostId, "댓글", null);
-        long hiddenPostId = fixture.writePost(session, "FREE", "숨길 글", "본문", null);
+        long hiddenPostId = fixture.writePost(session, "숨길 글", "본문", null);
         long hiddenPostCommentId = fixture.writeComment(session, hiddenPostId, "댓글", null);
         fixture.send(mvc.delete().uri(POSTS + "/" + deletedPostId), session, null);
         jdbc.update("UPDATE community_post SET status = 'HIDDEN' WHERE id = ?", hiddenPostId);
@@ -407,8 +407,8 @@ class CommunityCommentApiIntegrationTest {
     void postCommentCountCountsActiveCommentsAndReplies() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
-        long otherPostId = fixture.writePost(session, "FREE", "다른 글", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
+        long otherPostId = fixture.writePost(session, "다른 글", "본문", null);
         fixture.writeComment(session, otherPostId, "다른 글 댓글", null);
         long a = fixture.writeComment(session, postId, "댓글 A", null);
         long b = fixture.writeComment(session, postId, "답글 B", a);
@@ -439,7 +439,7 @@ class CommunityCommentApiIntegrationTest {
         // given
         Member author = fixture.saveMember("새벽능선");
         Cookie session = fixture.verifiedSession(author);
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         long commentId = fixture.writeComment(session, postId, "댓글", null);
         MvcTestResult beforeWithdraw = mvc.get().uri(commentsUri(postId)).exchange();
         Member loaded = memberRepository.findById(author.getId()).orElseThrow();
@@ -469,7 +469,7 @@ class CommunityCommentApiIntegrationTest {
     void writeRequiresVerifiedMember() {
         // given
         Cookie authorSession = fixture.verifiedSession(fixture.saveMember(null));
-        long postId = fixture.writePost(authorSession, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(authorSession, "제목", "본문", null);
         Member unverified = fixture.saveMember(null);
 
         // when

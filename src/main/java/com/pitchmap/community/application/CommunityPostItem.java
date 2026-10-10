@@ -1,6 +1,5 @@
 package com.pitchmap.community.application;
 
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.infra.CommunityPostRow;
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +19,6 @@ import java.util.List;
  */
 public record CommunityPostItem(
         long postId,
-        CommunityCategory category,
         String title,
         String text,
         long authorId,
@@ -39,7 +37,6 @@ public record CommunityPostItem(
     static CommunityPostItem from(CommunityPostRow row, String thumbnailUrl, List<CommunityPostImage> images) {
         return new CommunityPostItem(
                 row.postId(),
-                row.category(),
                 row.title(),
                 row.text(),
                 row.authorId(),

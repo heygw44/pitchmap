@@ -13,13 +13,10 @@ public interface CommunityPostMapper {
 
     /**
      * 호출하면 ACTIVE인 글을 최신순(글 ID 내림차순)으로 offset건 건너뛰고 최대 limit건 읽는다. text에는 본문 앞 100자만 담는다.
-     * category와 spotId는 null이면 조건에서 뺀다. category는 열거값 이름 문자열이다.
+     * spotId는 null이면 조건에서 뺀다.
      */
     List<CommunityPostRow> selectActive(
-            @Param("category") String category,
-            @Param("spotId") Long spotId,
-            @Param("offset") long offset,
-            @Param("limit") int limit);
+            @Param("spotId") Long spotId, @Param("offset") long offset, @Param("limit") int limit);
 
     /**
      * 호출하면 ACTIVE인 글 한 건을 본문 전체와 함께 읽는다. 글이 없거나 ACTIVE가 아니면 빈 값이다.

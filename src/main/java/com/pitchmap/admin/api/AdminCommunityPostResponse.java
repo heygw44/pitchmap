@@ -7,7 +7,6 @@ import java.util.List;
 /** 관리자 글 검토 목록의 한 항목. 숨긴 글도 content에 원문 전체를 담는다. */
 public record AdminCommunityPostResponse(
         long postId,
-        String category,
         String title,
         String content,
         AdminCommunityReports.Author author,
@@ -20,7 +19,6 @@ public record AdminCommunityPostResponse(
     static AdminCommunityPostResponse from(AdminCommunityPostSummary summary) {
         return new AdminCommunityPostResponse(
                 summary.postId(),
-                summary.category(),
                 summary.title(),
                 summary.content(),
                 AdminCommunityReports.Author.from(summary.author()),

@@ -46,8 +46,8 @@ public class CommunityPostWriter {
         if (command.spotId() != null) {
             requireLinkable(command.spotId());
         }
-        CommunityPost post = CommunityPost.write(
-                memberId, command.category(), command.title(), command.content(), command.spotId(), clock.instant());
+        CommunityPost post =
+                CommunityPost.write(memberId, command.title(), command.content(), command.spotId(), clock.instant());
         long postId = communityPostRepository.saveAndFlush(post).getId();
         if (!command.imageIds().isEmpty()) {
             communityPostImageAttacher.replace(memberId, postId, command.imageIds());
@@ -58,7 +58,7 @@ public class CommunityPostWriter {
     /**
      * 호출하면 작성자 memberId가 postId인 글에서 요청에 담은 필드만 고치고, 고친 뒤의 글을 돌려준다. 요청에 없는 필드는 그대로 둔다.
      *
-     * <p>글이 없거나 ACTIVE가 아니면 NOT_FOUND로, 다른 회원이 쓴 글이면 ACCESS_DENIED로 거부한다. 카테고리, 제목, 본문을 null로 보냈거나
+     * <p>글이 없거나 ACTIVE가 아니면 NOT_FOUND로, 다른 회원이 쓴 글이면 ACCESS_DENIED로 거부한다. 제목이나 본문을 null로 보냈거나
      * 값이 규칙을 어기거나, 연결할 장소가 ACTIVE가 아니면 INVALID_INPUT으로 거부한다.
      */
     @Transactional
@@ -107,7 +107,6 @@ public class CommunityPostWriter {
     }
 
     private void applyChanges(CommunityPost post, CommunityPostReviseCommand command, Instant now) {
-        requireNotCleared(command.category(), "카테고리");
         requireNotCleared(command.title(), "제목");
         requireNotCleared(command.content(), "본문");
         if (command.title().present()) {
@@ -120,17 +119,13 @@ public class CommunityPostWriter {
         if (command.spotId().present() && newSpotId != null) {
             requireLinkable(newSpotId);
         }
-        post.revise(
-                command.category().value(),
-                command.title().value(),
-                command.content().value(),
-                now);
+        post.revise(command.title().value(), command.content().value(), now);
         if (command.spotId().present()) {
             post.changeSpot(newSpotId, now);
         }
     }
 
-    // 카테고리, 제목, 본문은 지울 수 있는 값이 아니다. 요청에 있는데 null이면 지우려는 것으로 보고 거부한다.
+    // 제목과 본문은 지울 수 있는 값이 아니다. 요청에 있는데 null이면 지우려는 것으로 보고 거부한다.
     private static void requireNotCleared(PatchField<?> field, String label) {
         if (field.present() && field.value() == null) {
             throw invalidInput(label + "은(는) 비울 수 없습니다.");

@@ -101,13 +101,12 @@ final class CommunityApiFixture {
     }
 
     // 글을 쓰고 201을 확인한 뒤 postId를 돌려준다.
-    long writePost(Cookie session, String category, String title, String content, Long spotId) {
+    long writePost(Cookie session, String title, String content, Long spotId) {
         String spotPart = spotId == null ? "" : ",\"spotId\":" + spotId;
         MvcTestResult created = send(
                 mvc.post().uri(POSTS),
                 session,
-                "{\"category\":\"%s\",\"title\":\"%s\",\"content\":\"%s\"%s}"
-                        .formatted(category, title, content, spotPart));
+                "{\"title\":\"%s\",\"content\":\"%s\"%s}".formatted(title, content, spotPart));
         assertThat(created).hasStatus(HttpStatus.CREATED);
         return postIdOf(created);
     }

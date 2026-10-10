@@ -4,7 +4,6 @@ import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import type { CommunityLikeResponse, CommunityPostDetail } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
-import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { AsideSection, HubLayout } from '../../components/HubLayout';
 import { Dialog } from '../../components/Dialog';
@@ -18,7 +17,7 @@ import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import { CommunityComments } from './CommunityComments';
 import { CommunityReportDialog } from './CommunityReportDialog';
-import { CATEGORY_META, SECONDARY_LINK_CLASS } from './communityLabels';
+import { SECONDARY_LINK_CLASS } from './communityLabels';
 
 type LoadResult = { postId: number; post: CommunityPostDetail } | { postId: number; error: unknown };
 
@@ -97,7 +96,7 @@ export function CommunityPostDetailPage({ postId }: { postId: number }) {
     return (
       <HubLayout
         title={post.title}
-        breadcrumb={<PostBreadcrumb post={post} />}
+        breadcrumb={<BackToCommunity />}
         meta={<PostMeta post={post} />}
         actions={<PostActions post={post} />}
         aside={asideNode}
@@ -105,7 +104,7 @@ export function CommunityPostDetailPage({ postId }: { postId: number }) {
         <PostContent post={post} onLikeChanged={applyLike} onImageError={handleImageError} />
         <CommunityComments postId={postId} count={post.commentCount} onChanged={reload} />
         <div>
-          <Link to={`/community?category=${post.category}`} className={SECONDARY_LINK_CLASS}>
+          <Link to="/community" className={SECONDARY_LINK_CLASS}>
             목록으로
           </Link>
         </div>
@@ -157,24 +156,10 @@ function BackToCommunity() {
   );
 }
 
-function PostBreadcrumb({ post }: { post: CommunityPostDetail }) {
-  return (
-    <nav aria-label="현재 위치" className="flex flex-wrap items-center gap-x-2">
-      <BackToCommunity />
-      <span aria-hidden="true">/</span>
-      <Link to={`/community?category=${post.category}`} className={CRUMB_LINK}>
-        {CATEGORY_META[post.category].label}
-      </Link>
-    </nav>
-  );
-}
-
 function PostMeta({ post }: { post: CommunityPostDetail }) {
-  const category = CATEGORY_META[post.category];
   const edited = post.updatedAt !== post.createdAt;
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
-      <Badge tone={category.tone}>{category.label}</Badge>
       <Link to={`/members/${post.author.memberId}`} className="font-semibold text-ink underline-offset-2 hover:underline">
         {post.author.nickname}
       </Link>

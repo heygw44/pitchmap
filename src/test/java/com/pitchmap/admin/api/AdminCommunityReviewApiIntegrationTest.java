@@ -89,7 +89,6 @@ class AdminCommunityReviewApiIntegrationTest {
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
         assertThat(ids(result, "$.content[*].postId")).containsExactly(pending);
-        assertThat(result).bodyJson().extractingPath("$.content[0].category").isEqualTo("FREE");
         assertThat(result).bodyJson().extractingPath("$.content[0].title").isEqualTo("제목");
         assertThat(result).bodyJson().extractingPath("$.content[0].content").isEqualTo("본문 전체");
         assertThat(result)
@@ -483,8 +482,8 @@ class AdminCommunityReviewApiIntegrationTest {
 
     private long insertPost(String status, Instant updatedAt) {
         jdbc.update(
-                "INSERT INTO community_post (member_id, category, title, content, status, created_at, updated_at)"
-                        + " VALUES (?, 'FREE', '제목', '본문 전체', ?, ?, ?)",
+                "INSERT INTO community_post (member_id, title, content, status, created_at, updated_at)"
+                        + " VALUES (?, '제목', '본문 전체', ?, ?, ?)",
                 authorId,
                 status,
                 BASE,

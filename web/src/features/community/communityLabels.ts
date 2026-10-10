@@ -1,25 +1,5 @@
-import type { CommunityCategory, CommunityReportReason } from '../../api/types';
-import type { BadgeTone } from '../../components/Badge';
+import type { CommunityReportReason } from '../../api/types';
 import type { ChoiceOption } from '../../components/ChoiceGroup';
-
-export const CATEGORY_META: Record<CommunityCategory, { label: string; tone: BadgeTone }> = {
-  EXPERIENCE: { label: '백패킹 경험', tone: 'forest' },
-  GEAR: { label: '장비 소개', tone: 'sea' },
-  FREE: { label: '자유', tone: 'neutral' },
-};
-
-export const CATEGORY_ORDER: readonly CommunityCategory[] = ['EXPERIENCE', 'GEAR', 'FREE'];
-
-export const CATEGORY_DESCRIPTIONS: Record<CommunityCategory, string> = {
-  EXPERIENCE: '다녀온 박지와 그날의 날씨',
-  GEAR: '직접 써 본 텐트와 배낭 이야기',
-  FREE: '준비하며 궁금한 것',
-};
-
-export const CATEGORY_OPTIONS: ReadonlyArray<ChoiceOption<CommunityCategory>> = CATEGORY_ORDER.map((value) => ({
-  value,
-  label: CATEGORY_META[value].label,
-}));
 
 export const REPORT_REASON_OPTIONS: ReadonlyArray<ChoiceOption<CommunityReportReason>> = [
   { value: 'SPAM', label: '스팸·광고' },
@@ -29,10 +9,6 @@ export const REPORT_REASON_OPTIONS: ReadonlyArray<ChoiceOption<CommunityReportRe
   { value: 'MONEY_SCAM', label: '금전 요구·사기' },
   { value: 'OTHER', label: '기타' },
 ];
-
-export function isCategory(value: string | null): value is CommunityCategory {
-  return value === 'EXPERIENCE' || value === 'GEAR' || value === 'FREE';
-}
 
 // 주소의 spotId는 양의 정수만 받는다. 그 밖의 값은 조건이 없는 것으로 본다.
 export function parseSpotId(raw: string | null): number | null {

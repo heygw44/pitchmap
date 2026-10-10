@@ -4,7 +4,6 @@ import static com.pitchmap.member.domain.MemberBuilder.aMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.infra.CommunityPostLikeMapper;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.util.ArrayList;
@@ -78,8 +77,7 @@ class CommunityPostLikeConcurrencyIntegrationTest {
     }
 
     private long savePost(long authorId) {
-        return postCommandService.write(
-                authorId, new CommunityPostWriteCommand(CommunityCategory.FREE, "제목", "본문", null));
+        return postCommandService.write(authorId, new CommunityPostWriteCommand("제목", "본문", null));
     }
 
     private List<Long> saveMembers(int count) {

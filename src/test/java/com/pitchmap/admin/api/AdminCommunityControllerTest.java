@@ -82,7 +82,6 @@ class AdminCommunityControllerTest {
         // given
         var summary = new AdminCommunityPostSummary(
                 9L,
-                "FREE",
                 "제목",
                 "본문 전체",
                 new AdminCommunityAuthor(4L, "작성자"),
@@ -102,7 +101,7 @@ class AdminCommunityControllerTest {
         assertThat(result).bodyJson().isStrictlyEqualTo("""
                 {
                   "content": [{
-                    "postId": 9, "category": "FREE", "title": "제목", "content": "본문 전체",
+                    "postId": 9, "title": "제목", "content": "본문 전체",
                     "author": {"memberId": 4, "nickname": "작성자"},
                     "status": "PENDING_REVIEW", "reportCount": 5,
                     "reasonCounts": {"SPAM": 2, "ABUSE": 1, "ILLEGAL_CAMPING": 0, "PRIVACY": 0, "MONEY_SCAM": 1, "OTHER": 1},

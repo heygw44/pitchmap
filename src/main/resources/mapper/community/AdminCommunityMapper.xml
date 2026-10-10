@@ -12,7 +12,6 @@
          숨긴 글도 관리자가 판단할 수 있도록 본문 전체를 읽는다. -->
     <select id="selectPosts" resultType="com.pitchmap.community.infra.AdminCommunityPostRow">
         SELECT p.id AS post_id,
-               p.category AS category,
                p.title AS title,
                p.content AS content,
                p.member_id AS author_id,

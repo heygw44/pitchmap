@@ -1,6 +1,5 @@
 import { ApiError, apiFetch } from './client';
 import type {
-  CommunityCategory,
   CommunityComment,
   CommunityCommentCreateRequest,
   CommunityImageUpload,
@@ -19,7 +18,6 @@ export const COMMUNITY_POST_PAGE_SIZE = 20;
 export const COMMUNITY_COMMENT_PAGE_SIZE = 20;
 
 export interface CommunityPostQuery {
-  category?: CommunityCategory;
   spotId?: number;
 }
 
@@ -30,7 +28,7 @@ export function listPosts(
   signal?: AbortSignal,
 ): Promise<Page<CommunityPostSummary>> {
   return apiFetch<Page<CommunityPostSummary>>('/api/community/posts', {
-    query: { category: filter.category, spotId: filter.spotId, page, size: COMMUNITY_POST_PAGE_SIZE },
+    query: { spotId: filter.spotId, page, size: COMMUNITY_POST_PAGE_SIZE },
     signal,
   });
 }

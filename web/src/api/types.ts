@@ -848,8 +848,6 @@ export interface MyProgramApplicationItem {
 
 // 커뮤니티
 
-export type CommunityCategory = 'EXPERIENCE' | 'GEAR' | 'FREE';
-
 export type CommunityReportReason = 'SPAM' | 'ABUSE' | 'ILLEGAL_CAMPING' | 'PRIVACY' | 'MONEY_SCAM' | 'OTHER';
 
 export interface CommunityAuthor {
@@ -865,7 +863,6 @@ export interface CommunityPostSpot {
 
 interface CommunityPostBase {
   postId: number;
-  category: CommunityCategory;
   title: string;
   author: CommunityAuthor;
   spot?: CommunityPostSpot;
@@ -896,7 +893,6 @@ export interface CommunityPostDetail extends CommunityPostBase {
 }
 
 export interface CommunityPostCreateRequest {
-  category: CommunityCategory;
   title: string;
   content: string;
   spotId?: number;
@@ -905,7 +901,6 @@ export interface CommunityPostCreateRequest {
 
 // 보내지 않은 필드는 그대로 두고, spotId: null은 장소 연결을 끊는다.
 export interface CommunityPostUpdateRequest {
-  category?: CommunityCategory;
   title?: string;
   content?: string;
   spotId?: number | null;

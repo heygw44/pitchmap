@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pitchmap.community.api.CommunityPostItemResponse.Author;
 import com.pitchmap.community.api.CommunityPostItemResponse.LinkedSpot;
 import com.pitchmap.community.application.CommunityPostItem;
-import com.pitchmap.community.domain.CommunityCategory;
 import java.time.Instant;
 import java.util.List;
 
@@ -12,7 +11,6 @@ import java.util.List;
 // likedByMe는 로그인한 회원에게만 주고, 비회원에게는 null이 아니라 필드를 뺀다.
 public record CommunityPostDetailResponse(
         long postId,
-        CommunityCategory category,
         String title,
         String content,
         List<Image> images,
@@ -30,7 +28,6 @@ public record CommunityPostDetailResponse(
     static CommunityPostDetailResponse from(CommunityPostItem item) {
         return new CommunityPostDetailResponse(
                 item.postId(),
-                item.category(),
                 item.title(),
                 item.text(),
                 item.images().stream()

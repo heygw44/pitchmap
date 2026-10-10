@@ -1,18 +1,14 @@
 package com.pitchmap.community.api;
 
 import com.pitchmap.community.application.CommunityPostWriteCommand;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.domain.CommunityPost;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
 // 연결할 장소가 ACTIVE인지는 장소 상태를 읽어야 해서 서비스가 검사한다. 이미지도 개수, 소유자, 저장소 객체를 서비스가 검사한다.
 public record CommunityPostCreateRequest(
-        @NotNull(message = "카테고리를 입력해야 합니다.") CommunityCategory category,
-
         @NotBlank(message = "제목을 입력해야 합니다.") @Size(max = CommunityPost.TITLE_MAX_LENGTH, message = "제목은 100자 이하여야 합니다.")
         String title,
 
@@ -27,6 +23,6 @@ public record CommunityPostCreateRequest(
         List<Long> imageIds) {
 
     CommunityPostWriteCommand toCommand() {
-        return new CommunityPostWriteCommand(category, title, content, spotId, imageIds);
+        return new CommunityPostWriteCommand(title, content, spotId, imageIds);
     }
 }

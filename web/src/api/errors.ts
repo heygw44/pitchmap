@@ -93,7 +93,6 @@ const FIELD_LABELS: Record<string, string> = {
   password: '비밀번호',
   nickname: '닉네임',
   code: '인증 코드',
-  category: '분류',
   title: '제목',
   content: '내용',
   imageIds: '이미지',

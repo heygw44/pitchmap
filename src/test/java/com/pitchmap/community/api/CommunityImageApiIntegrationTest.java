@@ -148,7 +148,7 @@ class CommunityImageApiIntegrationTest {
     @DisplayName("[F-29][CM-06] 이미지가 없는 글의 목록 항목은 imageCount가 0이고 thumbnailUrl 필드가 없으며, 비로그인 목록 조회도 된다")
     void postWithoutImagesHasNoThumbnail() {
         // given
-        fixture.writePost(session, "FREE", "제목", "본문", null);
+        fixture.writePost(session, "제목", "본문", null);
 
         // when
         MvcTestResult list = mvc.get().uri(POSTS).exchange();
@@ -290,7 +290,7 @@ class CommunityImageApiIntegrationTest {
     @DisplayName("[F-29][CM-06] 수정에서 imageIds를 null로 보내면 400, 남의 글이면 이미지 검사보다 먼저 403, 없는 글이면 404다")
     void reviseImageIdsErrors() {
         // given
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
         Cookie other = fixture.verifiedSession(fixture.saveMember("다른회원"));
         long otherImage = uploadedImage(other, SIZE);
 
@@ -331,7 +331,7 @@ class CommunityImageApiIntegrationTest {
         return fixture.send(
                 mvc.post().uri(POSTS),
                 cookie,
-                "{\"category\":\"FREE\",\"title\":\"제목\",\"content\":\"본문\",\"imageIds\":%s}".formatted(imageIds));
+                "{\"title\":\"제목\",\"content\":\"본문\",\"imageIds\":%s}".formatted(imageIds));
     }
 
     private MvcTestResult patch(Cookie cookie, long postId, String body) {

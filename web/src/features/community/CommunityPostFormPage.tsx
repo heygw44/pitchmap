@@ -4,11 +4,7 @@ import { createPost, getPost, putImage, requestImageUpload, updatePost } from '.
 import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import { fetchSpotDetail } from '../../api/spots';
-import type {
-  CommunityCategory,
-  CommunityPostDetail,
-  CommunityPostUpdateRequest,
-} from '../../api/types';
+import type { CommunityPostDetail, CommunityPostUpdateRequest } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
@@ -21,13 +17,7 @@ import { TextField } from '../../components/TextField';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
-import {
-  CATEGORY_DESCRIPTIONS,
-  CATEGORY_META,
-  CATEGORY_ORDER,
-  parseSpotId,
-  SECONDARY_LINK_CLASS,
-} from './communityLabels';
+import { parseSpotId, SECONDARY_LINK_CLASS } from './communityLabels';
 
 // 서버 규칙과 같은 값이다.
 const TITLE_MAX = 100;
@@ -121,16 +111,6 @@ function WriteAside() {
           <li>송금을 요구하는 글은 신고 대상이에요.</li>
           <li>공원 안 야영을 권하지 않아요.</li>
           <li>전화번호나 주소 같은 개인정보는 쓰지 않아요.</li>
-        </ul>
-      </AsideSection>
-      <AsideSection title="분류">
-        <ul>
-          {CATEGORY_ORDER.map((value) => (
-            <li key={value} className="flex flex-col">
-              <span className="text-base font-semibold text-ink">{CATEGORY_META[value].label}</span>
-              <span>{CATEGORY_DESCRIPTIONS[value]}</span>
-            </li>
-          ))}
         </ul>
       </AsideSection>
       <AsideSection title="사진">
@@ -234,11 +214,11 @@ type ImageItem = {
 
 type LinkedSpot = { spotId: number; name: string | null };
 
-type FormField = 'category' | 'title' | 'content' | 'imageIds';
+type FormField = 'title' | 'content' | 'imageIds';
 type FormFieldErrors = Partial<Record<FormField, string>>;
 
 function isFormField(field: string): field is FormField {
-  return field === 'category' || field === 'title' || field === 'content' || field === 'imageIds';
+  return field === 'title' || field === 'content' || field === 'imageIds';
 }
 
 type PostFormProps = { initialSpot: LinkedSpot | null } & ({ mode: 'create' } | { mode: 'edit'; post: CommunityPostDetail });
@@ -246,7 +226,6 @@ type PostFormProps = { initialSpot: LinkedSpot | null } & ({ mode: 'create' } | 
 function PostForm(props: PostFormProps) {
   const mode: FormMode = props.mode;
   const initialPost = props.mode === 'edit' ? props.post : null;
-  const [category, setCategory] = useState<CommunityCategory | null>(initialPost?.category ?? null);
   const [title, setTitle] = useState(initialPost?.title ?? '');
   const [content, setContent] = useState(initialPost?.content ?? '');
   const [spot, setSpot] = useState<LinkedSpot | null>(props.initialSpot);
@@ -350,7 +329,6 @@ function PostForm(props: PostFormProps) {
 
   function validate(): FormFieldErrors {
     const errors: FormFieldErrors = {};
-    if (category === null) errors.category = '분류를 골라 주세요.';
     if (title.trim() === '') errors.title = '제목을 적어 주세요.';
     else if (title.length > TITLE_MAX) errors.title = `${TITLE_MAX}자 이하로 적어 주세요.`;
     if (content.trim() === '') errors.content = '내용을 적어 주세요.';
@@ -364,14 +342,13 @@ function PostForm(props: PostFormProps) {
     setFormError(null);
     const errors = validate();
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0 || category === null) return;
+    if (Object.keys(errors).length > 0) return;
 
     const imageIds = images.flatMap((image) => (image.imageId === undefined ? [] : [image.imageId]));
     setSubmitting(true);
     try {
       if (props.mode === 'create') {
         const created = await createPost({
-          category,
           title: title.trim(),
           content: content.trim(),
           spotId: spot?.spotId,
@@ -382,7 +359,6 @@ function PostForm(props: PostFormProps) {
       }
       const post = props.post;
       const changes: CommunityPostUpdateRequest = {};
-      if (category !== post.category) changes.category = category;
       if (title.trim() !== post.title) changes.title = title.trim();
       if (content.trim() !== post.content) changes.content = content.trim();
       if ((spot?.spotId ?? null) !== (post.spot?.spotId ?? null)) changes.spotId = spot?.spotId ?? null;
@@ -437,8 +413,6 @@ function PostForm(props: PostFormProps) {
           </Notice>
         </div>
       )}
-
-      <CategoryField value={category} onChange={setCategory} error={fieldErrors.category} disabled={submitting} />
 
       <div className="flex flex-col gap-3 px-5 py-5">
         <div className="flex flex-col gap-1">
@@ -520,54 +494,6 @@ function PostForm(props: PostFormProps) {
         </Button>
       </div>
     </form>
-  );
-}
-
-type CategoryFieldProps = {
-  value: CommunityCategory | null;
-  onChange: (value: CommunityCategory) => void;
-  error?: string;
-  disabled: boolean;
-};
-
-// 분류는 기본 라디오 입력을 화면에서만 숨기고 타일로 그린다. 방향키로 고르는 동작은 브라우저가 맡는다.
-function CategoryField({ value, onChange, error, disabled }: CategoryFieldProps) {
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-3 px-5 py-5" aria-describedby={error ? 'community-category-error' : undefined}>
-      <legend className="float-left mb-3 w-full text-sm font-medium text-ink">분류</legend>
-      <div className="clear-both grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {CATEGORY_ORDER.map((option) => (
-          <label key={option} className="relative flex">
-            <input
-              type="radio"
-              name="community-category"
-              value={option}
-              checked={value === option}
-              disabled={disabled}
-              onChange={() => onChange(option)}
-              className="peer sr-only"
-            />
-            <span
-              className={[
-                'flex min-h-11 w-full flex-col gap-1 rounded-control border p-3 text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-sea peer-disabled:cursor-not-allowed',
-                'peer-checked:border-forest peer-checked:bg-forest-soft peer-checked:text-forest-deep',
-                error ? 'border-danger bg-card' : 'border-ink-subtle bg-card',
-                disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-paper-deep',
-              ].join(' ')}
-            >
-              <span className="text-base font-semibold">{CATEGORY_META[option].label}</span>
-              <span className="text-xs text-ink-muted">{CATEGORY_DESCRIPTIONS[option]}</span>
-            </span>
-          </label>
-        ))}
-      </div>
-      {error && (
-        <p id="community-category-error" className="flex items-start gap-1 text-sm text-danger">
-          <Icon name="alert" size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </p>
-      )}
-    </fieldset>
   );
 }
 

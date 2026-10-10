@@ -1,6 +1,5 @@
 package com.pitchmap.community.infra;
 
-import com.pitchmap.community.domain.CommunityCategory;
 import java.time.Instant;
 
 /**
@@ -12,7 +11,6 @@ import java.time.Instant;
  */
 public record CommunityPostRow(
         long postId,
-        CommunityCategory category,
         String title,
         String text,
         long authorId,

@@ -58,7 +58,7 @@ class CommunityReportApiIntegrationTest {
         // given
         Cookie author = session();
         Cookie reporter = session();
-        long postId = fixture.writePost(author, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(author, "제목", "본문", null);
 
         // when
         MvcTestResult result = report(postId, reporter, BODY);
@@ -80,7 +80,7 @@ class CommunityReportApiIntegrationTest {
     void reportingTwiceIsConflict() {
         // given
         Cookie reporter = session();
-        long postId = fixture.writePost(session(), "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session(), "제목", "본문", null);
         assertThat(report(postId, reporter, BODY)).hasStatus(HttpStatus.CREATED);
 
         // when
@@ -97,7 +97,7 @@ class CommunityReportApiIntegrationTest {
     void authorCanReportOwnPost() {
         // given
         Cookie author = session();
-        long postId = fixture.writePost(author, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(author, "제목", "본문", null);
 
         // when
         MvcTestResult result = report(postId, author, BODY);
@@ -110,8 +110,8 @@ class CommunityReportApiIntegrationTest {
     @DisplayName("[F-29][CM-07] 검토 전 신고가 5건이 되면 글이 PENDING_REVIEW가 되어 상세는 404이고 목록에서 빠지며, 그 뒤 신고는 404다")
     void fifthReportMovesPostToPendingReview() {
         // given
-        long postId = fixture.writePost(session(), "FREE", "신고 글", "본문", null);
-        long otherId = fixture.writePost(session(), "FREE", "멀쩡한 글", "본문", null);
+        long postId = fixture.writePost(session(), "신고 글", "본문", null);
+        long otherId = fixture.writePost(session(), "멀쩡한 글", "본문", null);
         List<Cookie> reporters = sessions(6);
         for (int i = 0; i < 4; i++) {
             assertThat(report(postId, reporters.get(i), BODY)).hasStatus(HttpStatus.CREATED);
@@ -145,8 +145,8 @@ class CommunityReportApiIntegrationTest {
         // given
         Cookie author = session();
         Cookie reporter = session();
-        long deletedId = fixture.writePost(author, "FREE", "지운 글", "본문", null);
-        long hiddenId = fixture.writePost(author, "FREE", "숨긴 글", "본문", null);
+        long deletedId = fixture.writePost(author, "지운 글", "본문", null);
+        long hiddenId = fixture.writePost(author, "숨긴 글", "본문", null);
         fixture.send(mvc.delete().uri(POSTS + "/" + deletedId), author, null);
         jdbc.update("UPDATE community_post SET status = 'HIDDEN' WHERE id = ?", hiddenId);
 
@@ -167,7 +167,7 @@ class CommunityReportApiIntegrationTest {
     void invalidReasonIsBadRequest() {
         // given
         Cookie reporter = session();
-        long postId = fixture.writePost(session(), "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session(), "제목", "본문", null);
 
         // when
         MvcTestResult unknown = report(postId, reporter, "{\"reason\":\"UNKNOWN\"}");
@@ -186,7 +186,7 @@ class CommunityReportApiIntegrationTest {
     @DisplayName("[F-29][CM-07] 이메일 인증을 마치지 않은 회원은 403 MEMBER_NOT_VERIFIED, 로그인하지 않은 사용자는 401이다")
     void requiresVerifiedMember() {
         // given
-        long postId = fixture.writePost(session(), "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session(), "제목", "본문", null);
         Cookie unverified = fixture.loginOnly(fixture.saveMember(TestSequence.nickname()));
 
         // when
@@ -209,7 +209,7 @@ class CommunityReportApiIntegrationTest {
     void fifthReportOnCommentHidesItFromList() {
         // given
         Cookie author = session();
-        long postId = fixture.writePost(author, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(author, "제목", "본문", null);
         long withReply = fixture.writeComment(author, postId, "답글 달린 댓글", null);
         long replyId = fixture.writeComment(author, postId, "답글", withReply);
         long withoutReply = fixture.writeComment(author, postId, "답글 없는 댓글", null);
@@ -247,7 +247,7 @@ class CommunityReportApiIntegrationTest {
         // given
         Cookie author = session();
         Cookie reporter = session();
-        long postId = fixture.writePost(author, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(author, "제목", "본문", null);
         long commentId = fixture.writeComment(author, postId, "댓글", null);
         assertThat(reportComment(commentId, reporter, BODY)).hasStatus(HttpStatus.CREATED);
 
@@ -266,7 +266,7 @@ class CommunityReportApiIntegrationTest {
         // given
         Cookie author = session();
         Cookie reporter = session();
-        long postId = fixture.writePost(author, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(author, "제목", "본문", null);
         long commentId = fixture.writeComment(author, postId, "댓글", null);
         long deletedId = fixture.writeComment(author, postId, "지울 댓글", null);
         fixture.send(mvc.delete().uri(COMMENTS + deletedId), author, null);
