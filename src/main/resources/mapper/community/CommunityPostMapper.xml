@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pitchmap.community.infra.CommunityPostMapper">
+
+    <!-- 작성자 닉네임은 조회할 때의 회원 값이다. 탈퇴한 회원은 member 행의 닉네임이 익명 값으로 바뀌어 있어서 그대로 내보낸다.
+         연결한 장소는 ACTIVE일 때만 조인한다. 장소가 숨겨졌거나 연결하지 않았으면 spot_id와 spot_name이 NULL이 되고, 글은 그대로 나온다.
+         글 ID는 순서대로 커지므로 ID 내림차순이 곧 최신순이다. 그래서 작성 시각 정렬 없이 기본 키 순서로 읽는다. -->
+    <sql id="postColumns">
+        p.id AS post_id,
+        p.category AS category,
+        p.title AS title,
+        p.member_id AS author_id,
+        m.nickname AS author_nickname,
+        s.id AS spot_id,
+        s.name AS spot_name,
+        p.created_at AS created_at,
+        p.updated_at AS updated_at
+    </sql>
+
+    <sql id="postJoins">
+        FROM community_post p
+        JOIN member m ON m.id = p.member_id
+        LEFT JOIN spot s ON s.id = p.spot_id AND s.status = 'ACTIVE'
+    </sql>
+
+    <!-- 목록은 본문 전체를 읽지 않고 앞 100자만 읽는다. -->
+    <select id="selectActive" resultType="com.pitchmap.community.infra.CommunityPostRow">
+        SELECT
+        <include refid="postColumns"/>,
+               LEFT(p.content, 100) AS text
+        <include refid="postJoins"/>
+        <where>
+            p.status = 'ACTIVE'
+            <if test="category != null">
+                AND p.category = #{category}
+            </if>
+            <if test="spotId != null">
+                AND p.spot_id = #{spotId}
+            </if>
+        </where>
+        ORDER BY p.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectActiveById" resultType="com.pitchmap.community.infra.CommunityPostRow">
+        SELECT
+        <include refid="postColumns"/>,
+               p.content AS text
+        <include refid="postJoins"/>
+        WHERE p.id = #{postId}
+          AND p.status = 'ACTIVE'
+    </select>
+
+</mapper>
