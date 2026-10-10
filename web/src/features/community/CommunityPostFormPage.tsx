@@ -117,7 +117,7 @@ function WriteAside() {
         <ul className="list-disc pl-5">
           <li>최대 5장까지 올려요.</li>
           <li>JPEG, PNG, WebP 파일을 장당 5MB까지 올릴 수 있어요.</li>
-          <li>맨 앞 사진이 목록의 대표 사진이 돼요. 순서는 &apos;앞으로&apos; 버튼으로 바꿔요.</li>
+          <li>맨 앞 사진이 글에서 가장 먼저 보여요. 순서는 &apos;앞으로&apos; 버튼으로 바꿔요.</li>
         </ul>
       </AsideSection>
     </>

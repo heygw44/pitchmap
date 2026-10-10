@@ -300,6 +300,12 @@ export interface Page<T> {
   hasNext: boolean;
 }
 
+// 번호형 페이지 목록(커뮤니티 글)은 조건에 맞는 전체 개수와 페이지 수를 더 준다.
+export interface NumberedPage<T> extends Page<T> {
+  totalElements: number;
+  totalPages: number;
+}
+
 // 장소 후기
 
 export interface SpotReviewAuthor {

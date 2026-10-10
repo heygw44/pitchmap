@@ -30,6 +30,16 @@
         LEFT JOIN spot s ON s.id = p.spot_id AND s.status = 'ACTIVE'
     </sql>
 
+    <!-- 목록과 개수 세기가 같이 쓰는 조건이다. -->
+    <sql id="activeListConditions">
+        <where>
+            p.status = 'ACTIVE'
+            <if test="spotId != null">
+                AND p.spot_id = #{spotId}
+            </if>
+        </where>
+    </sql>
+
     <!-- 목록은 본문 전체를 읽지 않고 앞 100자만 읽는다. -->
     <select id="selectActive" resultType="com.pitchmap.community.infra.CommunityPostRow">
         SELECT
@@ -37,14 +47,16 @@
                LEFT(p.content, 100) AS text,
                NULL AS liked_by_me
         <include refid="postJoins"/>
-        <where>
-            p.status = 'ACTIVE'
-            <if test="spotId != null">
-                AND p.spot_id = #{spotId}
-            </if>
-        </where>
+        <include refid="activeListConditions"/>
         ORDER BY p.id DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- 목록과 같은 조인과 조건으로 센다. 그래야 페이지 수가 목록과 어긋나지 않는다. -->
+    <select id="countActive" resultType="long">
+        SELECT COUNT(*)
+        <include refid="postJoins"/>
+        <include refid="activeListConditions"/>
     </select>
 
     <select id="selectActiveById" resultType="com.pitchmap.community.infra.CommunityPostRow">

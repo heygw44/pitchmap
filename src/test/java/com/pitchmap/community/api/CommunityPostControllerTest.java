@@ -85,10 +85,11 @@ class CommunityPostControllerTest {
 
     @Test
     @DisplayName(
-            "[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 좋아요 수와 댓글 수와 이미지 수는 있고 이미지가 없으면 thumbnailUrl과 likedByMe는 없다")
+            "[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 전체 글 수·페이지 수를 담은 페이지 정보를 받고, 좋아요 수와 댓글 수와 이미지 수는 있고 이미지가 없으면 thumbnailUrl과 likedByMe는 없다")
     void anonymousReadsPostList() {
         // given
-        when(communityPostQueryService.list(null, 0, 20)).thenReturn(new CommunityPostPage(List.of(ITEM), 0, 20, true));
+        when(communityPostQueryService.list(null, 0, 20))
+                .thenReturn(new CommunityPostPage(List.of(ITEM), 0, 20, true, 21L, 2));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS).exchange();
@@ -108,7 +109,7 @@ class CommunityPostControllerTest {
                   "commentCount": 3,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
-                  "page": 0, "size": 20, "hasNext": true
+                  "page": 0, "size": 20, "hasNext": true, "totalElements": 21, "totalPages": 2
                 }
                 """);
     }
@@ -118,7 +119,7 @@ class CommunityPostControllerTest {
     void listOmitsSpotFieldWhenNoVisibleSpot() {
         // given
         when(communityPostQueryService.list(null, 0, 20))
-                .thenReturn(new CommunityPostPage(List.of(ITEM_WITHOUT_SPOT), 0, 20, false));
+                .thenReturn(new CommunityPostPage(List.of(ITEM_WITHOUT_SPOT), 0, 20, false, 1L, 1));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS).exchange();
@@ -137,7 +138,7 @@ class CommunityPostControllerTest {
                   "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
-                  "page": 0, "size": 20, "hasNext": false
+                  "page": 0, "size": 20, "hasNext": false, "totalElements": 1, "totalPages": 1
                 }
                 """);
     }
@@ -146,7 +147,8 @@ class CommunityPostControllerTest {
     @DisplayName("[F-29] 목록의 spotId, page, size를 서비스에 그대로 넘긴다")
     void listPassesFiltersAndPaging() {
         // given
-        when(communityPostQueryService.list(101L, 2, 50)).thenReturn(new CommunityPostPage(List.of(), 2, 50, false));
+        when(communityPostQueryService.list(101L, 2, 50))
+                .thenReturn(new CommunityPostPage(List.of(), 2, 50, false, 1L, 1));
 
         // when
         MvcTestResult result =
@@ -463,7 +465,7 @@ class CommunityPostControllerTest {
     void listWithoutParametersUsesDefaults() {
         // given
         when(communityPostQueryService.list(any(), anyInt(), anyInt()))
-                .thenReturn(new CommunityPostPage(List.of(), 0, 20, false));
+                .thenReturn(new CommunityPostPage(List.of(), 0, 20, false, 1L, 1));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS).exchange();
@@ -494,7 +496,7 @@ class CommunityPostControllerTest {
                 UPDATED_AT,
                 null);
         when(communityPostQueryService.list(null, 0, 20))
-                .thenReturn(new CommunityPostPage(List.of(withImages), 0, 20, false));
+                .thenReturn(new CommunityPostPage(List.of(withImages), 0, 20, false, 1L, 1));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS).exchange();

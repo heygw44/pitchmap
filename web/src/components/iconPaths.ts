@@ -12,6 +12,7 @@ export type IconName =
   | 'search'
   | 'terrain'
   | 'chevronLeft'
+  | 'chevronRight'
   | 'close'
   | 'info'
   | 'bell'
@@ -53,6 +54,7 @@ export const ICON_PATHS: Record<IconName, string> = {
     '<path d="M2 20h20"/>' +
     '<path d="M5.8 13c2 1 4.4 1 6.4 0"/>',
   chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+  chevronRight: '<path d="m9 18 6-6-6-6"/>',
   close: '<path d="M18 6 6 18"/>' + '<path d="m6 6 12 12"/>',
   info: '<circle cx="12" cy="12" r="9"/>' + '<path d="M12 11v5"/>' + '<path d="M12 8h.01"/>',
   bell:
