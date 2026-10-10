@@ -4,7 +4,7 @@ import { ICON_PATHS } from '../components/iconPaths';
 import type { IconName } from '../components/iconPaths';
 import type { ClusterData, MarkerKind, SpotMarkerData } from './types';
 
-const KIND_STYLE: Record<MarkerKind, { label: string; icon: IconName; fill: string }> = {
+export const KIND_STYLE: Record<MarkerKind, { label: string; icon: IconName; fill: string }> = {
   CAMPSITE: { label: '공공 야영장', icon: 'tent', fill: 'fill-forest' },
   FOREST: { label: '자연휴양림', icon: 'tree', fill: 'fill-forest-deep' },
   BAKJI: { label: '박지', icon: 'backpack', fill: 'fill-earth' },
@@ -12,7 +12,7 @@ const KIND_STYLE: Record<MarkerKind, { label: string; icon: IconName; fill: stri
 
 // 표지기 핀 모양이다. 28×28 몸통(좌표 4~32) 아래로 뾰족한 끝이 (18, 42)에 온다.
 // 버튼 높이가 44px이고 오버레이를 아래쪽 끝(yAnchor 1)에 맞추므로, 핀 끝이 장소 좌표에 거의 그대로 놓인다.
-const PIN_PATH = 'M7 4h22a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3h-5l-6 10-6-10H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z';
+export const PIN_PATH = 'M7 4h22a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3h-5l-6 10-6-10H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z';
 
 // 흰 윤곽선 굵기다. 선은 경로 양쪽으로 반씩 퍼지고 안쪽 반은 핀 색이 덮으므로, 바깥에 보이는 두께는 절반이다.
 // 기본은 바깥 1px, 경고 핀은 황토 테두리(바깥 1px) 밖으로 1px, 선택하면 흰 링이 2px 더 두꺼워진다.

@@ -84,7 +84,7 @@ export function SpotDetailPanel({ spotId, onBack }: SpotDetailPanelProps) {
         description="삭제됐거나 숨김 처리된 장소예요."
         action={
           <Link
-            to="/"
+            to="/map"
             className="inline-flex min-h-11 items-center rounded-control border border-ink-subtle bg-card px-4 font-semibold text-ink hover:bg-paper-deep"
           >
             목록으로
