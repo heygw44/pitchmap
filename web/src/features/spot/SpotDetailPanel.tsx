@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import { fetchSpotDetail } from '../../api/spots';
-import type { BakjiDetail, MidTermForecast, PublicDetail, SpotDetail, Weather } from '../../api/types';
+import type { BakjiDetail, ExpectedPeople, MidTermForecast, PublicDetail, SpotDetail, Weather } from '../../api/types';
 import { Link } from '../../app/router';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -181,6 +181,8 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
       )}
       {publicDetail && <PublicSection publicDetail={publicDetail} />}
 
+      <ExpectedPeopleSection expectedPeople={detail.expectedPeople} />
+
       <section className={SECTION_CLASS} aria-labelledby="spot-basecamp-title">
         <h3 id="spot-basecamp-title" className={SECTION_TITLE_CLASS}>
           베이스캠프
@@ -351,6 +353,27 @@ function PublicSection({ publicDetail }: { publicDetail: PublicDetail }) {
             ) : (
               <p className="py-2 text-sm text-ink">홈페이지 {homepage}</p>
             ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// 서버는 오늘 이후이면서 인원이 있는 날짜만 날짜 순으로 준다. 그래서 화면은 받은 날짜를 자르지 않고 모두 보여 준다.
+function ExpectedPeopleSection({ expectedPeople }: { expectedPeople: ExpectedPeople[] }) {
+  return (
+    <section className={SECTION_CLASS} aria-labelledby="spot-expected-people-title">
+      <h3 id="spot-expected-people-title" className={SECTION_TITLE_CLASS}>
+        예상 인원
+      </h3>
+      {expectedPeople.length === 0 ? (
+        <p className="mt-2 text-sm text-ink-muted">아직 확정된 베이스캠프나 행사 참가자가 없어요</p>
+      ) : (
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="text-sm text-ink-muted">확정된 베이스캠프 멤버와 행사 참가자를 밤마다 센 인원이에요.</p>
+          <Evidence
+            items={expectedPeople.map((day) => ({ label: formatLocalDate(day.date), value: `${day.count}명` }))}
+          />
         </div>
       )}
     </section>
