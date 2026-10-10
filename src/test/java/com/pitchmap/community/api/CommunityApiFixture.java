@@ -129,4 +129,53 @@ final class CommunityApiFixture {
     int postCount() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM community_post", Integer.class);
     }
+
+    // 댓글이나 답글을 쓰고 201을 확인한 뒤 commentId를 돌려준다. parentId가 null이면 최상위 댓글이다.
+    long writeComment(Cookie session, long postId, String content, Long parentId) {
+        MvcTestResult created = writeCommentRaw(session, postId, content, parentId);
+        assertThat(created).hasStatus(HttpStatus.CREATED);
+        AtomicInteger commentId = new AtomicInteger();
+        assertThat(created)
+                .bodyJson()
+                .extractingPath("$.commentId")
+                .asNumber()
+                .satisfies(number -> commentId.set(number.intValue()));
+        return commentId.get();
+    }
+
+    MvcTestResult writeCommentRaw(Cookie session, long postId, String content, Long parentId) {
+        String parentPart = parentId == null ? "" : ",\"parentId\":" + parentId;
+        return send(
+                mvc.post().uri(POSTS + "/" + postId + "/comments"),
+                session,
+                "{\"content\":\"%s\"%s}".formatted(content, parentPart));
+    }
+
+    void setCommentStatus(long commentId, String status) {
+        jdbc.update("UPDATE community_comment SET status = ? WHERE id = ?", status, commentId);
+    }
+
+    String commentStatus(long commentId) {
+        return jdbc.queryForObject("SELECT status FROM community_comment WHERE id = ?", String.class, commentId);
+    }
+
+    String commentContent(long commentId) {
+        return jdbc.queryForObject("SELECT content FROM community_comment WHERE id = ?", String.class, commentId);
+    }
+
+    int commentCount() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM community_comment", Integer.class);
+    }
+
+    // 이메일 인증 없이 로그인만 한 세션을 만든다.
+    Cookie loginOnly(Member member) {
+        MvcTestResult login = mvc.post()
+                .uri("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"%s\",\"password\":\"%s\"}".formatted(member.getEmail(), VALID_PASSWORD))
+                .exchange();
+        assertThat(login).hasStatus(HttpStatus.OK);
+        return login.getResponse().getCookie(SESSION_COOKIE);
+    }
 }

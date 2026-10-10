@@ -56,9 +56,9 @@ class CommunityPostControllerTest {
     private static final Instant CREATED_AT = Instant.parse("2026-10-05T03:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-05T04:00:00Z");
     private static final CommunityPostItem ITEM = new CommunityPostItem(
-            9L, CommunityCategory.GEAR, "텐트 후기", "가볍다", 31L, "새벽능선", 101L, "능선 끝 평지", CREATED_AT, UPDATED_AT);
+            9L, CommunityCategory.GEAR, "텐트 후기", "가볍다", 31L, "새벽능선", 101L, "능선 끝 평지", 3L, CREATED_AT, UPDATED_AT);
     private static final CommunityPostItem ITEM_WITHOUT_SPOT = new CommunityPostItem(
-            10L, CommunityCategory.FREE, "안녕", "반가워요", 31L, "새벽능선", null, null, CREATED_AT, CREATED_AT);
+            10L, CommunityCategory.FREE, "안녕", "반가워요", 31L, "새벽능선", null, null, 0L, CREATED_AT, CREATED_AT);
 
     @Autowired
     private MockMvcTester mvc;
@@ -70,7 +70,7 @@ class CommunityPostControllerTest {
     private CommunityPostQueryService communityPostQueryService;
 
     @Test
-    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 이미지·좋아요·댓글 필드는 없다")
+    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 댓글 수는 있고 이미지·좋아요 필드는 없다")
     void anonymousReadsPostList() {
         // given
         when(communityPostQueryService.list(null, null, 0, 20))
@@ -90,6 +90,7 @@ class CommunityPostControllerTest {
                     "excerpt": "가볍다",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
                     "spot": { "spotId": 101, "name": "능선 끝 평지" },
+                    "commentCount": 3,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": true
@@ -117,6 +118,7 @@ class CommunityPostControllerTest {
                     "title": "안녕",
                     "excerpt": "반가워요",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
+                    "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": false
@@ -178,6 +180,7 @@ class CommunityPostControllerTest {
                   "content": "가볍다",
                   "author": { "memberId": 31, "nickname": "새벽능선" },
                   "spot": { "spotId": 101, "name": "능선 끝 평지" },
+                  "commentCount": 3,
                   "createdAt": "2026-10-05T03:00:00Z",
                   "updatedAt": "2026-10-05T04:00:00Z"
                 }

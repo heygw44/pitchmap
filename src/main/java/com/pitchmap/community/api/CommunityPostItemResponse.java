@@ -14,6 +14,7 @@ public record CommunityPostItemResponse(
         String excerpt,
         Author author,
         @JsonInclude(JsonInclude.Include.NON_NULL) LinkedSpot spot,
+        long commentCount,
         Instant createdAt) {
 
     static CommunityPostItemResponse from(CommunityPostItem item) {
@@ -24,6 +25,7 @@ public record CommunityPostItemResponse(
                 item.text(),
                 new Author(item.authorId(), item.authorNickname()),
                 LinkedSpot.of(item),
+                item.commentCount(),
                 item.createdAt());
     }
 
