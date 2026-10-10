@@ -65,7 +65,7 @@ function usePostPage(query: ListQuery) {
 }
 
 // 넓은 화면에서 머리 줄과 행이 같은 열 너비를 쓴다.
-const ROW_COLUMNS = 'md:grid md:grid-cols-[minmax(0,1fr)_8rem_6rem_4rem] md:items-center md:gap-3';
+const ROW_COLUMNS = 'md:grid md:grid-cols-[minmax(0,1fr)_8rem_6rem_3.5rem_3.5rem] md:items-center md:gap-3';
 
 export function CommunityListPage() {
   const { search } = useLocation();
@@ -150,6 +150,7 @@ function ListHeader() {
         <span>제목</span>
         <span>글쓴이</span>
         <span>작성일</span>
+        <span className="text-right">조회</span>
         <span className="text-right">좋아요</span>
       </div>
     </div>
@@ -278,7 +279,7 @@ function SpotFilterLine({ spotId, onRemove }: { spotId: number; onRemove: () => 
   );
 }
 
-// 좁은 화면에서는 제목 한 줄과 정보 한 줄로, 넓은 화면에서는 머리 줄과 같은 열로 보여 준다.
+// 좁은 화면에서는 제목 한 줄과 정보 한 줄(글쓴이 · 작성일 · 조회 · 좋아요)로, 넓은 화면에서는 머리 줄과 같은 열로 보여 준다.
 function PostRow({ item }: { item: CommunityPostSummary }) {
   return (
     <li>
@@ -305,6 +306,13 @@ function PostRow({ item }: { item: CommunityPostSummary }) {
           <time dateTime={item.createdAt} className="tabular-nums">
             {formatRelativeKst(item.createdAt)}
           </time>
+          <span aria-hidden="true" className="md:hidden">
+            ·
+          </span>
+          <span className="tabular-nums md:text-right">
+            <span className="md:sr-only">조회 </span>
+            {item.viewCount}
+          </span>
           <span aria-hidden="true" className="md:hidden">
             ·
           </span>

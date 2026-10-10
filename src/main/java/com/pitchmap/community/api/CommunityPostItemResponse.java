@@ -16,6 +16,7 @@ public record CommunityPostItemResponse(
         long imageCount,
         long likeCount,
         long commentCount,
+        long viewCount,
         Instant createdAt) {
 
     static CommunityPostItemResponse from(CommunityPostItem item) {
@@ -29,6 +30,7 @@ public record CommunityPostItemResponse(
                 item.imageCount(),
                 item.likeCount(),
                 item.commentCount(),
+                item.viewCount(),
                 item.createdAt());
     }
 

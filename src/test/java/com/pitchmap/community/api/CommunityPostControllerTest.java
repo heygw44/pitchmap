@@ -68,11 +68,12 @@ class CommunityPostControllerTest {
             List.of(),
             5L,
             3L,
+            12L,
             CREATED_AT,
             UPDATED_AT,
             null);
     private static final CommunityPostItem ITEM_WITHOUT_SPOT = new CommunityPostItem(
-            10L, "안녕", "반가워요", 31L, "새벽능선", null, null, null, 0L, List.of(), 0L, 0L, CREATED_AT, CREATED_AT, null);
+            10L, "안녕", "반가워요", 31L, "새벽능선", null, null, null, 0L, List.of(), 0L, 0L, 0L, CREATED_AT, CREATED_AT, null);
 
     @Autowired
     private MockMvcTester mvc;
@@ -107,6 +108,7 @@ class CommunityPostControllerTest {
                     "imageCount": 0,
                     "likeCount": 5,
                   "commentCount": 3,
+                    "viewCount": 12,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": true, "totalElements": 21, "totalPages": 2
@@ -136,6 +138,7 @@ class CommunityPostControllerTest {
                     "imageCount": 0,
                     "likeCount": 0,
                   "commentCount": 0,
+                    "viewCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
                   "page": 0, "size": 20, "hasNext": false, "totalElements": 1, "totalPages": 1
@@ -194,6 +197,7 @@ class CommunityPostControllerTest {
                   "spot": { "spotId": 101, "name": "능선 끝 평지" },
                   "likeCount": 5,
                   "commentCount": 3,
+                    "viewCount": 12,
                   "createdAt": "2026-10-05T03:00:00Z",
                   "updatedAt": "2026-10-05T04:00:00Z"
                 }
@@ -205,7 +209,22 @@ class CommunityPostControllerTest {
     void verifiedMemberReadsDetailWithLikedByMe() {
         // given
         CommunityPostItem liked = new CommunityPostItem(
-                9L, "텐트 후기", "가볍다", 31L, "새벽능선", null, null, null, 0L, List.of(), 5L, 3L, CREATED_AT, UPDATED_AT, true);
+                9L,
+                "텐트 후기",
+                "가볍다",
+                31L,
+                "새벽능선",
+                null,
+                null,
+                null,
+                0L,
+                List.of(),
+                5L,
+                3L,
+                12L,
+                CREATED_AT,
+                UPDATED_AT,
+                true);
         when(communityPostQueryService.detail(9L, MEMBER_ID)).thenReturn(liked);
 
         // when
@@ -492,6 +511,7 @@ class CommunityPostControllerTest {
                 List.of(),
                 5L,
                 3L,
+                12L,
                 CREATED_AT,
                 UPDATED_AT,
                 null);
@@ -529,6 +549,7 @@ class CommunityPostControllerTest {
                         new CommunityPostImage(40L, "https://example.test/view/b")),
                 5L,
                 3L,
+                12L,
                 CREATED_AT,
                 UPDATED_AT,
                 null);
