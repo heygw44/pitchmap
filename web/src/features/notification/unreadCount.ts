@@ -24,6 +24,11 @@ function getSnapshot() {
   return unreadCount;
 }
 
+// 알림 링크의 스크린 리더용 이름이다. 배지 숫자는 장식으로 숨기므로 개수를 이름에 넣는다.
+export function notificationLabel(count: number): string {
+  return count > 0 ? `알림, 안 읽음 ${count}개` : '알림';
+}
+
 export function useUnreadCount(): number {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
@@ -66,4 +71,10 @@ export function useUnreadCountSync(enabled: boolean): void {
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [enabled]);
+}
+
+// 머리글과 하단 탭이 함께 떠 있어도 서버에 한 번만 묻도록 앱 맨 위에서 한 번만 그린다.
+export function UnreadCountSync({ enabled }: { enabled: boolean }): null {
+  useUnreadCountSync(enabled);
+  return null;
 }
