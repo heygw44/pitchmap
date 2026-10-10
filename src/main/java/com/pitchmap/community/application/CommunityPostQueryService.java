@@ -34,11 +34,14 @@ public class CommunityPostQueryService {
         return new CommunityPostPage(content, page, size, hasNext);
     }
 
-    /** 호출하면 postId인 글 한 건을 본문 전체와 함께 돌려준다. 글이 없거나 ACTIVE가 아니면 NOT_FOUND로 거부한다. */
+    /**
+     * 호출하면 postId인 글 한 건을 본문 전체와 함께 돌려준다. viewerId가 null이 아니면 그 회원이 좋아요를 눌렀는지(likedByMe)도 담는다.
+     * 글이 없거나 ACTIVE가 아니면 NOT_FOUND로 거부한다.
+     */
     @Transactional(readOnly = true)
-    public CommunityPostItem detail(long postId) {
+    public CommunityPostItem detail(long postId, Long viewerId) {
         return communityPostMapper
-                .selectActiveById(postId)
+                .selectActiveById(postId, viewerId)
                 .map(CommunityPostItem::from)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
     }

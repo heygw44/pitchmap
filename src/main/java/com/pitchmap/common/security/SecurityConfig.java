@@ -75,7 +75,9 @@ public class SecurityConfig {
         "/api/program-applications/*/cancel",
     };
 
-    private static final String[] VERIFIED_PUT_PATTERNS = {"/api/basecamps/*/contact"};
+    private static final String[] VERIFIED_PUT_PATTERNS = {
+        "/api/basecamps/*/contact", "/api/community/posts/*/like",
+    };
 
     private static final String[] VERIFIED_PATCH_PATTERNS = {
         "/api/me",
@@ -91,6 +93,7 @@ public class SecurityConfig {
         "/api/reviews/*",
         "/api/community/posts/*",
         "/api/community/comments/*",
+        "/api/community/posts/*/like",
         "/api/basecamps/*/applications/me",
         "/api/basecamps/*/members/me",
         "/api/programs/*/vacancy-alerts",

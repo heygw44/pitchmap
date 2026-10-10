@@ -21,6 +21,9 @@ public interface CommunityPostMapper {
             @Param("offset") long offset,
             @Param("limit") int limit);
 
-    /** 호출하면 ACTIVE인 글 한 건을 본문 전체와 함께 읽는다. 글이 없거나 ACTIVE가 아니면 빈 값이다. */
-    Optional<CommunityPostRow> selectActiveById(@Param("postId") long postId);
+    /**
+     * 호출하면 ACTIVE인 글 한 건을 본문 전체와 함께 읽는다. 글이 없거나 ACTIVE가 아니면 빈 값이다.
+     * viewerId가 null이면 likedByMe를 읽지 않고 null로 둔다.
+     */
+    Optional<CommunityPostRow> selectActiveById(@Param("postId") long postId, @Param("viewerId") Long viewerId);
 }
