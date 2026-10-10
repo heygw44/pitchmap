@@ -2,6 +2,8 @@ package com.pitchmap.community.application;
 
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
+import com.pitchmap.community.domain.CommunityPost;
+import com.pitchmap.community.infra.CommunityPostListCondition;
 import com.pitchmap.community.infra.CommunityPostMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -17,18 +19,19 @@ public class CommunityPostQueryService {
     private final CommunityPostItemReader communityPostItemReader;
 
     /**
-     * 호출하면 ACTIVE인 글을 최신순으로 한 페이지 돌려준다. spotId는 null이면 거르지 않는다.
+     * 호출하면 query 조건에 맞는 ACTIVE인 글을 최신순으로 한 페이지 돌려준다.
      *
      * <p>spotId로 거를 때는 그 장소가 지금 ACTIVE인지 보지 않는다. 화면이 페이지 번호를 그리려면 전체 글 수가 필요하다. 그래서 서비스는 같은
      * 조건으로 글 수를 따로 센다. 마지막 페이지 너머를 요청하면 빈 목록과 함께 전체 글 수와 페이지 수를 돌려준다.
      */
     @Transactional(readOnly = true)
-    public CommunityPostPage list(Long spotId, int page, int size) {
-        long totalElements = communityPostMapper.countActive(spotId);
+    public CommunityPostPage list(CommunityPostListQuery query, int page, int size) {
+        CommunityPostListCondition condition = toCondition(query);
+        long totalElements = communityPostMapper.countActive(condition);
         long offset = (long) page * size;
         List<CommunityPostItem> content = offset >= totalElements
                 ? List.of()
-                : communityPostMapper.selectActive(spotId, offset, size).stream()
+                : communityPostMapper.selectActive(condition, offset, size).stream()
                         .map(communityPostItemReader::toListItem)
                         .toList();
         return CommunityPostPage.of(content, page, size, totalElements);
@@ -54,5 +57,10 @@ public class CommunityPostQueryService {
             return item;
         }
         return item.withOneMoreView();
+    }
+
+    private static CommunityPostListCondition toCondition(CommunityPostListQuery query) {
+        Integer minLikeCount = query.popular() ? CommunityPost.POPULAR_LIKE_THRESHOLD : null;
+        return new CommunityPostListCondition(query.spotId(), minLikeCount);
     }
 }

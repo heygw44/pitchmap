@@ -12,6 +12,8 @@ import com.pitchmap.member.domain.Member;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -574,6 +576,55 @@ class CommunityPostApiIntegrationTest {
         // then
         for (long postId : new long[] {deleted, hidden, pending}) {
             assertThat(viewCount(postId)).isZero();
+        }
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-12] 인기글 목록에는 좋아요 5개 이상인 글만 나오고, 좋아요가 취소돼 4개가 되면 빠지며, 전체 글 수도 인기글로 센다")
+    void popularListKeepsOnlyPostsWithFiveOrMoreLikes() {
+        // given
+        Cookie author = fixture.verifiedSession(fixture.saveMember(null));
+        long four = fixture.writePost(author, "좋아요 4개", "본문", null);
+        long five = fixture.writePost(author, "좋아요 5개", "본문", null);
+        long six = fixture.writePost(author, "좋아요 6개", "본문", null);
+        fixture.writePost(author, "좋아요 없음", "본문", null);
+        List<Cookie> likers = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            likers.add(fixture.verifiedSession(fixture.saveMember(null)));
+        }
+        like(four, likers.subList(0, 4));
+        like(five, likers.subList(0, 5));
+        like(six, likers);
+
+        // when
+        MvcTestResult popular = mvc.get().uri(POSTS + "?popular=true").exchange();
+        MvcTestResult paged = mvc.get().uri(POSTS + "?popular=true&size=1").exchange();
+        fixture.send(mvc.delete().uri(POSTS + "/" + five + "/like"), likers.get(0), null);
+        MvcTestResult afterUnlike = mvc.get().uri(POSTS + "?popular=true").exchange();
+        MvcTestResult all = mvc.get().uri(POSTS + "?popular=false").exchange();
+
+        // then
+        assertThat(popular)
+                .bodyJson()
+                .extractingPath("$.content[*].postId")
+                .asList()
+                .containsExactly((int) six, (int) five);
+        assertThat(popular).bodyJson().extractingPath("$.totalElements").isEqualTo(2);
+        assertThat(paged).bodyJson().extractingPath("$.totalPages").isEqualTo(2);
+        assertThat(paged).bodyJson().extractingPath("$.hasNext").isEqualTo(true);
+        assertThat(afterUnlike)
+                .bodyJson()
+                .extractingPath("$.content[*].postId")
+                .asList()
+                .containsExactly((int) six);
+        assertThat(afterUnlike).bodyJson().extractingPath("$.totalElements").isEqualTo(1);
+        assertThat(all).bodyJson().extractingPath("$.totalElements").isEqualTo(4);
+    }
+
+    private void like(long postId, List<Cookie> sessions) {
+        for (Cookie session : sessions) {
+            assertThat(fixture.send(mvc.put().uri(POSTS + "/" + postId + "/like"), session, null))
+                    .hasStatus(HttpStatus.OK);
         }
     }
 

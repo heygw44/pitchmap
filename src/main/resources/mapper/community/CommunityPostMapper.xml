@@ -31,12 +31,16 @@
         LEFT JOIN spot s ON s.id = p.spot_id AND s.status = 'ACTIVE'
     </sql>
 
-    <!-- 목록과 개수 세기가 같이 쓰는 조건이다. -->
+    <!-- 목록과 개수 세기가 같이 쓰는 조건이다.
+         좋아요 수는 저장하지 않으므로 글마다 좋아요 행을 세어 거른다. 그래서 좋아요가 취소되면 바로 조건에서 빠진다. -->
     <sql id="activeListConditions">
         <where>
             p.status = 'ACTIVE'
-            <if test="spotId != null">
-                AND p.spot_id = #{spotId}
+            <if test="condition.spotId != null">
+                AND p.spot_id = #{condition.spotId}
+            </if>
+            <if test="condition.minLikeCount != null">
+                AND (SELECT COUNT(*) FROM community_post_like pl WHERE pl.post_id = p.id) &gt;= #{condition.minLikeCount}
             </if>
         </where>
     </sql>

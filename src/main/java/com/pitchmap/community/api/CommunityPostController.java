@@ -35,6 +35,7 @@ class CommunityPostController {
             summary = "커뮤니티 글 목록",
             description = "삭제·숨김·검토 대기가 아닌(ACTIVE) 글을 최신 글부터 돌려준다. 로그인하지 않아도 조회할 수 있다. "
                     + "spotId는 선택이고, 보내면 그 장소에 연결한 글만 준다. "
+                    + "popular=true를 보내면 좋아요를 5개 이상 받은 인기글만 최신순으로 주고, 전체 글 수와 페이지 수도 인기글로 센다. "
                     + "spotId로 거를 때는 그 장소가 지금 지도에 보이는지 따지지 않는다. "
                     + "각 항목은 postId, 제목(title), 본문 앞 100자(excerpt), 작성자(memberId, nickname), "
                     + "연결한 장소(spotId, name), 좋아요 수(likeCount), 댓글 수(commentCount), 작성 시각(createdAt)이다. "
@@ -47,7 +48,7 @@ class CommunityPostController {
     @GetMapping("/api/community/posts")
     CommunityPostPageResponse list(@Valid @ParameterObject @ModelAttribute CommunityPostListRequest request) {
         return CommunityPostPageResponse.from(
-                communityPostQueryService.list(request.spotId(), request.pageOrDefault(), request.sizeOrDefault()));
+                communityPostQueryService.list(request.toQuery(), request.pageOrDefault(), request.sizeOrDefault()));
     }
 
     @Operation(

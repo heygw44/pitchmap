@@ -10,6 +10,7 @@ import { Icon } from '../../components/icons';
 import { Notice } from '../../components/Notice';
 import { Pagination } from '../../components/Pagination';
 import { Skeleton } from '../../components/Skeleton';
+import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatRelativeKst } from '../../lib/datetime';
 import { withNext } from '../member/nextPath';
@@ -17,7 +18,13 @@ import { useSession } from '../member/session';
 import { LINK_BUTTON_CLASS, parseSpotId, SECONDARY_LINK_CLASS, UNVERIFIED_WRITE_REASON } from './communityLabels';
 
 // 주소의 page는 사람이 읽는 1부터 시작하는 번호다. 서버에는 1을 빼서 보낸다.
-type ListQuery = { spotId: number | null; page: number };
+type ListTab = 'all' | 'popular';
+type ListQuery = { spotId: number | null; tab: ListTab; page: number };
+
+const TABS: ReadonlyArray<{ value: ListTab; label: string }> = [
+  { value: 'all', label: '전체글' },
+  { value: 'popular', label: '인기글' },
+];
 
 function parsePage(raw: string | null): number {
   if (raw === null || !/^\d+$/.test(raw)) return 1;
@@ -27,11 +34,16 @@ function parsePage(raw: string | null): number {
 
 function parseListQuery(search: string): ListQuery {
   const params = new URLSearchParams(search);
-  return { spotId: parseSpotId(params.get('spotId')), page: parsePage(params.get('page')) };
+  return {
+    spotId: parseSpotId(params.get('spotId')),
+    tab: params.get('tab') === 'popular' ? 'popular' : 'all',
+    page: parsePage(params.get('page')),
+  };
 }
 
-function listPath({ spotId, page }: ListQuery): string {
+function listPath({ spotId, tab, page }: ListQuery): string {
   const params = new URLSearchParams();
+  if (tab === 'popular') params.set('tab', 'popular');
   if (spotId !== null) params.set('spotId', String(spotId));
   if (page > 1) params.set('page', String(page));
   const query = params.toString();
@@ -44,12 +56,12 @@ type PageResult = { key: string; data: NumberedPage<CommunityPostSummary> | null
 function usePostPage(query: ListQuery) {
   const [result, setResult] = useState<PageResult | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const { spotId, page } = query;
-  const key = `${spotId ?? ''}|${page}|${attempt}`;
+  const { spotId, tab, page } = query;
+  const key = `${spotId ?? ''}|${tab}|${page}|${attempt}`;
 
   useEffect(() => {
     const controller = new AbortController();
-    listPosts({ spotId: spotId ?? undefined }, page - 1, controller.signal).then(
+    listPosts({ spotId: spotId ?? undefined, popular: tab === 'popular' }, page - 1, controller.signal).then(
       (data) => {
         if (!controller.signal.aborted) setResult({ key, data, error: null });
       },
@@ -58,7 +70,7 @@ function usePostPage(query: ListQuery) {
       },
     );
     return () => controller.abort();
-  }, [key, spotId, page]);
+  }, [key, spotId, tab, page]);
 
   const current = result !== null && result.key === key ? result : null;
   return { current, retry: () => setAttempt((value) => value + 1) };
@@ -85,13 +97,14 @@ export function CommunityListPage() {
       title="커뮤니티"
       description="백패킹 이야기를 자유롭게 나누는 곳이에요."
       actions={<WriteAction spotId={query.spotId} />}
+      tabs={<UnderlineTabs label="글 모아 보기" options={TABS} value={query.tab} onChange={(tab) => goTo({ tab, page: 1 })} />}
       aside={<CommunityAside />}
     >
       {query.spotId !== null && (
         <SpotFilterLine
           key={query.spotId}
           spotId={query.spotId}
-          onRemove={() => navigate(listPath({ spotId: null, page: 1 }), { replace: true })}
+          onRemove={() => navigate(listPath({ ...query, spotId: null, page: 1 }), { replace: true })}
         />
       )}
       {current?.error && (
@@ -121,6 +134,8 @@ export function CommunityListPage() {
             <li>
               {data.totalElements > 0 ? (
                 <PageOutOfRange onFirst={() => goTo({ page: 1 })} />
+              ) : query.tab === 'popular' ? (
+                <PopularEmpty />
               ) : (
                 <CommunityEmpty spotId={query.spotId} />
               )}
@@ -164,6 +179,16 @@ function PageOutOfRange({ onFirst }: { onFirst: () => void }) {
       <Button variant="secondary" onClick={onFirst}>
         첫 페이지로
       </Button>
+    </div>
+  );
+}
+
+function PopularEmpty() {
+  return (
+    <div className="flex flex-col items-start gap-3 p-6">
+      <Icon name="chat" size={24} className="text-ink-muted" />
+      <p className="font-serif text-lg text-ink">아직 인기글이 없어요</p>
+      <p className="text-sm text-ink-muted">좋아요 5개를 받은 글이 여기에 모여요.</p>
     </div>
   );
 }
