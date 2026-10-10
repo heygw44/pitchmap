@@ -307,11 +307,26 @@ class ProgramControllerTest {
         when(programApplyService.apply(4L, 3L)).thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_SOLD_OUT));
         when(programApplyService.apply(4L, 4L))
                 .thenThrow(new BusinessException(CommonErrorCode.TRUST_LEVEL_INSUFFICIENT));
+        when(programApplyService.apply(4L, 5L))
+                .thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_ALREADY_APPLIED));
 
         assertError(1L, HttpStatus.NOT_FOUND, "NOT_FOUND");
         assertError(2L, HttpStatus.BAD_REQUEST, "PROGRAM_NOT_IN_APPLY_PERIOD");
         assertError(3L, HttpStatus.CONFLICT, "PROGRAM_SOLD_OUT");
         assertError(4L, HttpStatus.FORBIDDEN, "TRUST_LEVEL_INSUFFICIENT");
+        assertError(5L, HttpStatus.CONFLICT, "PROGRAM_ALREADY_APPLIED");
+    }
+
+    @Test
+    @DisplayName("[F-18][PG-07] 자리가 없어 409이면 응답 메시지로 빈자리 알림 신청을 안내한다")
+    void soldOutMessageGuidesVacancyAlert() {
+        when(idempotencyRecordRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(programApplyService.apply(4L, 3L)).thenThrow(new ProgramException(ProgramErrorCode.PROGRAM_SOLD_OUT));
+
+        MvcTestResult result = applyRequest(3L, "key-3").with(member(4L)).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertThat(result).bodyJson().extractingPath("$.message").asString().contains("빈자리 알림");
     }
 
     @Test
