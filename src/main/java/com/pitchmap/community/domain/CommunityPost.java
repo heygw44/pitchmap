@@ -32,6 +32,9 @@ public class CommunityPost {
     /** 본문의 최대 길이다. */
     public static final int CONTENT_MAX_LENGTH = 10000;
 
+    /** 좋아요를 이만큼 이상 받은 글이 인기글이다. */
+    public static final int POPULAR_LIKE_THRESHOLD = 5;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

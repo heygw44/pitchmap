@@ -20,6 +20,8 @@ export const COMMUNITY_COMMENT_PAGE_SIZE = 20;
 
 export interface CommunityPostQuery {
   spotId?: number;
+  // true면 좋아요 5개 이상인 글만 준다.
+  popular?: boolean;
 }
 
 // 최신 글부터 준다. page는 서버 기준이라 0부터 센다.
@@ -29,7 +31,7 @@ export function listPosts(
   signal?: AbortSignal,
 ): Promise<NumberedPage<CommunityPostSummary>> {
   return apiFetch<NumberedPage<CommunityPostSummary>>('/api/community/posts', {
-    query: { spotId: filter.spotId, page, size: COMMUNITY_POST_PAGE_SIZE },
+    query: { spotId: filter.spotId, popular: filter.popular || undefined, page, size: COMMUNITY_POST_PAGE_SIZE },
     signal,
   });
 }

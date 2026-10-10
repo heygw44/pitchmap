@@ -23,6 +23,7 @@ import com.pitchmap.common.web.PatchField;
 import com.pitchmap.community.application.CommunityPostCommandService;
 import com.pitchmap.community.application.CommunityPostImage;
 import com.pitchmap.community.application.CommunityPostItem;
+import com.pitchmap.community.application.CommunityPostListQuery;
 import com.pitchmap.community.application.CommunityPostPage;
 import com.pitchmap.community.application.CommunityPostQueryService;
 import com.pitchmap.community.application.CommunityPostReviseCommand;
@@ -89,7 +90,7 @@ class CommunityPostControllerTest {
             "[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 전체 글 수·페이지 수를 담은 페이지 정보를 받고, 좋아요 수와 댓글 수와 이미지 수는 있고 이미지가 없으면 thumbnailUrl과 likedByMe는 없다")
     void anonymousReadsPostList() {
         // given
-        when(communityPostQueryService.list(null, 0, 20))
+        when(communityPostQueryService.list(CommunityPostListQuery.all(), 0, 20))
                 .thenReturn(new CommunityPostPage(List.of(ITEM), 0, 20, true, 21L, 2));
 
         // when
@@ -120,7 +121,7 @@ class CommunityPostControllerTest {
     @DisplayName("[F-29][CM-02] 연결한 장소가 없거나 보이지 않는 글은 spot 필드가 null이 아니라 아예 없다")
     void listOmitsSpotFieldWhenNoVisibleSpot() {
         // given
-        when(communityPostQueryService.list(null, 0, 20))
+        when(communityPostQueryService.list(CommunityPostListQuery.all(), 0, 20))
                 .thenReturn(new CommunityPostPage(List.of(ITEM_WITHOUT_SPOT), 0, 20, false, 1L, 1));
 
         // when
@@ -147,19 +148,19 @@ class CommunityPostControllerTest {
     }
 
     @Test
-    @DisplayName("[F-29] 목록의 spotId, page, size를 서비스에 그대로 넘긴다")
+    @DisplayName("[F-29][CM-12] 목록의 spotId, popular, page, size를 서비스에 그대로 넘긴다")
     void listPassesFiltersAndPaging() {
         // given
-        when(communityPostQueryService.list(101L, 2, 50))
+        when(communityPostQueryService.list(new CommunityPostListQuery(101L, true), 2, 50))
                 .thenReturn(new CommunityPostPage(List.of(), 2, 50, false, 1L, 1));
 
         // when
         MvcTestResult result =
-                mvc.get().uri(POSTS + "?spotId=101&page=2&size=50").exchange();
+                mvc.get().uri(POSTS + "?spotId=101&popular=true&page=2&size=50").exchange();
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
-        verify(communityPostQueryService).list(101L, 2, 50);
+        verify(communityPostQueryService).list(new CommunityPostListQuery(101L, true), 2, 50);
     }
 
     @Test
@@ -480,7 +481,7 @@ class CommunityPostControllerTest {
     }
 
     @Test
-    @DisplayName("[F-29] 목록 파라미터를 보내지 않으면 spotId로 거르지 않고 page 0, size 20으로 서비스를 부른다")
+    @DisplayName("[F-29] 목록 파라미터를 보내지 않으면 장소와 인기글로 거르지 않고 page 0, size 20으로 서비스를 부른다")
     void listWithoutParametersUsesDefaults() {
         // given
         when(communityPostQueryService.list(any(), anyInt(), anyInt()))
@@ -491,7 +492,7 @@ class CommunityPostControllerTest {
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
-        verify(communityPostQueryService).list(null, 0, 20);
+        verify(communityPostQueryService).list(CommunityPostListQuery.all(), 0, 20);
     }
 
     @Test
@@ -515,7 +516,7 @@ class CommunityPostControllerTest {
                 CREATED_AT,
                 UPDATED_AT,
                 null);
-        when(communityPostQueryService.list(null, 0, 20))
+        when(communityPostQueryService.list(CommunityPostListQuery.all(), 0, 20))
                 .thenReturn(new CommunityPostPage(List.of(withImages), 0, 20, false, 1L, 1));
 
         // when
