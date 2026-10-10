@@ -28,10 +28,18 @@ public class ActiveSpotChecker {
      */
     @Transactional(readOnly = true)
     public void requireActive(long spotId) {
-        spotRepository
+        if (!isActive(spotId)) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND);
+        }
+    }
+
+    /** 호출하면 spotId인 장소가 있고 ACTIVE이면 true를 돌려준다. 없거나 ACTIVE가 아니면 false이고, 거부하지 않는다. */
+    @Transactional(readOnly = true)
+    public boolean isActive(long spotId) {
+        return spotRepository
                 .findById(spotId)
-                .filter(ActiveSpotChecker::isActive)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+                .filter(ActiveSpotChecker::isActiveSpot)
+                .isPresent();
     }
 
     /**
@@ -43,12 +51,12 @@ public class ActiveSpotChecker {
     public boolean isWarningBakji(long spotId) {
         Spot spot = spotRepository
                 .findById(spotId)
-                .filter(ActiveSpotChecker::isActive)
+                .filter(ActiveSpotChecker::isActiveSpot)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
         return spot.getType() == SpotType.BAKJI && spot.isParkWarning();
     }
 
-    private static boolean isActive(Spot spot) {
+    private static boolean isActiveSpot(Spot spot) {
         return spot.getStatus() == SpotStatus.ACTIVE;
     }
 }

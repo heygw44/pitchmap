@@ -38,6 +38,7 @@ public final class ArchitectureRules {
             "basecamp",
             "program",
             "notification",
+            "community",
             "admin",
             COMMON);
 
@@ -47,7 +48,8 @@ public final class ArchitectureRules {
      * 클래스 의존으로 나타나지 않는다.
      */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
-            "admin", Set.of("trust", "program", "spot", "member"),
+            "admin", Set.of("trust", "program", "spot", "member", "community"),
+            "community", Set.of("spot"),
             "basecamp", Set.of("trust", "spot"),
             "program", Set.of("trust"),
             "review", Set.of("spot"),
