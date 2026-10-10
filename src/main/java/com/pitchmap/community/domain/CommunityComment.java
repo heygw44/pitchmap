@@ -1,5 +1,6 @@
 package com.pitchmap.community.domain;
 
+import com.pitchmap.common.error.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -97,6 +98,42 @@ public class CommunityComment {
         }
         this.status = CommunityCommentStatus.DELETED;
         this.content = null;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 상태를 {@link CommunityCommentStatus#PENDING_REVIEW}로 바꾸고 수정 시각을 now로 갱신한다. 신고가 쌓여 관리자 검토를 기다리게 하는 전이다.
+     * 지금 상태가 ACTIVE가 아니면 호출하는 쪽의 버그라서 {@link IllegalStateException}을 던진다.
+     */
+    public void markPendingReview(Instant now) {
+        if (status != CommunityCommentStatus.ACTIVE) {
+            throw new IllegalStateException("보이는 댓글만 검토 대기로 바꿀 수 있습니다. 현재 상태: " + status);
+        }
+        this.status = CommunityCommentStatus.PENDING_REVIEW;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 관리자가 댓글을 숨긴 것으로 상태를 {@link CommunityCommentStatus#HIDDEN}으로 바꾸고 수정 시각을 now로 갱신한다. ACTIVE나
+     * PENDING_REVIEW에서만 숨길 수 있고, 이미 숨겼거나 작성자가 지운 댓글이면 {@link BusinessException}(COMMUNITY_INVALID_STATE)을 던진다. 숨겨도 내용은 지우지 않는다.
+     */
+    public void hide(Instant now) {
+        if (status != CommunityCommentStatus.ACTIVE && status != CommunityCommentStatus.PENDING_REVIEW) {
+            throw new BusinessException(CommunityErrorCode.COMMUNITY_INVALID_STATE);
+        }
+        this.status = CommunityCommentStatus.HIDDEN;
+        this.updatedAt = now;
+    }
+
+    /**
+     * 호출하면 관리자가 댓글을 되살린 것으로 상태를 {@link CommunityCommentStatus#ACTIVE}로 바꾸고 수정 시각을 now로 갱신한다. PENDING_REVIEW나
+     * HIDDEN에서만 되살릴 수 있고, 이미 ACTIVE이거나 작성자가 지운 댓글이면 {@link BusinessException}(COMMUNITY_INVALID_STATE)을 던진다.
+     */
+    public void restore(Instant now) {
+        if (status != CommunityCommentStatus.PENDING_REVIEW && status != CommunityCommentStatus.HIDDEN) {
+            throw new BusinessException(CommunityErrorCode.COMMUNITY_INVALID_STATE);
+        }
+        this.status = CommunityCommentStatus.ACTIVE;
         this.updatedAt = now;
     }
 
