@@ -18,6 +18,9 @@ public interface CommunityPostMapper {
     List<CommunityPostRow> selectActive(
             @Param("spotId") Long spotId, @Param("offset") long offset, @Param("limit") int limit);
 
+    /** 호출하면 {@link #selectActive}와 같은 조건에 맞는 글의 수를 센다. spotId는 null이면 조건에서 뺀다. */
+    long countActive(@Param("spotId") Long spotId);
+
     /**
      * 호출하면 ACTIVE인 글 한 건을 본문 전체와 함께 읽는다. 글이 없거나 ACTIVE가 아니면 빈 값이다.
      * viewerId가 null이면 likedByMe를 읽지 않고 null로 둔다.

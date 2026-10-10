@@ -63,7 +63,7 @@ export function AsideSection({ title, children }: { title: string; children: Rea
 }
 
 // 목록을 감싸는 패널이다. header가 있으면 위에 한 줄 머리를 두고, 항목 사이에는 선을 긋는다.
-export function ListPanel({ header, children }: { header?: string; children: ReactNode }) {
+export function ListPanel({ header, children }: { header?: ReactNode; children: ReactNode }) {
   return (
     <div className="rounded-control border border-contour bg-card">
       {header && (

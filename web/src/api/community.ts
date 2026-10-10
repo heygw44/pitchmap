@@ -10,6 +10,7 @@ import type {
   CommunityPostSummary,
   CommunityPostUpdateRequest,
   CommunityReportRequest,
+  NumberedPage,
   Page,
 } from './types';
 
@@ -21,13 +22,13 @@ export interface CommunityPostQuery {
   spotId?: number;
 }
 
-// 최신 글부터 준다.
+// 최신 글부터 준다. page는 서버 기준이라 0부터 센다.
 export function listPosts(
   filter: CommunityPostQuery,
   page: number,
   signal?: AbortSignal,
-): Promise<Page<CommunityPostSummary>> {
-  return apiFetch<Page<CommunityPostSummary>>('/api/community/posts', {
+): Promise<NumberedPage<CommunityPostSummary>> {
+  return apiFetch<NumberedPage<CommunityPostSummary>>('/api/community/posts', {
     query: { spotId: filter.spotId, page, size: COMMUNITY_POST_PAGE_SIZE },
     signal,
   });

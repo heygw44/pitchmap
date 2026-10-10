@@ -120,7 +120,7 @@ class CommunityPostApiIntegrationTest {
                   "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
                   }],
-                  "page": 0, "size": 20, "hasNext": false
+                  "page": 0, "size": 20, "hasNext": false, "totalElements": 1, "totalPages": 1
                 }
                 """.formatted(postId, author.getId(), spotId));
         assertThat(list.getResponse().getContentAsString()).doesNotContain(author.getEmail());
@@ -205,6 +205,45 @@ class CommunityPostApiIntegrationTest {
                 .containsExactly((int) first);
         assertThat(page1).bodyJson().extractingPath("$.hasNext").isEqualTo(false);
         assertThat(exact).bodyJson().extractingPath("$.hasNext").isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-01] 목록은 조건에 맞는 전체 글 수와 페이지 수를 주고, 마지막 페이지 너머를 요청하면 빈 목록과 같은 페이지 수를 준다")
+    void listReportsTotalsAndHandlesPageBeyondLast() {
+        // given
+        long spotId = fixture.insertSpot("능선 끝 평지", "ACTIVE");
+        Cookie session = fixture.verifiedSession(fixture.saveMember(null));
+        for (int i = 0; i < 5; i++) {
+            fixture.writePost(session, "글 " + i, "본문", i < 3 ? spotId : null);
+        }
+        long deleted = fixture.writePost(session, "지운 글", "본문", null);
+        fixture.send(mvc.delete().uri(POSTS + "/" + deleted), session, null);
+
+        // when
+        MvcTestResult first = mvc.get().uri(POSTS + "?page=0&size=2").exchange();
+        MvcTestResult last = mvc.get().uri(POSTS + "?page=2&size=2").exchange();
+        MvcTestResult beyond = mvc.get().uri(POSTS + "?page=7&size=2").exchange();
+        MvcTestResult bySpot =
+                mvc.get().uri(POSTS + "?spotId=" + spotId + "&size=2").exchange();
+        MvcTestResult emptySpot =
+                mvc.get().uri(POSTS + "?spotId=" + (spotId + 1000)).exchange();
+
+        // then
+        assertThat(first).bodyJson().extractingPath("$.totalElements").isEqualTo(5);
+        assertThat(first).bodyJson().extractingPath("$.totalPages").isEqualTo(3);
+        assertThat(first).bodyJson().extractingPath("$.hasNext").isEqualTo(true);
+        assertThat(last).bodyJson().extractingPath("$.content").asList().hasSize(1);
+        assertThat(last).bodyJson().extractingPath("$.hasNext").isEqualTo(false);
+        assertThat(beyond).hasStatus(HttpStatus.OK);
+        assertThat(beyond).bodyJson().extractingPath("$.content").asList().isEmpty();
+        assertThat(beyond).bodyJson().extractingPath("$.page").isEqualTo(7);
+        assertThat(beyond).bodyJson().extractingPath("$.totalElements").isEqualTo(5);
+        assertThat(beyond).bodyJson().extractingPath("$.totalPages").isEqualTo(3);
+        assertThat(beyond).bodyJson().extractingPath("$.hasNext").isEqualTo(false);
+        assertThat(bySpot).bodyJson().extractingPath("$.totalElements").isEqualTo(3);
+        assertThat(bySpot).bodyJson().extractingPath("$.totalPages").isEqualTo(2);
+        assertThat(emptySpot).bodyJson().extractingPath("$.totalElements").isEqualTo(0);
+        assertThat(emptySpot).bodyJson().extractingPath("$.totalPages").isEqualTo(0);
     }
 
     @Test
