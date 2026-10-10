@@ -21,7 +21,10 @@ class MemberController {
         this.memberSignupService = memberSignupService;
     }
 
-    @Operation(summary = "회원가입")
+    @Operation(
+            summary = "회원가입",
+            description =
+                    "passwordConfirm이 password와 다르면 400 INVALID_INPUT을 응답하고 fieldErrors에 passwordConfirm 항목을 담는다.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     SignupResponse signUp(@Valid @RequestBody SignupRequest request, HttpServletRequest httpRequest) {

@@ -121,7 +121,8 @@ class MemberSignupApiIntegrationTest {
     }
 
     private MvcTestResult post(String email, String password, String nickname) {
-        String body = "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"%s\"}".formatted(email, password, nickname);
+        String body = "{\"email\":\"%s\",\"password\":\"%s\",\"passwordConfirm\":\"%s\",\"nickname\":\"%s\"}"
+                .formatted(email, password, password, nickname);
         return mvc.post()
                 .uri("/api/members")
                 .with(csrf())

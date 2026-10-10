@@ -21,7 +21,9 @@ export type IconName =
   | 'chat'
   | 'heart'
   | 'image'
-  | 'arrowUp';
+  | 'arrowUp'
+  | 'eye'
+  | 'eyeOff';
 
 export const ICON_PATHS: Record<IconName, string> = {
   tent:
@@ -74,4 +76,9 @@ export const ICON_PATHS: Record<IconName, string> = {
     '<circle cx="9" cy="10" r="1.75"/>' +
     '<path d="m3.5 17 5-4.5 4 3.5 3-2.5 5 4.5"/>',
   arrowUp: '<path d="M12 19V5"/>' + '<path d="m5.5 11.5 6.5-6.5 6.5 6.5"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>' + '<circle cx="12" cy="12" r="3"/>',
+  eyeOff:
+    '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>' +
+    '<circle cx="12" cy="12" r="3"/>' +
+    '<path d="M4 4l16 16"/>',
 };

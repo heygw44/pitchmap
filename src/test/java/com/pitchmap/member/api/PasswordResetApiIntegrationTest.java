@@ -399,7 +399,8 @@ class PasswordResetApiIntegrationTest {
     }
 
     private static String confirmBody(String token, String newPassword) {
-        return "{\"token\":\"%s\",\"newPassword\":\"%s\"}".formatted(token, newPassword);
+        return "{\"token\":\"%s\",\"newPassword\":\"%s\",\"newPasswordConfirm\":\"%s\"}"
+                .formatted(token, newPassword, newPassword);
     }
 
     private static String bodyOf(MvcTestResult result) {

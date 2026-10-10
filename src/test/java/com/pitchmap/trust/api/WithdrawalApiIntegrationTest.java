@@ -118,8 +118,8 @@ class WithdrawalApiIntegrationTest {
         MvcTestResult loginAgain = postJson("/api/auth/login", loginBody(email, PASSWORD), null);
         MvcTestResult signup = postJson(
                 "/api/members",
-                "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"%s\"}"
-                        .formatted(email, PASSWORD, TestSequence.nickname()),
+                "{\"email\":\"%s\",\"password\":\"%s\",\"passwordConfirm\":\"%s\",\"nickname\":\"%s\"}"
+                        .formatted(email, PASSWORD, PASSWORD, TestSequence.nickname()),
                 null);
 
         assertThat(loginAgain).hasStatus(HttpStatus.UNAUTHORIZED);
@@ -136,8 +136,8 @@ class WithdrawalApiIntegrationTest {
 
         MvcTestResult signup = postJson(
                 "/api/members",
-                "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"탈퇴회원_1\"}"
-                        .formatted(TestSequence.email(), PASSWORD),
+                "{\"email\":\"%s\",\"password\":\"%s\",\"passwordConfirm\":\"%s\",\"nickname\":\"탈퇴회원_1\"}"
+                        .formatted(TestSequence.email(), PASSWORD, PASSWORD),
                 null);
         MvcTestResult rename = mvc.patch()
                 .uri(ME_PATH)

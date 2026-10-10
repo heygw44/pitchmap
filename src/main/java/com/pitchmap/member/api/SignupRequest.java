@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+@PasswordsMatch
 public record SignupRequest(
         @NotBlank(message = "이메일은 필수입니다.")
         @Email(message = "이메일 형식이 올바르지 않습니다.")
@@ -16,10 +17,28 @@ public record SignupRequest(
 
         @NotNull(message = "비밀번호는 필수입니다.") String password,
 
-        @NotBlank(message = "닉네임은 필수입니다.") @ValidNickname String nickname) {
+        @NotNull(message = "비밀번호 확인은 필수입니다.") String passwordConfirm,
+
+        @NotBlank(message = "닉네임은 필수입니다.") @ValidNickname String nickname)
+        implements ConfirmedPassword {
 
     public SignupCommand toCommand(String requestIp) {
         return new SignupCommand(email, password, nickname, requestIp);
+    }
+
+    @Override
+    public String passwordToConfirm() {
+        return password;
+    }
+
+    @Override
+    public String passwordConfirmation() {
+        return passwordConfirm;
+    }
+
+    @Override
+    public String confirmationFieldName() {
+        return "passwordConfirm";
     }
 
     // 레코드 기본 toString은 모든 구성요소를 찍는다. 그래서 이메일·비밀번호가 로그에 새지 않도록 우리가 재정의했다.
