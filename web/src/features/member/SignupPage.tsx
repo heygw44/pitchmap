@@ -5,11 +5,20 @@ import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import { Link, navigate, useLocation } from '../../app/router';
 import { Button } from '../../components/Button';
+import { EmailField } from '../../components/EmailField';
+import { composeEmail, CUSTOM_DOMAIN, EMPTY_EMAIL } from '../../components/emailValue';
+import type { EmailValue } from '../../components/emailValue';
 import { Notice } from '../../components/Notice';
 import { TextField } from '../../components/TextField';
 import { AuthLayout } from './AuthLayout';
 import { safeNextPath, withNext } from './nextPath';
-import { EMAIL_REQUIRED, NICKNAME_REQUIRED, PASSWORD_REQUIRED } from './requiredMessages';
+import {
+  EMAIL_CUSTOM_DOMAIN_REQUIRED,
+  EMAIL_DOMAIN_REQUIRED,
+  EMAIL_REQUIRED,
+  NICKNAME_REQUIRED,
+  PASSWORD_REQUIRED,
+} from './requiredMessages';
 import { useSession } from './session';
 
 type SignupField = 'email' | 'password' | 'nickname';
@@ -34,7 +43,7 @@ export function SignupPage() {
   const next = safeNextPath(search);
   const session = useSession();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState<EmailValue>(EMPTY_EMAIL);
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<SignupField, string>>>({});
@@ -51,7 +60,11 @@ export function SignupPage() {
 
     // 비밀번호·닉네임 규칙은 서버가 검사한다. 화면은 빈 칸만 미리 막는다.
     const emptyErrors: Partial<Record<SignupField, string>> = {};
-    if (email.trim() === '') emptyErrors.email = EMAIL_REQUIRED;
+    if (email.local.trim() === '') emptyErrors.email = EMAIL_REQUIRED;
+    else if (email.domainChoice === '') emptyErrors.email = EMAIL_DOMAIN_REQUIRED;
+    else if (email.domainChoice === CUSTOM_DOMAIN && email.customDomain.trim() === '') {
+      emptyErrors.email = EMAIL_CUSTOM_DOMAIN_REQUIRED;
+    }
     if (password === '') emptyErrors.password = PASSWORD_REQUIRED;
     if (nickname === '') emptyErrors.nickname = NICKNAME_REQUIRED;
     setFieldErrors(emptyErrors);
@@ -59,7 +72,7 @@ export function SignupPage() {
     if (Object.keys(emptyErrors).length > 0) return;
 
     setSubmitting(true);
-    const credentials = { email: email.trim(), password };
+    const credentials = { email: composeEmail(email), password };
     try {
       await signUp({ ...credentials, nickname });
     } catch (error) {
@@ -116,16 +129,7 @@ export function SignupPage() {
       }
     >
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <TextField
-          label="이메일"
-          type="email"
-          name="email"
-          autoComplete="email"
-          autoFocus
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          error={fieldErrors.email}
-        />
+        <EmailField autoFocus value={email} onChange={setEmail} error={fieldErrors.email} />
         <TextField
           label="비밀번호"
           type="password"
