@@ -36,6 +36,9 @@ class CommunityPostController {
             description = "삭제·숨김·검토 대기가 아닌(ACTIVE) 글을 최신 글부터 돌려준다. 로그인하지 않아도 조회할 수 있다. "
                     + "spotId는 선택이고, 보내면 그 장소에 연결한 글만 준다. "
                     + "popular=true를 보내면 좋아요를 5개 이상 받은 인기글만 최신순으로 주고, 전체 글 수와 페이지 수도 인기글로 센다. "
+                    + "keyword를 보내면 searchType(TITLE_CONTENT 기본, TITLE, CONTENT, AUTHOR)에 검색어가 들어간 글만 준다. "
+                    + "AUTHOR는 닉네임 부분 일치이고, 댓글은 검색하지 않는다. 검색어는 앞뒤 공백을 지운 뒤 2~50자이고, 공백뿐이면 검색하지 않는다. "
+                    + "검색어 안의 %, _, 역슬래시는 와일드카드가 아닌 글자 그대로 찾는다. 장소·인기글 조건과 함께 쓸 수 있다. "
                     + "spotId로 거를 때는 그 장소가 지금 지도에 보이는지 따지지 않는다. "
                     + "각 항목은 postId, 제목(title), 본문 앞 100자(excerpt), 작성자(memberId, nickname), "
                     + "연결한 장소(spotId, name), 좋아요 수(likeCount), 댓글 수(commentCount), 작성 시각(createdAt)이다. "
@@ -44,7 +47,7 @@ class CommunityPostController {
                     + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. "
                     + "응답에는 다음 페이지가 있는지(hasNext)와 함께 조건에 맞는 전체 글 수(totalElements)와 페이지 수(totalPages)를 준다. "
                     + "마지막 페이지 너머를 요청하면 빈 content와 올바른 totalPages를 준다. "
-                    + "범위를 벗어난 파라미터는 400 INVALID_INPUT으로 응답한다.")
+                    + "범위를 벗어난 파라미터나 알 수 없는 searchType, 길이를 벗어난 검색어는 400 INVALID_INPUT으로 응답한다.")
     @GetMapping("/api/community/posts")
     CommunityPostPageResponse list(@Valid @ParameterObject @ModelAttribute CommunityPostListRequest request) {
         return CommunityPostPageResponse.from(

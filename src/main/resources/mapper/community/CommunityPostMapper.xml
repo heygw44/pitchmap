@@ -32,7 +32,9 @@
     </sql>
 
     <!-- 목록과 개수 세기가 같이 쓰는 조건이다.
-         좋아요 수는 저장하지 않으므로 글마다 좋아요 행을 세어 거른다. 그래서 좋아요가 취소되면 바로 조건에서 빠진다. -->
+         좋아요 수는 저장하지 않으므로 글마다 좋아요 행을 세어 거른다. 그래서 좋아요가 취소되면 바로 조건에서 빠진다.
+         검색어는 #{}로만 넘기고, 검색 대상은 열거값 이름으로 분기한다. 서비스가 검색어의 \, %, _ 앞에 \를 붙여 넘기므로,
+         ESCAPE '\\'로 그 글자들을 와일드카드가 아닌 글자 그대로 찾는다. 작성자 검색은 조인한 member의 현재 닉네임을 본다. -->
     <sql id="activeListConditions">
         <where>
             p.status = 'ACTIVE'
@@ -41,6 +43,23 @@
             </if>
             <if test="condition.minLikeCount != null">
                 AND (SELECT COUNT(*) FROM community_post_like pl WHERE pl.post_id = p.id) &gt;= #{condition.minLikeCount}
+            </if>
+            <if test="condition.keyword != null">
+                <choose>
+                    <when test="condition.searchType == 'TITLE'">
+                        AND p.title LIKE CONCAT('%', #{condition.keyword}, '%') ESCAPE '\\'
+                    </when>
+                    <when test="condition.searchType == 'CONTENT'">
+                        AND p.content LIKE CONCAT('%', #{condition.keyword}, '%') ESCAPE '\\'
+                    </when>
+                    <when test="condition.searchType == 'AUTHOR'">
+                        AND m.nickname LIKE CONCAT('%', #{condition.keyword}, '%') ESCAPE '\\'
+                    </when>
+                    <otherwise>
+                        AND (p.title LIKE CONCAT('%', #{condition.keyword}, '%') ESCAPE '\\'
+                             OR p.content LIKE CONCAT('%', #{condition.keyword}, '%') ESCAPE '\\')
+                    </otherwise>
+                </choose>
             </if>
         </where>
     </sql>

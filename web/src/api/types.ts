@@ -854,6 +854,9 @@ export interface MyProgramApplicationItem {
 
 // 커뮤니티
 
+// 글 검색 대상. 댓글은 검색하지 않는다.
+export type CommunitySearchType = 'TITLE_CONTENT' | 'TITLE' | 'CONTENT' | 'AUTHOR';
+
 export type CommunityReportReason = 'SPAM' | 'ABUSE' | 'ILLEGAL_CAMPING' | 'PRIVACY' | 'MONEY_SCAM' | 'OTHER';
 
 export interface CommunityAuthor {

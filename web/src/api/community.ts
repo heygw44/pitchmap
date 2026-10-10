@@ -10,6 +10,7 @@ import type {
   CommunityPostSummary,
   CommunityPostUpdateRequest,
   CommunityReportRequest,
+  CommunitySearchType,
   NumberedPage,
   Page,
 } from './types';
@@ -22,6 +23,9 @@ export interface CommunityPostQuery {
   spotId?: number;
   // true면 좋아요 5개 이상인 글만 준다.
   popular?: boolean;
+  // keyword가 있을 때만 보낸다. 서버는 앞뒤 공백을 지운 2~50자만 받는다.
+  searchType?: CommunitySearchType;
+  keyword?: string;
 }
 
 // 최신 글부터 준다. page는 서버 기준이라 0부터 센다.
@@ -31,7 +35,12 @@ export function listPosts(
   signal?: AbortSignal,
 ): Promise<NumberedPage<CommunityPostSummary>> {
   return apiFetch<NumberedPage<CommunityPostSummary>>('/api/community/posts', {
-    query: { spotId: filter.spotId, popular: filter.popular || undefined, page, size: COMMUNITY_POST_PAGE_SIZE },
+    query: {
+      spotId: filter.spotId,
+      popular: filter.popular || undefined,
+      searchType: filter.keyword ? filter.searchType : undefined,
+      keyword: filter.keyword,
+      page, size: COMMUNITY_POST_PAGE_SIZE },
     signal,
   });
 }

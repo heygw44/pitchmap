@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { listPosts } from '../../api/community';
 import { toUserMessage } from '../../api/errors';
 import { fetchSpotDetail } from '../../api/spots';
-import type { CommunityPostSummary, NumberedPage } from '../../api/types';
+import type { CommunityPostSummary, CommunitySearchType, NumberedPage } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
 import { Button } from '../../components/Button';
 import { AsideSection, HubLayout, ListPanel } from '../../components/HubLayout';
 import { Icon } from '../../components/icons';
 import { Notice } from '../../components/Notice';
 import { Pagination } from '../../components/Pagination';
+import { SelectField } from '../../components/SelectField';
 import { Skeleton } from '../../components/Skeleton';
+import { TextField } from '../../components/TextField';
 import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatRelativeKst } from '../../lib/datetime';
@@ -19,7 +22,34 @@ import { LINK_BUTTON_CLASS, parseSpotId, SECONDARY_LINK_CLASS, UNVERIFIED_WRITE_
 
 // 주소의 page는 사람이 읽는 1부터 시작하는 번호다. 서버에는 1을 빼서 보낸다.
 type ListTab = 'all' | 'popular';
-type ListQuery = { spotId: number | null; tab: ListTab; page: number };
+type ListQuery = {
+  spotId: number | null;
+  tab: ListTab;
+  searchType: CommunitySearchType;
+  // 앞뒤 공백을 지운 검색어. null이면 검색하지 않는다.
+  keyword: string | null;
+  page: number;
+};
+
+const KEYWORD_MIN = 2;
+const KEYWORD_MAX = 50;
+
+const SEARCH_TYPES: ReadonlyArray<{ value: CommunitySearchType; label: string }> = [
+  { value: 'TITLE_CONTENT', label: '제목+내용' },
+  { value: 'TITLE', label: '제목' },
+  { value: 'CONTENT', label: '내용' },
+  { value: 'AUTHOR', label: '글쓴이' },
+];
+
+function parseSearchType(raw: string | null): CommunitySearchType {
+  return SEARCH_TYPES.find((option) => option.value === raw)?.value ?? 'TITLE_CONTENT';
+}
+
+// 주소를 손으로 고쳐 길이를 벗어난 검색어가 들어오면 검색하지 않는 것으로 본다.
+function parseKeyword(raw: string | null): string | null {
+  const keyword = raw?.trim() ?? '';
+  return keyword.length >= KEYWORD_MIN && keyword.length <= KEYWORD_MAX ? keyword : null;
+}
 
 const TABS: ReadonlyArray<{ value: ListTab; label: string }> = [
   { value: 'all', label: '전체글' },
@@ -37,14 +67,20 @@ function parseListQuery(search: string): ListQuery {
   return {
     spotId: parseSpotId(params.get('spotId')),
     tab: params.get('tab') === 'popular' ? 'popular' : 'all',
+    searchType: parseSearchType(params.get('searchType')),
+    keyword: parseKeyword(params.get('keyword')),
     page: parsePage(params.get('page')),
   };
 }
 
-function listPath({ spotId, tab, page }: ListQuery): string {
+function listPath({ spotId, tab, searchType, keyword, page }: ListQuery): string {
   const params = new URLSearchParams();
   if (tab === 'popular') params.set('tab', 'popular');
   if (spotId !== null) params.set('spotId', String(spotId));
+  if (keyword !== null) {
+    params.set('searchType', searchType);
+    params.set('keyword', keyword);
+  }
   if (page > 1) params.set('page', String(page));
   const query = params.toString();
   return query ? `/community?${query}` : '/community';
@@ -56,12 +92,18 @@ type PageResult = { key: string; data: NumberedPage<CommunityPostSummary> | null
 function usePostPage(query: ListQuery) {
   const [result, setResult] = useState<PageResult | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const { spotId, tab, page } = query;
-  const key = `${spotId ?? ''}|${tab}|${page}|${attempt}`;
+  const { spotId, tab, searchType, keyword, page } = query;
+  const key = `${spotId ?? ''}|${tab}|${searchType}|${keyword ?? ''}|${page}|${attempt}`;
 
   useEffect(() => {
     const controller = new AbortController();
-    listPosts({ spotId: spotId ?? undefined, popular: tab === 'popular' }, page - 1, controller.signal).then(
+    const filter = {
+      spotId: spotId ?? undefined,
+      popular: tab === 'popular',
+      searchType,
+      keyword: keyword ?? undefined,
+    };
+    listPosts(filter, page - 1, controller.signal).then(
       (data) => {
         if (!controller.signal.aborted) setResult({ key, data, error: null });
       },
@@ -70,7 +112,7 @@ function usePostPage(query: ListQuery) {
       },
     );
     return () => controller.abort();
-  }, [key, spotId, tab, page]);
+  }, [key, spotId, tab, searchType, keyword, page]);
 
   const current = result !== null && result.key === key ? result : null;
   return { current, retry: () => setAttempt((value) => value + 1) };
@@ -119,6 +161,12 @@ export function CommunityListPage() {
           </div>
         </div>
       )}
+      <SearchBar
+        key={`${query.searchType}|${query.keyword ?? ''}`}
+        searchType={query.searchType}
+        keyword={query.keyword}
+        onSearch={(searchType, keyword) => goTo({ searchType, keyword, page: 1 })}
+      />
       <div aria-busy={current === null} className="flex flex-col gap-4">
         <ListPanel header={<ListHeader />}>
           {current === null ? (
@@ -134,6 +182,8 @@ export function CommunityListPage() {
             <li>
               {data.totalElements > 0 ? (
                 <PageOutOfRange onFirst={() => goTo({ page: 1 })} />
+              ) : query.keyword !== null ? (
+                <SearchEmpty onClear={() => goTo({ keyword: null, page: 1 })} />
               ) : query.tab === 'popular' ? (
                 <PopularEmpty />
               ) : (
@@ -178,6 +228,81 @@ function PageOutOfRange({ onFirst }: { onFirst: () => void }) {
       <p className="text-base text-ink">이 페이지에는 글이 없어요.</p>
       <Button variant="secondary" onClick={onFirst}>
         첫 페이지로
+      </Button>
+    </div>
+  );
+}
+
+type SearchBarProps = {
+  searchType: CommunitySearchType;
+  keyword: string | null;
+  onSearch: (searchType: CommunitySearchType, keyword: string | null) => void;
+};
+
+// 주소의 검색 조건이 바뀌면 부모가 key를 바꿔 입력 상태를 새로 만든다. 길이는 서버도 다시 검사한다.
+function SearchBar({ searchType, keyword, onSearch }: SearchBarProps) {
+  const [type, setType] = useState<CommunitySearchType>(searchType);
+  const [text, setText] = useState(keyword ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = text.trim();
+    if (trimmed !== '' && trimmed.length < KEYWORD_MIN) {
+      setError(`검색어를 ${KEYWORD_MIN}자 이상 적어 주세요.`);
+      return;
+    }
+    setError(null);
+    onSearch(type, trimmed === '' ? null : trimmed);
+  }
+
+  return (
+    <form role="search" aria-label="글 검색" onSubmit={handleSubmit} className="flex flex-col gap-1">
+      <div className="flex items-start gap-2">
+        <SelectField
+          label="검색 대상"
+          hideLabel
+          options={SEARCH_TYPES}
+          value={type}
+          onChange={(event) => setType(parseSearchType(event.target.value))}
+          className="w-28 shrink-0 sm:w-32"
+        />
+        <TextField
+          label="검색어"
+          hideLabel
+          type="search"
+          maxLength={KEYWORD_MAX}
+          value={text}
+          invalid={error !== null}
+          aria-describedby={error ? 'community-search-error' : undefined}
+          onChange={(event) => {
+            setText(event.target.value);
+            setError(null);
+          }}
+          placeholder="2자 이상"
+          className="min-w-0 flex-1"
+        />
+        <Button type="submit" variant="secondary">
+          검색
+        </Button>
+      </div>
+      {error && (
+        <p id="community-search-error" className="flex items-start gap-1 text-sm text-danger">
+          <Icon name="alert" size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
+    </form>
+  );
+}
+
+function SearchEmpty({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3 p-6">
+      <p className="font-serif text-lg text-ink">검색 결과가 없어요</p>
+      <p className="text-sm text-ink-muted">다른 검색어나 검색 대상으로 찾아보세요.</p>
+      <Button variant="secondary" onClick={onClear}>
+        검색어 지우기
       </Button>
     </div>
   );

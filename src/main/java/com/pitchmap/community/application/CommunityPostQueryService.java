@@ -61,6 +61,16 @@ public class CommunityPostQueryService {
 
     private static CommunityPostListCondition toCondition(CommunityPostListQuery query) {
         Integer minLikeCount = query.popular() ? CommunityPost.POPULAR_LIKE_THRESHOLD : null;
-        return new CommunityPostListCondition(query.spotId(), minLikeCount);
+        if (query.keyword() == null) {
+            return new CommunityPostListCondition(query.spotId(), minLikeCount, null, null);
+        }
+        return new CommunityPostListCondition(
+                query.spotId(), minLikeCount, query.searchType().name(), escapeLike(query.keyword()));
+    }
+
+    // LIKE에서 %와 _는 와일드카드이고 \는 그 둘을 글자로 만드는 표시다. 회원이 입력한 이 글자들을 글자 그대로 찾도록 앞에 \를 붙인다.
+    // \를 먼저 바꿔야 뒤에서 붙인 \가 다시 바뀌지 않는다.
+    private static String escapeLike(String keyword) {
+        return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
