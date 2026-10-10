@@ -197,21 +197,21 @@ class BasecampStateActionTest {
     }
 
     @Test
-    @DisplayName("[02-1 6.3] 연락 수단은 모집 중에는 멤버에게도 보이지 않는다")
-    void contactHiddenWhileRecruiting() {
+    @DisplayName("[F-14][BC-23] 연락 수단은 모집 중에는 멤버에게 보이지 않고 캠프 리더에게만 보인다")
+    void contactVisibleOnlyToLeaderWhileRecruiting() {
         Basecamp basecamp = basecampIn(BasecampStatus.RECRUITING);
 
         assertThat(basecamp.canViewContact(MEMBER_ID, NOW)).isFalse();
-        assertThat(basecamp.canViewContact(BasecampBuilder.LEADER_ID, NOW)).isFalse();
+        assertThat(basecamp.canViewContact(BasecampBuilder.LEADER_ID, NOW)).isTrue();
     }
 
     @Test
-    @DisplayName("[02-1 6.3] 연락 수단은 마감 상태에서도 멤버에게 보이지 않는다")
-    void contactHiddenWhileClosed() {
+    @DisplayName("[F-14][BC-23] 연락 수단은 마감 상태에는 멤버에게 보이지 않고 캠프 리더에게만 보인다")
+    void contactVisibleOnlyToLeaderWhileClosed() {
         Basecamp basecamp = basecampIn(BasecampStatus.CLOSED);
 
         assertThat(basecamp.canViewContact(MEMBER_ID, NOW)).isFalse();
-        assertThat(basecamp.canViewContact(BasecampBuilder.LEADER_ID, NOW)).isFalse();
+        assertThat(basecamp.canViewContact(BasecampBuilder.LEADER_ID, NOW)).isTrue();
     }
 
     @Test

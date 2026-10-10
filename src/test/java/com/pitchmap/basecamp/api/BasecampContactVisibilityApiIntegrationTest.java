@@ -52,25 +52,35 @@ class BasecampContactVisibilityApiIntegrationTest {
     }
 
     // 현재 시각을 완료 시각 기준으로 얼마나 옮길지는 completedOffset이다. 완료 상태가 아니면 null이다.
+    // contactOpen은 활성 멤버 전체에게 보이는 시점이고, leaderOnly는 확정 전이라 캠프 리더에게만 보이는 시점이다.
     private enum Timing {
-        RECRUITING("모집 중", "RECRUITING", null, false),
-        CLOSED("마감", "CLOSED", null, false),
-        CONFIRMED("확정", "CONFIRMED", null, true),
-        COMPLETED_NOW("완료 직후", "COMPLETED", Duration.ZERO, true),
-        COMPLETED_7D("완료 후 정확히 7일", "COMPLETED", Duration.ofDays(7), true),
-        COMPLETED_7D_1S("완료 후 7일 1초", "COMPLETED", Duration.ofDays(7).plusSeconds(1), false),
-        CANCELED("취소", "CANCELED", null, false);
+        RECRUITING("모집 중", "RECRUITING", null, false, true),
+        CLOSED("마감", "CLOSED", null, false, true),
+        CONFIRMED("확정", "CONFIRMED", null, true, false),
+        COMPLETED_NOW("완료 직후", "COMPLETED", Duration.ZERO, true, false),
+        COMPLETED_7D("완료 후 정확히 7일", "COMPLETED", Duration.ofDays(7), true, false),
+        COMPLETED_7D_1S("완료 후 7일 1초", "COMPLETED", Duration.ofDays(7).plusSeconds(1), false, false),
+        CANCELED("취소", "CANCELED", null, false, false);
 
         private final String label;
         private final String status;
         private final Duration completedOffset;
         private final boolean contactOpen;
+        private final boolean leaderOnly;
 
-        Timing(String label, String status, Duration completedOffset, boolean contactOpen) {
+        Timing(String label, String status, Duration completedOffset, boolean contactOpen, boolean leaderOnly) {
             this.label = label;
             this.status = status;
             this.completedOffset = completedOffset;
             this.contactOpen = contactOpen;
+            this.leaderOnly = leaderOnly;
+        }
+
+        boolean isVisibleTo(Relation relation) {
+            if (relation == Relation.LEADER && leaderOnly) {
+                return true;
+            }
+            return relation.isActiveParticipant() && contactOpen;
         }
     }
 
@@ -95,7 +105,7 @@ class BasecampContactVisibilityApiIntegrationTest {
     static Stream<Arguments> matrix() {
         return Stream.of(Relation.values())
                 .flatMap(relation -> Stream.of(Timing.values()).map(timing -> {
-                    boolean visible = relation.isActiveParticipant() && timing.contactOpen;
+                    boolean visible = timing.isVisibleTo(relation);
                     String name =
                             "%s / %s -> 연락 수단 %s".formatted(relation.label, timing.label, visible ? "공개" : "필드 없음");
                     return Arguments.argumentSet(name, relation, timing, visible);
@@ -104,7 +114,7 @@ class BasecampContactVisibilityApiIntegrationTest {
 
     @ParameterizedTest
     @MethodSource("matrix")
-    @DisplayName("[F-14][BC-23][NFR-11] 연락 수단은 확정 또는 완료 후 7일 안의 활성 멤버·캠프 리더에게만 보이고, 나머지는 필드 자체가 없다")
+    @DisplayName("[F-14][BC-23][NFR-11] 연락 수단은 확정 또는 완료 후 7일 안의 활성 멤버·캠프 리더와 확정 전의 캠프 리더에게만 보이고, 나머지는 필드 자체가 없다")
     void contactInfoVisibility(Relation relation, Timing timing, boolean expectedVisible) {
         // given
         BasecampApiFixture fixture =

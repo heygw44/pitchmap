@@ -219,12 +219,14 @@ public class Basecamp {
      * memberId인 회원에게 연락 수단을 보여 줘도 되면 true다.
      *
      * <p>확정된 동안은 ACTIVE 멤버에게만 보인다. 완료된 뒤에는 완료 시각부터 {@link #CONTACT_VISIBLE_AFTER_COMPLETION}이 지날 때까지 보인다.
+     * 다만 캠프 리더는 모집 중이거나 마감된 동안에도 본다. 확정 전에 저장한 값을 리더가 다시 확인하고 고칠 수 있어야 하기 때문이다.
      */
     public boolean canViewContact(long memberId, Instant now) {
         if (!isActiveMember(memberId)) {
             return false;
         }
         return switch (status) {
+            case RECRUITING, CLOSED -> isLeader(memberId);
             case CONFIRMED -> true;
             case COMPLETED -> !now.isAfter(completedAt.plus(CONTACT_VISIBLE_AFTER_COMPLETION));
             default -> false;
