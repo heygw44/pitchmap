@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import { ApiError } from '../../api/client';
 import { toUserMessage } from '../../api/errors';
 import {
@@ -24,6 +23,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Notice } from '../../components/Notice';
 import { PageCard, PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
+import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { TextArea } from '../../components/TextArea';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { daysUntilKst, formatKstDateTime } from '../../lib/datetime';
@@ -35,6 +35,11 @@ import { MemberReportDialog } from '../report/MemberReportDialog';
 const COMMENT_MAX = 300;
 
 type Tab = 'pending' | 'received';
+
+const TAB_OPTIONS: ReadonlyArray<{ value: Tab; label: string }> = [
+  { value: 'pending', label: '작성할 후기' },
+  { value: 'received', label: '받은 후기' },
+];
 
 const REJOIN_OPTIONS: ReadonlyArray<ChoiceOption<'YES' | 'NO'>> = [
   { value: 'YES', label: '예' },
@@ -65,42 +70,29 @@ export function CompanionReviewsPage() {
 
   if (session.status !== 'authenticated' || !session.me) {
     return (
-      <PageLayout title="동행 후기">
+      <PageLayout title="동행 후기" description="함께 다녀온 멤버와 서로 남기는 후기예요.">
         {showSkeleton ? <Skeleton className="h-40 w-full" /> : null}
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout title="동행 후기">
-      <div role="tablist" aria-label="동행 후기 종류" className="flex overflow-hidden rounded-control border border-contour">
-        <TabButton active={tab === 'pending'} id="pending" to={pathname}>
-          작성할 후기
-        </TabButton>
-        <TabButton active={tab === 'received'} id="received" to={`${pathname}?tab=received`}>
-          받은 후기
-        </TabButton>
-      </div>
-      <div role="tabpanel" aria-labelledby={`tab-${tab}`} className="flex flex-col gap-4">
+    <PageLayout
+      title="동행 후기"
+      description="함께 다녀온 멤버와 서로 남기는 후기예요."
+      tabs={
+        <UnderlineTabs
+          label="동행 후기 종류"
+          options={TAB_OPTIONS}
+          value={tab}
+          onChange={(next) => navigate(next === 'received' ? `${pathname}?tab=received` : pathname, { replace: true })}
+        />
+      }
+    >
+      <div className="flex flex-col gap-4">
         {tab === 'pending' ? <PendingTab trustLevel={session.me.trustLevel} /> : <ReceivedTab />}
       </div>
     </PageLayout>
-  );
-}
-
-function TabButton({ active, id, to, children }: { active: boolean; id: Tab; to: string; children: ReactNode }) {
-  const base = 'flex min-h-11 flex-1 items-center justify-center px-3 text-base font-semibold';
-  return (
-    <button
-      type="button"
-      role="tab"
-      id={`tab-${id}`}
-      aria-selected={active}
-      onClick={() => navigate(to, { replace: true })}
-      className={active ? `${base} bg-forest-soft text-forest-deep` : `${base} bg-card text-ink hover:bg-paper-deep`}
-    >
-      {children}
-    </button>
   );
 }
 

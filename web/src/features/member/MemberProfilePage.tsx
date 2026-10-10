@@ -81,7 +81,21 @@ export function MemberProfilePage({ memberId }: { memberId: number }) {
     );
   }
 
-  return <PageLayout title="회원 프로필">{body}</PageLayout>;
+  const profile = current && 'profile' in current ? current.profile : null;
+  const badge = profile && profile.trustLevel !== undefined ? trustLevelBadge(profile.trustLevel) : null;
+  const meta = badge ? (
+    <div className="flex flex-wrap gap-1">
+      <Badge tone={badge.tone} icon={badge.icon}>
+        {badge.label}
+      </Badge>
+    </div>
+  ) : undefined;
+
+  return (
+    <PageLayout title={nickname ?? '회원 프로필'} meta={meta}>
+      {body}
+    </PageLayout>
+  );
 }
 
 function ProfileContent({ profile }: { profile: MemberProfile }) {
@@ -92,7 +106,7 @@ function ProfileContent({ profile }: { profile: MemberProfile }) {
   // 비회원 응답에는 닉네임만 있다. 신뢰 단계가 없으면 비회원 응답으로 본다.
   if (profile.trustLevel === undefined) {
     return (
-      <PageCard title={profile.nickname}>
+      <PageCard title="프로필">
         <p className="text-base text-ink-muted">로그인하면 이 회원의 신뢰 단계와 동행 기록을 볼 수 있어요.</p>
         <Link
           to={withNext('/login', pathname)}
@@ -104,17 +118,11 @@ function ProfileContent({ profile }: { profile: MemberProfile }) {
     );
   }
 
-  const badge = trustLevelBadge(profile.trustLevel);
   const summary = profile.companionReviewSummary;
 
   return (
     <>
-      <PageCard title={profile.nickname}>
-        <div className="flex flex-wrap gap-1">
-          <Badge tone={badge.tone} icon={badge.icon}>
-            {badge.label}
-          </Badge>
-        </div>
+      <PageCard title="기본 정보">
         <Evidence
           items={[
             { label: '연령대', value: verifiedValue(profile.ageGroup ? AGE_GROUP_LABELS[profile.ageGroup] : null, profile.ageGroupVerified) },

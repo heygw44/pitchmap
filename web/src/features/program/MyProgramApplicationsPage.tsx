@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { listMyProgramApplications } from '../../api/programs';
 import type { MyProgramApplicationItem, ProgramApplicationStatus } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
+import { BackLink } from '../../components/BackLink';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { ListPanel } from '../../components/HubLayout';
 import { Notice } from '../../components/Notice';
 import { PageLayout } from '../../components/PageLayout';
 import { Skeleton } from '../../components/Skeleton';
+import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatKstDateTime } from '../../lib/datetime';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
-import { FilterChips } from './FilterChips';
 import { APPLICATION_FILTERS, APPLICATION_STATUS_META, CANCEL_REASON_LABELS, countdownText } from './programLabels';
 import { useNow } from './useNow';
 import { usePagedList } from './usePagedList';
@@ -43,8 +45,12 @@ export function MyProgramApplicationsPage() {
   }, [session.status, pathname, search]);
 
   return (
-    <PageLayout title="내 행사 신청">
-      <FilterChips label="신청 상태" options={APPLICATION_FILTERS} value={filter} onChange={setFilter} />
+    <PageLayout
+      title="내 행사 신청"
+      description="신청한 공식 행사의 결제와 확정 상태를 확인해요."
+      breadcrumb={<BackLink to="/me">내 정보</BackLink>}
+      tabs={<UnderlineTabs label="신청 상태" options={APPLICATION_FILTERS} value={filter} onChange={setFilter} />}
+    >
       <div aria-busy={authenticated && current === null} className="flex flex-col gap-3">
         {!authenticated || current === null ? (
           showSkeleton ? <Skeleton className="h-24 w-full" /> : null
@@ -78,11 +84,11 @@ export function MyProgramApplicationsPage() {
                 }
               />
             ) : (
-              <ul className="flex flex-col gap-3">
+              <ListPanel>
                 {current.items.map((item) => (
                   <ApplicationCard key={item.applicationId} item={item} now={now} />
                 ))}
-              </ul>
+              </ListPanel>
             )}
             {current.hasNext && (
               <div>
@@ -105,7 +111,7 @@ function ApplicationCard({ item, now }: { item: MyProgramApplicationItem; now: n
     <li>
       <Link
         to={`/programs/${item.program.programId}`}
-        className="flex min-h-11 flex-col gap-2 rounded-control border border-contour bg-card p-4 hover:bg-paper-deep"
+        className="flex min-h-11 flex-col gap-2 p-4 hover:bg-paper-deep"
       >
         <span className="flex flex-wrap items-center gap-1">
           <Badge tone={status.tone}>{status.label}</Badge>
