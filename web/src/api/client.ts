@@ -62,6 +62,22 @@ function readCookie(name: string): string | undefined {
   return undefined;
 }
 
+let serverClockOffsetMs = 0;
+
+// 결제 기한처럼 서버가 정한 시각까지 남은 시간을 셀 때 쓴다. 브라우저 시계가 서버보다 늦으면 남은 시간이 길게 보이기 때문이다.
+// 그래서 마지막으로 받은 응답의 Date 헤더로 브라우저 시계를 보정한다. 응답을 받은 적이 없으면 브라우저 시계 그대로다.
+export function serverNow(): number {
+  return Date.now() + serverClockOffsetMs;
+}
+
+// Date 헤더는 초 단위라서 보정한 값이 서버보다 1초 안쪽으로 늦을 수 있다. 남은 시간을 세는 쪽이 이 오차를 감안한다.
+function recordServerClock(response: Response): void {
+  const serverDate = Date.parse(response.headers.get('Date') ?? '');
+  if (!Number.isNaN(serverDate)) {
+    serverClockOffsetMs = serverDate - Date.now();
+  }
+}
+
 let csrfCookieRequest: Promise<void> | null = null;
 
 // 서버는 모든 API 응답에 XSRF-TOKEN 쿠키를 실어 보낸다. 로그인하지 않았을 때 오는 401 응답도 마찬가지다.
@@ -220,6 +236,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw new ApiError(0, 'NETWORK_ERROR', null);
   }
 
+  recordServerClock(response);
   const text = response.status === 204 ? '' : await response.text();
 
   if (response.ok) {
