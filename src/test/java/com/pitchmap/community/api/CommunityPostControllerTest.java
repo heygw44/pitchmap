@@ -28,6 +28,7 @@ import com.pitchmap.community.application.CommunityPostPage;
 import com.pitchmap.community.application.CommunityPostQueryService;
 import com.pitchmap.community.application.CommunityPostReviseCommand;
 import com.pitchmap.community.application.CommunityPostWriteCommand;
+import com.pitchmap.community.application.CommunitySearchType;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -161,6 +162,49 @@ class CommunityPostControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
         verify(communityPostQueryService).list(new CommunityPostListQuery(101L, true), 2, 50);
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-13] 검색어는 앞뒤 공백을 지워 검색 대상과 함께 서비스에 넘기고, 검색 대상만 보내면 검색하지 않는다")
+    void listPassesTrimmedKeywordAndSearchType() {
+        // given
+        when(communityPostQueryService.list(any(), anyInt(), anyInt()))
+                .thenReturn(new CommunityPostPage(List.of(), 0, 20, false, 0L, 0));
+
+        // when
+        MvcTestResult byAuthor = mvc.get()
+                .uri(POSTS + "?searchType=AUTHOR&keyword={keyword}", "  새벽  ")
+                .exchange();
+        MvcTestResult defaultType = mvc.get().uri(POSTS + "?keyword=굴업도").exchange();
+        MvcTestResult typeOnly = mvc.get().uri(POSTS + "?searchType=TITLE").exchange();
+
+        // then
+        assertThat(byAuthor).hasStatus(HttpStatus.OK);
+        assertThat(defaultType).hasStatus(HttpStatus.OK);
+        assertThat(typeOnly).hasStatus(HttpStatus.OK);
+        verify(communityPostQueryService)
+                .list(new CommunityPostListQuery(null, false, CommunitySearchType.AUTHOR, "새벽"), 0, 20);
+        verify(communityPostQueryService)
+                .list(new CommunityPostListQuery(null, false, CommunitySearchType.TITLE_CONTENT, "굴업도"), 0, 20);
+        verify(communityPostQueryService).list(CommunityPostListQuery.all(), 0, 20);
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-13] 공백을 지운 검색어가 1자나 51자이거나 검색 대상이 알 수 없는 값이면 400 INVALID_INPUT이고 서비스를 부르지 않는다")
+    void listRejectsInvalidSearch() {
+        // when
+        MvcTestResult one = mvc.get().uri(POSTS + "?keyword={keyword}", " 가 ").exchange();
+        MvcTestResult tooLong =
+                mvc.get().uri(POSTS + "?keyword=" + "가".repeat(51)).exchange();
+        MvcTestResult unknownType =
+                mvc.get().uri(POSTS + "?searchType=COMMENT&keyword=굴업도").exchange();
+
+        // then
+        for (MvcTestResult result : new MvcTestResult[] {one, tooLong, unknownType}) {
+            assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+            assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        }
+        verifyNoInteractions(communityPostQueryService);
     }
 
     @Test
