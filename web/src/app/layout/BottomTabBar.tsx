@@ -1,7 +1,5 @@
 import { Icon } from '../../components/icons';
 import { useSession } from '../../features/member/session';
-import { UnreadBadge } from '../../features/notification/NotificationLink';
-import { notificationLabel, useUnreadCount } from '../../features/notification/unreadCount';
 import { Link, useLocation } from '../router';
 import { activeNavKey, NAV_ITEMS, navTarget } from './navItems';
 
@@ -10,7 +8,6 @@ import { activeNavKey, NAV_ITEMS, navTarget } from './navItems';
 export function BottomTabBar() {
   const { pathname } = useLocation();
   const session = useSession();
-  const count = useUnreadCount();
   const signedIn = session.status === 'authenticated' && session.me !== null;
   const active = activeNavKey(pathname);
 
@@ -22,26 +19,17 @@ export function BottomTabBar() {
       <ul className="grid grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const current = active === item.key;
-          const showCount = item.key === 'notifications' && signedIn;
           return (
             <li key={item.key}>
               <Link
                 to={navTarget(item, signedIn)}
                 aria-current={current ? 'page' : undefined}
-                aria-label={showCount ? notificationLabel(count) : undefined}
                 className={[
                   'relative flex h-14 flex-col items-center justify-center gap-0.5 border-t-2 text-xs',
                   current ? 'border-forest font-semibold text-forest-deep' : 'border-transparent text-ink-muted',
                 ].join(' ')}
               >
-                <span className="relative">
-                  <Icon name={item.icon} size={22} />
-                  {showCount && (
-                    <span className="absolute -right-3 -top-1.5">
-                      <UnreadBadge count={count} />
-                    </span>
-                  )}
-                </span>
+                <Icon name={item.icon} size={22} />
                 {item.label}
               </Link>
             </li>

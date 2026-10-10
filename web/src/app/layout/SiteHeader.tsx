@@ -2,7 +2,7 @@ import { Icon } from '../../components/icons';
 import { AccountChip } from '../../features/member/AccountChip';
 import { withNext } from '../../features/member/nextPath';
 import { useSession } from '../../features/member/session';
-import { UnreadBadge } from '../../features/notification/NotificationLink';
+import { NotificationBellLink, UnreadBadge } from '../../features/notification/NotificationLink';
 import { notificationLabel, useUnreadCount } from '../../features/notification/unreadCount';
 import { Link, useLocation } from '../router';
 import { activeNavKey, NAV_ITEMS } from './navItems';
@@ -17,7 +17,7 @@ type SiteHeaderProps = {
   className?: string;
 };
 
-const PRIMARY_KEYS = new Set(['map', 'basecamps', 'programs']);
+const PRIMARY_KEYS = new Set(['map', 'basecamps', 'community', 'programs']);
 
 // 지도가 없는 화면과 데스크톱 지도 화면 위에 붙는 머리글이다. 모바일에서는 메뉴를 하단 탭이 맡으므로 서비스 이름만 남긴다.
 export function SiteHeader({ mobileAccount = false, minimal = false, fluid = false, className = '' }: SiteHeaderProps) {
@@ -59,13 +59,14 @@ export function SiteHeader({ mobileAccount = false, minimal = false, fluid = fal
               <Link
                 to="/me/notifications"
                 aria-label={notificationLabel(count)}
-                aria-current={active === 'notifications' ? 'page' : undefined}
+                aria-current={pathname === '/me/notifications' ? 'page' : undefined}
                 className="hidden min-h-11 items-center gap-2 rounded-control px-3 text-ink hover:bg-paper-deep lg:inline-flex"
               >
                 <Icon name="bell" size={20} />
                 <UnreadBadge count={count} />
               </Link>
             )}
+            <NotificationBellLink className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-control px-2 text-ink hover:bg-paper-deep lg:hidden" />
             <div className={mobileAccount ? 'flex' : 'hidden lg:flex'}>
               <AccountChip />
             </div>

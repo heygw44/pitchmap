@@ -1,7 +1,7 @@
 import type { IconName } from '../../components/iconPaths';
 import { withNext } from '../../features/member/nextPath';
 
-export type NavKey = 'map' | 'basecamps' | 'programs' | 'notifications' | 'me';
+export type NavKey = 'map' | 'basecamps' | 'community' | 'programs' | 'me';
 
 export type NavItem = {
   key: NavKey;
@@ -16,8 +16,8 @@ export type NavItem = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'map', label: '지도', icon: 'map', needsLogin: false, path: '/map' },
   { key: 'basecamps', label: '베이스캠프', icon: 'tent', needsLogin: false, path: '/basecamps' },
+  { key: 'community', label: '커뮤니티', icon: 'chat', needsLogin: false, path: '/community' },
   { key: 'programs', label: '행사', icon: 'calendar', needsLogin: false, path: '/programs' },
-  { key: 'notifications', label: '알림', icon: 'bell', needsLogin: true, path: '/me/notifications' },
   { key: 'me', label: '내 정보', icon: 'user', needsLogin: true, path: '/me' },
 ];
 
@@ -29,8 +29,8 @@ export function navTarget(item: NavItem, signedIn: boolean): string {
 export function activeNavKey(pathname: string): NavKey | null {
   if (pathname === '/map' || pathname.startsWith('/spots/') || pathname.startsWith('/bakjis/')) return 'map';
   if (pathname === '/basecamps' || pathname.startsWith('/basecamps/')) return 'basecamps';
+  if (pathname === '/community' || pathname.startsWith('/community/')) return 'community';
   if (pathname === '/programs' || pathname.startsWith('/programs/')) return 'programs';
-  if (pathname === '/me/notifications') return 'notifications';
   if (pathname === '/me' || pathname.startsWith('/me/') || pathname === '/identity-verification') return 'me';
   return null;
 }

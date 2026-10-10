@@ -35,3 +35,18 @@ export function NotificationLink() {
     </Link>
   );
 }
+
+// 모바일 머리글과 지도 위에 두는 종 아이콘 링크다. 하단 탭에 알림 칸이 없어서 여기서 알림함으로 간다.
+export function NotificationBellLink({ className }: { className: string }) {
+  const session = useSession();
+  const count = useUnreadCount();
+
+  if (session.status !== 'authenticated' || session.me === null) return null;
+
+  return (
+    <Link to="/me/notifications" aria-label={notificationLabel(count)} className={className}>
+      <Icon name="bell" size={20} />
+      <UnreadBadge count={count} />
+    </Link>
+  );
+}
