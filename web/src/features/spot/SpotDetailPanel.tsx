@@ -205,6 +205,26 @@ function DetailContent({ detail }: { detail: SpotDetail }) {
         </div>
       </section>
 
+      <section className={SECTION_CLASS} aria-labelledby="spot-community-title">
+        <h3 id="spot-community-title" className={SECTION_TITLE_CLASS}>
+          커뮤니티
+        </h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link
+            to={`/community?spotId=${detail.spotId}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep"
+          >
+            이 장소 관련 글 보기
+          </Link>
+          <Link
+            to={`/community/new?spotId=${detail.spotId}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-control border border-ink-subtle bg-card px-4 text-base font-semibold text-ink hover:bg-paper-deep"
+          >
+            이 장소로 글쓰기
+          </Link>
+        </div>
+      </section>
+
       <SpotReviews key={detail.spotId} spotId={detail.spotId} initialRating={detail.rating} />
 
       <WeatherSection weather={detail.weather} />

@@ -76,6 +76,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   PROGRAM_CANCEL_NOT_ALLOWED: '취소할 수 있는 기한이 지났어요. 운영자에게 문의해 주세요.',
   PROGRAM_CAPACITY_DECREASE: '신청이 시작된 뒤에는 정원을 줄일 수 없어요. 정원을 늘리거나 그대로 두세요.',
 
+  // 커뮤니티
+  COMMUNITY_ALREADY_REPORTED: '이미 신고한 글이나 댓글이에요.',
+  COMMUNITY_INVALID_STATE: '지금 상태에서는 할 수 없는 작업이에요. 화면을 새로고침해 주세요.',
+  IMAGE_UPLOAD_FAILED: '이미지를 올리지 못했어요. 다시 시도해 주세요.',
+
   // 공공데이터
   SYNC_JOB_ALREADY_RUNNING: '같은 동기화 작업이 이미 돌고 있어요. 끝난 뒤 다시 실행해 주세요.',
 
@@ -88,6 +93,12 @@ const FIELD_LABELS: Record<string, string> = {
   password: '비밀번호',
   nickname: '닉네임',
   code: '인증 코드',
+  category: '분류',
+  title: '제목',
+  content: '내용',
+  imageIds: '이미지',
+  parentId: '답글 대상',
+  reason: '신고 사유',
 };
 
 const UNEXPECTED_ERROR_MESSAGE = '예상하지 못한 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.';

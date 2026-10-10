@@ -2,6 +2,9 @@ import { AdminReportDetailPage } from '../features/admin/AdminReportDetailPage';
 import { AdminReportsPage } from '../features/admin/AdminReportsPage';
 import { AdminSpotsPage } from '../features/admin/AdminSpotsPage';
 import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
+import { CommunityListPage } from '../features/community/CommunityListPage';
+import { CommunityPostDetailPage } from '../features/community/CommunityPostDetailPage';
+import { CommunityPostFormPage } from '../features/community/CommunityPostFormPage';
 import { MyProgramApplicationsPage } from '../features/program/MyProgramApplicationsPage';
 import { ProgramDetailPage } from '../features/program/ProgramDetailPage';
 import { ProgramListPage } from '../features/program/ProgramListPage';
@@ -59,6 +62,27 @@ export const routes: RouteDef[] = [
     render: (params) => {
       const basecampId = toPositiveId(params.basecampId);
       return basecampId === null ? <NotFoundPage /> : <BasecampManagePage key={basecampId} basecampId={basecampId} />;
+    },
+  },
+  { path: '/community', render: () => <CommunityListPage /> },
+  // '/community/new'가 '/community/:postId'보다 먼저 맞아야 하므로 이 경로를 앞에 둔다.
+  { path: '/community/new', render: () => <CommunityPostFormPage mode="create" /> },
+  {
+    path: '/community/:postId/edit',
+    render: (params) => {
+      const postId = toPositiveId(params.postId);
+      return postId === null ? (
+        <NotFoundPage />
+      ) : (
+        <CommunityPostFormPage key={postId} mode="edit" postId={postId} />
+      );
+    },
+  },
+  {
+    path: '/community/:postId',
+    render: (params) => {
+      const postId = toPositiveId(params.postId);
+      return postId === null ? <NotFoundPage /> : <CommunityPostDetailPage key={postId} postId={postId} />;
     },
   },
   { path: '/programs', render: () => <ProgramListPage /> },

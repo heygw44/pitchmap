@@ -17,7 +17,11 @@ export type IconName =
   | 'bell'
   | 'map'
   | 'calendar'
-  | 'user';
+  | 'user'
+  | 'chat'
+  | 'heart'
+  | 'image'
+  | 'arrowUp';
 
 export const ICON_PATHS: Record<IconName, string> = {
   tent:
@@ -60,4 +64,14 @@ export const ICON_PATHS: Record<IconName, string> = {
     '<path d="M8 3v4"/>' +
     '<path d="M16 3v4"/>',
   user: '<circle cx="12" cy="8" r="4"/>' + '<path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  chat:
+    '<path d="M4 5.5h16a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/>' +
+    '<path d="M7.5 10h9"/>' +
+    '<path d="M7.5 13h5"/>',
+  heart: '<path d="M12 20.5 4.2 12.7a4.8 4.8 0 0 1 6.8-6.8l1 1 1-1a4.8 4.8 0 0 1 6.8 6.8z"/>',
+  image:
+    '<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/>' +
+    '<circle cx="9" cy="10" r="1.75"/>' +
+    '<path d="m3.5 17 5-4.5 4 3.5 3-2.5 5 4.5"/>',
+  arrowUp: '<path d="M12 19V5"/>' + '<path d="m5.5 11.5 6.5-6.5 6.5 6.5"/>',
 };

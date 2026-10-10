@@ -19,6 +19,7 @@ import { BasecampOpenPanel } from '../basecamp/BasecampOpenPanel';
 import { useBasecampsInView } from '../basecamp/useBasecampsInView';
 import type { BasecampFilters, BasecampsInView } from '../basecamp/useBasecampsInView';
 import { withNext } from '../member/nextPath';
+import { NotificationBellLink } from '../notification/NotificationLink';
 import { useSession } from '../member/session';
 import { AnnouncementBar } from '../program/AnnouncementBar';
 import { BakjiReportPanel } from './BakjiReportPanel';
@@ -279,24 +280,27 @@ export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: Map
               <Link to="/" className={`${CHIP_CLASS} font-serif text-lg font-semibold text-forest-deep lg:invisible`}>
                 피치맵
               </Link>
-              {map && (
-                <div className="flex flex-wrap justify-end gap-2">
-                  {!reporting && !basecampMode && !opening && <ReportButton />}
-                  <button
-                    type="button"
-                    aria-pressed={terrainOn}
-                    onClick={() => setTerrainOn((value) => !value)}
-                    className={
-                      terrainOn
-                        ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
-                        : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
-                    }
-                  >
-                    <Icon name="terrain" size={20} />
-                    지형
-                  </button>
-                </div>
-              )}
+              <div className="flex flex-wrap justify-end gap-2">
+                <NotificationBellLink className="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-ink hover:bg-paper-deep lg:hidden" />
+                {map && (
+                  <>
+                    {!reporting && !basecampMode && !opening && <ReportButton />}
+                    <button
+                      type="button"
+                      aria-pressed={terrainOn}
+                      onClick={() => setTerrainOn((value) => !value)}
+                      className={
+                        terrainOn
+                          ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
+                          : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
+                      }
+                    >
+                      <Icon name="terrain" size={20} />
+                      지형
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <MapSafetyNotice />
           </div>

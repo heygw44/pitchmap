@@ -38,6 +38,9 @@ export function SiteFooter() {
           <Link to="/basecamps" className={LINK_CLASS}>
             베이스캠프
           </Link>
+          <Link to="/community" className={LINK_CLASS}>
+            커뮤니티
+          </Link>
           <Link to="/programs" className={LINK_CLASS}>
             공식 행사
           </Link>
