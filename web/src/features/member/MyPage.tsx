@@ -71,6 +71,9 @@ export function MyPage() {
         <Link to="/me/basecamps" className={PAGE_LINK_CLASS}>
           내 베이스캠프
         </Link>
+        <Link to="/me/program-applications" className={PAGE_LINK_CLASS}>
+          내 행사 신청
+        </Link>
         <Link to="/me/companion-reviews" className={PAGE_LINK_CLASS}>
           동행 후기
         </Link>

@@ -4,6 +4,7 @@ import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.program.domain.ProgramPhase;
 import com.pitchmap.program.infra.MyApplicationRow;
+import com.pitchmap.program.infra.MyProgramApplicationRow;
 import com.pitchmap.program.infra.ProgramDetailRow;
 import com.pitchmap.program.infra.ProgramListRow;
 import com.pitchmap.program.infra.ProgramQueryMapper;
@@ -57,6 +58,22 @@ public class ProgramQueryService {
         return toDetail(row, clock.instant(), findMyApplication(programId, viewerId));
     }
 
+    /**
+     * 호출하면 memberId인 회원의 신청을 query.status로 거르고 최근 신청부터 한 페이지 읽는다. 취소된 행사의 신청도 포함한다.
+     * 다음 페이지가 있는지 알려고 한 건을 더 읽고, 그 건은 결과에서 뺀다.
+     */
+    @Transactional(readOnly = true)
+    public MyProgramApplicationPage listMine(long memberId, MyProgramApplicationQuery query) {
+        Instant now = clock.instant();
+        long offset = (long) query.page() * query.size();
+        List<MyProgramApplicationRow> rows =
+                programQueryMapper.selectMyApplications(memberId, query.status(), offset, query.size() + 1);
+        boolean hasNext = rows.size() > query.size();
+        List<MyProgramApplicationItem> content =
+                rows.stream().limit(query.size()).map(row -> toMyItem(row, now)).toList();
+        return new MyProgramApplicationPage(content, query.page(), query.size(), hasNext);
+    }
+
     private ProgramDetail.MyApplication findMyApplication(long programId, Long viewerId) {
         if (viewerId == null) {
             return null;
@@ -84,6 +101,26 @@ public class ProgramQueryService {
                 row.fee(),
                 row.overnight(),
                 phase.name());
+    }
+
+    private static MyProgramApplicationItem toMyItem(MyProgramApplicationRow row, Instant now) {
+        ProgramPhase phase = ProgramPhase.of(row.programStatus(), row.applyOpenAt(), row.applyCloseAt(), now);
+        return new MyProgramApplicationItem(
+                row.applicationId(),
+                row.status().name(),
+                row.paymentDueAt(),
+                row.confirmedAt(),
+                row.canceledAt(),
+                row.cancelReason() == null ? null : row.cancelReason().name(),
+                row.createdAt(),
+                new MyProgramApplicationItem.Program(
+                        row.programId(),
+                        row.title(),
+                        row.locationText(),
+                        row.startAt(),
+                        row.endAt(),
+                        row.fee(),
+                        phase.name()));
     }
 
     private static ProgramDetail toDetail(ProgramDetailRow row, Instant now, ProgramDetail.MyApplication mine) {

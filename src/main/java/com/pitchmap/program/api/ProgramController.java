@@ -57,6 +57,26 @@ class ProgramController {
     }
 
     @Operation(
+            summary = "내 행사 신청 목록",
+            description =
+                    "로그인한 회원 본인의 행사 신청을 최근 신청부터(applicationId 내림차순) 돌려준다. 이메일 인증 전의 회원도 조회할 수 있다. "
+                            + "status를 생략하면 모든 상태를 주고, PENDING_PAYMENT, CONFIRMED, CANCELED, EXPIRED 중 하나를 보내면 그 상태만 준다. "
+                            + "취소된 행사의 신청도 내 기록이라서 포함하고, 이때 program.status가 CANCELED이다. "
+                            + "항목마다 applicationId, status, paymentDueAt, confirmedAt, canceledAt, cancelReason, createdAt, "
+                            + "program(programId, title, locationText, startAt, endAt, fee, status)이 있다. "
+                            + "program.fee는 지금의 참가비이고 결제한 금액이 아니다. program.status는 UPCOMING, OPEN, CLOSED, CANCELED 중 하나다. "
+                            + "confirmedAt, canceledAt, cancelReason은 해당 상태가 아니면 null이다. "
+                            + "page는 0부터 시작하고 기본값은 0이다. size는 1~50이고 기본값은 20이다. 응답에는 전체 개수가 없고 다음 페이지가 있는지만 hasNext로 알려 준다. "
+                            + "로그인하지 않았으면 401 AUTHENTICATION_REQUIRED, status가 허용 값이 아니거나 page·size가 범위를 벗어나면 400 INVALID_INPUT이다.")
+    @GetMapping("/api/me/program-applications")
+    MyProgramApplicationPageResponse listMine(
+            @AuthenticationPrincipal LoginMember loginMember,
+            @Valid @ParameterObject @ModelAttribute MyProgramApplicationListRequest request) {
+        return MyProgramApplicationPageResponse.from(
+                programQueryService.listMine(loginMember.memberId(), request.toQuery()));
+    }
+
+    @Operation(
             summary = "행사 선착순 신청",
             description = "로그인한 인증 회원이 행사에 신청한다. Idempotency-Key 헤더가 필요하다. 없으면 400 IDEMPOTENCY_KEY_REQUIRED, "
                     + "영문·숫자·'-'·'_' 1~64자가 아니면 400 INVALID_INPUT이다. 같은 키로 다시 보내면 처음 결과를 그대로 돌려주고, "

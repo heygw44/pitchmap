@@ -3,7 +3,9 @@ package com.pitchmap.program.api;
 import static com.pitchmap.common.testsupport.TestCsrf.csrf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -18,6 +20,9 @@ import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.common.security.SecurityConfig;
 import com.pitchmap.common.testsupport.MutableClock;
 import com.pitchmap.common.trace.TraceIdFilter;
+import com.pitchmap.program.application.MyProgramApplicationItem;
+import com.pitchmap.program.application.MyProgramApplicationPage;
+import com.pitchmap.program.application.MyProgramApplicationQuery;
 import com.pitchmap.program.application.ProgramApplyResult;
 import com.pitchmap.program.application.ProgramApplyService;
 import com.pitchmap.program.application.ProgramDetail;
@@ -26,6 +31,7 @@ import com.pitchmap.program.application.ProgramPage;
 import com.pitchmap.program.application.ProgramQueryService;
 import com.pitchmap.program.application.ProgramSummary;
 import com.pitchmap.program.application.ProgramVacancyAlertService;
+import com.pitchmap.program.domain.ProgramApplicationStatus;
 import com.pitchmap.program.domain.ProgramErrorCode;
 import com.pitchmap.program.domain.ProgramException;
 import com.pitchmap.program.domain.ProgramPhase;
@@ -185,6 +191,70 @@ class ProgramControllerTest {
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("IDEMPOTENCY_KEY_REQUIRED");
         verifyNoInteractions(programApplyService);
+    }
+
+    @Test
+    @DisplayName("[F-18] 내 행사 신청 목록은 로그인한 회원 ID와 조회 조건으로 서비스를 부르고, 시각과 사유가 없는 필드는 null로 응답한다")
+    void listMineReturnsPage() {
+        MyProgramApplicationItem item = new MyProgramApplicationItem(
+                31L,
+                "PENDING_PAYMENT",
+                AT,
+                null,
+                null,
+                null,
+                AT,
+                new MyProgramApplicationItem.Program(4L, "가을 능선 백패킹", "지리산 성삼재", AT, AT, 30000, "OPEN"));
+        when(programQueryService.listMine(4L, new MyProgramApplicationQuery(ProgramApplicationStatus.CONFIRMED, 1, 5)))
+                .thenReturn(new MyProgramApplicationPage(List.of(item), 1, 5, true));
+
+        MvcTestResult result = mvc.get()
+                .uri("/api/me/program-applications")
+                .param("status", "CONFIRMED")
+                .param("page", "1")
+                .param("size", "5")
+                .with(member(4L))
+                .exchange();
+
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[0].applicationId")
+                .isEqualTo(31);
+        assertThat(result).bodyJson().extractingPath("$.content[0].confirmedAt").isNull();
+        assertThat(result).bodyJson().extractingPath("$.content[0].program.fee").isEqualTo(30000);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[0].program.status")
+                .isEqualTo("OPEN");
+        assertThat(result).bodyJson().extractingPath("$.hasNext").isEqualTo(true);
+        assertThat(result).bodyJson().extractingPath("$.content[0]").asMap().containsKey("cancelReason");
+    }
+
+    @Test
+    @DisplayName("[F-18] 내 행사 신청 목록의 status가 허용 값이 아니거나 size가 1~50을 벗어나면 400 INVALID_INPUT이다")
+    void listMineRejectsInvalidParameters() {
+        for (String[] param :
+                new String[][] {{"status", "OPEN"}, {"status", "confirmed"}, {"size", "51"}, {"page", "-1"}}) {
+            MvcTestResult result = mvc.get()
+                    .uri("/api/me/program-applications")
+                    .param(param[0], param[1])
+                    .with(member(4L))
+                    .exchange();
+
+            assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+            assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        }
+        verify(programQueryService, never()).listMine(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("[F-18] 로그인하지 않고 내 행사 신청 목록을 조회하면 401 AUTHENTICATION_REQUIRED이다")
+    void listMineRequiresLogin() {
+        MvcTestResult result = mvc.get().uri("/api/me/program-applications").exchange();
+
+        assertThat(result).hasStatus(HttpStatus.UNAUTHORIZED);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("AUTHENTICATION_REQUIRED");
     }
 
     @Test

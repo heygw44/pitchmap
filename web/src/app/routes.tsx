@@ -2,6 +2,9 @@ import { AdminReportDetailPage } from '../features/admin/AdminReportDetailPage';
 import { AdminReportsPage } from '../features/admin/AdminReportsPage';
 import { AdminSpotsPage } from '../features/admin/AdminSpotsPage';
 import { BasecampManagePage } from '../features/basecamp/BasecampManagePage';
+import { MyProgramApplicationsPage } from '../features/program/MyProgramApplicationsPage';
+import { ProgramDetailPage } from '../features/program/ProgramDetailPage';
+import { ProgramListPage } from '../features/program/ProgramListPage';
 import { MyBasecampsPage } from '../features/basecamp/MyBasecampsPage';
 import { NotificationsPage } from '../features/notification/NotificationsPage';
 import { CompanionReviewsPage } from '../features/review/CompanionReviewsPage';
@@ -56,7 +59,16 @@ export const routes: RouteDef[] = [
       return basecampId === null ? <NotFoundPage /> : <BasecampManagePage key={basecampId} basecampId={basecampId} />;
     },
   },
+  { path: '/programs', render: () => <ProgramListPage /> },
+  {
+    path: '/programs/:programId',
+    render: (params) => {
+      const programId = toPositiveId(params.programId);
+      return programId === null ? <NotFoundPage /> : <ProgramDetailPage key={programId} programId={programId} />;
+    },
+  },
   { path: '/me/basecamps', render: () => <MyBasecampsPage /> },
+  { path: '/me/program-applications', render: () => <MyProgramApplicationsPage /> },
   { path: '/me/companion-reviews', render: () => <CompanionReviewsPage /> },
   { path: '/me/notifications', render: () => <NotificationsPage /> },
   { path: '/admin/reports', render: () => <AdminReportsPage /> },

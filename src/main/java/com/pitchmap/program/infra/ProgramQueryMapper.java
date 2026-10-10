@@ -37,6 +37,16 @@ public interface ProgramQueryMapper {
             @Param("offset") long offset,
             @Param("limit") int limit);
 
+    /**
+     * 호출하면 memberId인 회원의 신청 중 status인 것을 신청 ID가 큰(최근) 순서로 offset건 건너뛰고 최대 limit건 읽는다. status가 null이면 상태로 거르지 않는다.
+     * 취소된 행사의 신청도 읽고, 행사 정보는 지금 값이다.
+     */
+    List<MyProgramApplicationRow> selectMyApplications(
+            @Param("memberId") long memberId,
+            @Param("status") ProgramApplicationStatus status,
+            @Param("offset") long offset,
+            @Param("limit") int limit);
+
     /** 호출하면 spotId인 장소가 있고 지도에 보이는(ACTIVE) 상태이면 true를 돌려준다. */
     boolean existsActiveSpot(@Param("spotId") long spotId);
 }
