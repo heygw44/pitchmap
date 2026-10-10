@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.testsupport.IntegrationTest;
 import com.pitchmap.common.testsupport.MutableClock;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.infra.TestCommunityImageStorage;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.time.Duration;
@@ -80,8 +79,7 @@ class CommunityImageCleanupIntegrationTest {
     @DisplayName("[F-29][CM-06] 오래됐어도 글에 붙은 이미지는 행도 저장소 객체도 지우지 않는다")
     void keepsAttachedImages() {
         // given
-        long postId = postCommandService.write(
-                memberId, new CommunityPostWriteCommand(CommunityCategory.FREE, "제목", "본문", null));
+        long postId = postCommandService.write(memberId, new CommunityPostWriteCommand("제목", "본문", null));
         Instant old = clock.instant().minus(Duration.ofDays(3));
         long attached = insertImage(old);
         long unattached = insertImage(old);

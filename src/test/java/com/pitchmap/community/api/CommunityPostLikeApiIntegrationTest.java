@@ -50,7 +50,7 @@ class CommunityPostLikeApiIntegrationTest {
     void likeAndUnlikeAreIdempotent() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember("새벽능선"));
-        long postId = fixture.writePost(session, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(session, "제목", "본문", null);
 
         // when
         MvcTestResult first = fixture.send(mvc.put().uri(likeUri(postId)), session, null);
@@ -76,7 +76,7 @@ class CommunityPostLikeApiIntegrationTest {
         // given
         Cookie first = fixture.verifiedSession(fixture.saveMember("새벽능선"));
         Cookie second = fixture.verifiedSession(fixture.saveMember("아침안개"));
-        long postId = fixture.writePost(first, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(first, "제목", "본문", null);
 
         // when
         fixture.send(mvc.put().uri(likeUri(postId)), first, null);
@@ -92,8 +92,8 @@ class CommunityPostLikeApiIntegrationTest {
     void deletedOrHiddenPostIsNotFound() {
         // given
         Cookie session = fixture.verifiedSession(fixture.saveMember("새벽능선"));
-        long deletedId = fixture.writePost(session, "FREE", "지운 글", "본문", null);
-        long hiddenId = fixture.writePost(session, "FREE", "숨긴 글", "본문", null);
+        long deletedId = fixture.writePost(session, "지운 글", "본문", null);
+        long hiddenId = fixture.writePost(session, "숨긴 글", "본문", null);
         fixture.send(mvc.delete().uri(POSTS + "/" + deletedId), session, null);
         jdbc.update("UPDATE community_post SET status = 'HIDDEN' WHERE id = ?", hiddenId);
 
@@ -118,7 +118,7 @@ class CommunityPostLikeApiIntegrationTest {
         // given
         Cookie liker = fixture.verifiedSession(fixture.saveMember("새벽능선"));
         Cookie other = fixture.verifiedSession(fixture.saveMember("아침안개"));
-        long postId = fixture.writePost(liker, "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(liker, "제목", "본문", null);
         fixture.send(mvc.put().uri(likeUri(postId)), liker, null);
 
         // when
@@ -144,7 +144,7 @@ class CommunityPostLikeApiIntegrationTest {
     void unverifiedMemberCannotLike() {
         // given
         Member author = fixture.saveMember("새벽능선");
-        long postId = fixture.writePost(fixture.verifiedSession(author), "FREE", "제목", "본문", null);
+        long postId = fixture.writePost(fixture.verifiedSession(author), "제목", "본문", null);
         Cookie unverified = fixture.loginOnly(fixture.saveMember("아침안개"));
 
         // when

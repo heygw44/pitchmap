@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.testsupport.IntegrationTest;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.domain.CommunityErrorCode;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.util.ArrayList;
@@ -182,8 +181,7 @@ class CommunityReportConcurrencyIntegrationTest {
     }
 
     private long savePost(long authorId) {
-        return postCommandService.write(
-                authorId, new CommunityPostWriteCommand(CommunityCategory.FREE, "제목", "본문", null));
+        return postCommandService.write(authorId, new CommunityPostWriteCommand("제목", "본문", null));
     }
 
     private long saveMember() {

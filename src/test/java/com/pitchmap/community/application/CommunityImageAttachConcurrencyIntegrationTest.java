@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pitchmap.common.error.InvalidFieldException;
 import com.pitchmap.common.testsupport.IntegrationTest;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.infra.TestCommunityImageStorage;
 import com.pitchmap.member.infra.MemberJpaRepository;
 import java.util.ArrayList;
@@ -53,9 +52,7 @@ class CommunityImageAttachConcurrencyIntegrationTest {
         List<Callable<Object>> tasks = new ArrayList<>();
         for (int i = 0; i < THREADS; i++) {
             tasks.add(() -> postCommandService.write(
-                    memberId,
-                    new CommunityPostWriteCommand(
-                            CommunityCategory.FREE, "제목", "본문", null, List.of(upload.imageId()))));
+                    memberId, new CommunityPostWriteCommand("제목", "본문", null, List.of(upload.imageId()))));
         }
 
         // when

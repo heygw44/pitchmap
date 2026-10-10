@@ -11,7 +11,6 @@
          글 ID는 순서대로 커지므로 ID 내림차순이 곧 최신순이다. 그래서 작성 시각 정렬 없이 기본 키 순서로 읽는다. -->
     <sql id="postColumns">
         p.id AS post_id,
-        p.category AS category,
         p.title AS title,
         p.member_id AS author_id,
         m.nickname AS author_nickname,
@@ -40,9 +39,6 @@
         <include refid="postJoins"/>
         <where>
             p.status = 'ACTIVE'
-            <if test="category != null">
-                AND p.category = #{category}
-            </if>
             <if test="spotId != null">
                 AND p.spot_id = #{spotId}
             </if>

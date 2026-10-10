@@ -27,7 +27,6 @@ import com.pitchmap.community.application.CommunityPostPage;
 import com.pitchmap.community.application.CommunityPostQueryService;
 import com.pitchmap.community.application.CommunityPostReviseCommand;
 import com.pitchmap.community.application.CommunityPostWriteCommand;
-import com.pitchmap.community.domain.CommunityCategory;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -53,13 +52,11 @@ class CommunityPostControllerTest {
 
     private static final long MEMBER_ID = 7L;
     private static final String POSTS = "/api/community/posts";
-    private static final String VALID_BODY =
-            "{\"category\":\"GEAR\",\"title\":\"텐트 후기\",\"content\":\"가볍다\",\"spotId\":101}";
+    private static final String VALID_BODY = "{\"title\":\"텐트 후기\",\"content\":\"가볍다\",\"spotId\":101}";
     private static final Instant CREATED_AT = Instant.parse("2026-10-05T03:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-05T04:00:00Z");
     private static final CommunityPostItem ITEM = new CommunityPostItem(
             9L,
-            CommunityCategory.GEAR,
             "텐트 후기",
             "가볍다",
             31L,
@@ -75,22 +72,7 @@ class CommunityPostControllerTest {
             UPDATED_AT,
             null);
     private static final CommunityPostItem ITEM_WITHOUT_SPOT = new CommunityPostItem(
-            10L,
-            CommunityCategory.FREE,
-            "안녕",
-            "반가워요",
-            31L,
-            "새벽능선",
-            null,
-            null,
-            null,
-            0L,
-            List.of(),
-            0L,
-            0L,
-            CREATED_AT,
-            CREATED_AT,
-            null);
+            10L, "안녕", "반가워요", 31L, "새벽능선", null, null, null, 0L, List.of(), 0L, 0L, CREATED_AT, CREATED_AT, null);
 
     @Autowired
     private MockMvcTester mvc;
@@ -106,8 +88,7 @@ class CommunityPostControllerTest {
             "[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 좋아요 수와 댓글 수와 이미지 수는 있고 이미지가 없으면 thumbnailUrl과 likedByMe는 없다")
     void anonymousReadsPostList() {
         // given
-        when(communityPostQueryService.list(null, null, 0, 20))
-                .thenReturn(new CommunityPostPage(List.of(ITEM), 0, 20, true));
+        when(communityPostQueryService.list(null, 0, 20)).thenReturn(new CommunityPostPage(List.of(ITEM), 0, 20, true));
 
         // when
         MvcTestResult result = mvc.get().uri(POSTS).exchange();
@@ -118,7 +99,6 @@ class CommunityPostControllerTest {
                 {
                   "content": [{
                     "postId": 9,
-                    "category": "GEAR",
                     "title": "텐트 후기",
                     "excerpt": "가볍다",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
@@ -137,7 +117,7 @@ class CommunityPostControllerTest {
     @DisplayName("[F-29][CM-02] 연결한 장소가 없거나 보이지 않는 글은 spot 필드가 null이 아니라 아예 없다")
     void listOmitsSpotFieldWhenNoVisibleSpot() {
         // given
-        when(communityPostQueryService.list(null, null, 0, 20))
+        when(communityPostQueryService.list(null, 0, 20))
                 .thenReturn(new CommunityPostPage(List.of(ITEM_WITHOUT_SPOT), 0, 20, false));
 
         // when
@@ -149,7 +129,6 @@ class CommunityPostControllerTest {
                 {
                   "content": [{
                     "postId": 10,
-                    "category": "FREE",
                     "title": "안녕",
                     "excerpt": "반가워요",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
@@ -164,34 +143,28 @@ class CommunityPostControllerTest {
     }
 
     @Test
-    @DisplayName("[F-29] 목록의 category, spotId, page, size를 서비스에 그대로 넘긴다")
+    @DisplayName("[F-29] 목록의 spotId, page, size를 서비스에 그대로 넘긴다")
     void listPassesFiltersAndPaging() {
         // given
-        when(communityPostQueryService.list(CommunityCategory.GEAR, 101L, 2, 50))
-                .thenReturn(new CommunityPostPage(List.of(), 2, 50, false));
+        when(communityPostQueryService.list(101L, 2, 50)).thenReturn(new CommunityPostPage(List.of(), 2, 50, false));
 
         // when
-        MvcTestResult result = mvc.get()
-                .uri(POSTS + "?category=GEAR&spotId=101&page=2&size=50")
-                .exchange();
+        MvcTestResult result =
+                mvc.get().uri(POSTS + "?spotId=101&page=2&size=50").exchange();
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
-        verify(communityPostQueryService).list(CommunityCategory.GEAR, 101L, 2, 50);
+        verify(communityPostQueryService).list(101L, 2, 50);
     }
 
     @Test
-    @DisplayName("[F-29] 알 수 없는 category나 범위를 벗어난 size·page는 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
-    void listRejectsUnknownCategoryAndOutOfRangePaging() {
+    @DisplayName("[F-29] 범위를 벗어난 size·page는 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
+    void listRejectsOutOfRangePaging() {
         // when
-        MvcTestResult unknownCategory =
-                mvc.get().uri(POSTS + "?category=CAMPING").exchange();
         MvcTestResult tooBig = mvc.get().uri(POSTS + "?size=51").exchange();
         MvcTestResult negativePage = mvc.get().uri(POSTS + "?page=-1").exchange();
 
         // then
-        assertThat(unknownCategory).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(unknownCategory).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         assertThat(tooBig).hasStatus(HttpStatus.BAD_REQUEST);
         assertThat(tooBig).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
         assertThat(negativePage).hasStatus(HttpStatus.BAD_REQUEST);
@@ -212,7 +185,6 @@ class CommunityPostControllerTest {
         assertThat(result).bodyJson().isStrictlyEqualTo("""
                 {
                   "postId": 9,
-                  "category": "GEAR",
                   "title": "텐트 후기",
                   "content": "가볍다",
                   "images": [],
@@ -231,22 +203,7 @@ class CommunityPostControllerTest {
     void verifiedMemberReadsDetailWithLikedByMe() {
         // given
         CommunityPostItem liked = new CommunityPostItem(
-                9L,
-                CommunityCategory.GEAR,
-                "텐트 후기",
-                "가볍다",
-                31L,
-                "새벽능선",
-                null,
-                null,
-                null,
-                0L,
-                List.of(),
-                5L,
-                3L,
-                CREATED_AT,
-                UPDATED_AT,
-                true);
+                9L, "텐트 후기", "가볍다", 31L, "새벽능선", null, null, null, 0L, List.of(), 5L, 3L, CREATED_AT, UPDATED_AT, true);
         when(communityPostQueryService.detail(9L, MEMBER_ID)).thenReturn(liked);
 
         // when
@@ -288,8 +245,7 @@ class CommunityPostControllerTest {
         assertThat(result).bodyJson().isStrictlyEqualTo("{ \"postId\": 55 }");
         ArgumentCaptor<CommunityPostWriteCommand> captor = ArgumentCaptor.forClass(CommunityPostWriteCommand.class);
         verify(communityPostCommandService).write(eq(MEMBER_ID), captor.capture());
-        assertThat(captor.getValue())
-                .isEqualTo(new CommunityPostWriteCommand(CommunityCategory.GEAR, "텐트 후기", "가볍다", 101L));
+        assertThat(captor.getValue()).isEqualTo(new CommunityPostWriteCommand("텐트 후기", "가볍다", 101L));
     }
 
     @Test
@@ -299,26 +255,22 @@ class CommunityPostControllerTest {
         when(communityPostCommandService.write(eq(MEMBER_ID), any())).thenReturn(56L);
 
         // when
-        MvcTestResult result = send(
-                mvc.post().uri(POSTS), verified(), "{\"category\":\"FREE\",\"title\":\"안녕\",\"content\":\"반가워요\"}");
+        MvcTestResult result = send(mvc.post().uri(POSTS), verified(), "{\"title\":\"안녕\",\"content\":\"반가워요\"}");
 
         // then
         assertThat(result).hasStatus(HttpStatus.CREATED);
-        verify(communityPostCommandService)
-                .write(MEMBER_ID, new CommunityPostWriteCommand(CommunityCategory.FREE, "안녕", "반가워요", null));
+        verify(communityPostCommandService).write(MEMBER_ID, new CommunityPostWriteCommand("안녕", "반가워요", null));
     }
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(
             strings = {
-                "{\"title\":\"제목\",\"content\":\"본문\"}",
-                "{\"category\":\"FREE\",\"content\":\"본문\"}",
-                "{\"category\":\"FREE\",\"title\":\"  \",\"content\":\"본문\"}",
-                "{\"category\":\"FREE\",\"title\":\"제목\"}",
-                "{\"category\":\"FREE\",\"title\":\"제목\",\"content\":\"   \"}",
-                "{\"category\":\"CAMPING\",\"title\":\"제목\",\"content\":\"본문\"}"
+                "{\"content\":\"본문\"}",
+                "{\"title\":\"  \",\"content\":\"본문\"}",
+                "{\"title\":\"제목\"}",
+                "{\"title\":\"제목\",\"content\":\"   \"}"
             })
-    @DisplayName("[F-29][CM-02] 카테고리가 없거나 틀리고, 제목이나 본문이 비면 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
+    @DisplayName("[F-29][CM-02] 제목이나 본문이 비면 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
     void writeRejectsInvalidBody(String body) {
         // when
         MvcTestResult result = send(mvc.post().uri(POSTS), verified(), body);
@@ -414,10 +366,7 @@ class CommunityPostControllerTest {
         when(communityPostCommandService.revise(eq(MEMBER_ID), eq(9L), any())).thenReturn(ITEM);
 
         // when
-        MvcTestResult result = send(
-                mvc.patch().uri(POSTS + "/9"),
-                verified(),
-                "{\"title\":\"새 제목\",\"category\":\"FREE\",\"spotId\":null}");
+        MvcTestResult result = send(mvc.patch().uri(POSTS + "/9"), verified(), "{\"title\":\"새 제목\",\"spotId\":null}");
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
@@ -427,10 +376,7 @@ class CommunityPostControllerTest {
         verify(communityPostCommandService).revise(eq(MEMBER_ID), eq(9L), captor.capture());
         assertThat(captor.getValue())
                 .isEqualTo(new CommunityPostReviseCommand(
-                        PatchField.of(CommunityCategory.FREE),
-                        PatchField.of("새 제목"),
-                        PatchField.absent(),
-                        PatchField.of(null)));
+                        PatchField.of("새 제목"), PatchField.absent(), PatchField.of(null)));
     }
 
     @Test
@@ -448,25 +394,12 @@ class CommunityPostControllerTest {
                 .revise(
                         MEMBER_ID,
                         9L,
-                        new CommunityPostReviseCommand(
-                                PatchField.absent(), PatchField.absent(), PatchField.absent(), PatchField.absent()));
-    }
-
-    @Test
-    @DisplayName("[F-29][CM-03] 수정에서 category가 알 수 없는 값이면 400 INVALID_INPUT을 응답하고 서비스를 부르지 않는다")
-    void updateRejectsUnknownCategory() {
-        // when
-        MvcTestResult result = send(mvc.patch().uri(POSTS + "/9"), verified(), "{\"category\":\"CAMPING\"}");
-
-        // then
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
-        verifyNoInteractions(communityPostCommandService);
+                        new CommunityPostReviseCommand(PatchField.absent(), PatchField.absent(), PatchField.absent()));
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"{\"category\":null}", "{\"title\":null}", "{\"content\":null}"})
-    @DisplayName("[F-29][CM-03] category, title, content를 null로 보내면 서비스가 던진 INVALID_INPUT을 400으로 응답한다")
+    @ValueSource(strings = {"{\"title\":null}", "{\"content\":null}"})
+    @DisplayName("[F-29][CM-03] title, content를 null로 보내면 서비스가 던진 INVALID_INPUT을 400으로 응답한다")
     void updateWithExplicitNullIsBadRequest(String body) {
         // given
         when(communityPostCommandService.revise(anyLong(), anyLong(), any()))
@@ -481,7 +414,7 @@ class CommunityPostControllerTest {
         ArgumentCaptor<CommunityPostReviseCommand> captor = ArgumentCaptor.forClass(CommunityPostReviseCommand.class);
         verify(communityPostCommandService).revise(eq(MEMBER_ID), eq(9L), captor.capture());
         CommunityPostReviseCommand command = captor.getValue();
-        long explicitNulls = List.of(command.category(), command.title(), command.content()).stream()
+        long explicitNulls = List.of(command.title(), command.content()).stream()
                 .filter(field -> field.present() && field.value() == null)
                 .count();
         assertThat(explicitNulls).isEqualTo(1);
@@ -526,10 +459,10 @@ class CommunityPostControllerTest {
     }
 
     @Test
-    @DisplayName("[F-29] 목록 파라미터를 보내지 않으면 category와 spotId는 거르지 않고 page 0, size 20으로 서비스를 부른다")
+    @DisplayName("[F-29] 목록 파라미터를 보내지 않으면 spotId로 거르지 않고 page 0, size 20으로 서비스를 부른다")
     void listWithoutParametersUsesDefaults() {
         // given
-        when(communityPostQueryService.list(any(), any(), anyInt(), anyInt()))
+        when(communityPostQueryService.list(any(), anyInt(), anyInt()))
                 .thenReturn(new CommunityPostPage(List.of(), 0, 20, false));
 
         // when
@@ -537,7 +470,7 @@ class CommunityPostControllerTest {
 
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
-        verify(communityPostQueryService).list(null, null, 0, 20);
+        verify(communityPostQueryService).list(null, 0, 20);
     }
 
     @Test
@@ -546,7 +479,6 @@ class CommunityPostControllerTest {
         // given
         CommunityPostItem withImages = new CommunityPostItem(
                 9L,
-                CommunityCategory.GEAR,
                 "텐트 후기",
                 "가볍다",
                 31L,
@@ -561,7 +493,7 @@ class CommunityPostControllerTest {
                 CREATED_AT,
                 UPDATED_AT,
                 null);
-        when(communityPostQueryService.list(null, null, 0, 20))
+        when(communityPostQueryService.list(null, 0, 20))
                 .thenReturn(new CommunityPostPage(List.of(withImages), 0, 20, false));
 
         // when
@@ -582,7 +514,6 @@ class CommunityPostControllerTest {
         // given
         CommunityPostItem withImages = new CommunityPostItem(
                 9L,
-                CommunityCategory.GEAR,
                 "텐트 후기",
                 "가볍다",
                 31L,
@@ -619,17 +550,13 @@ class CommunityPostControllerTest {
         when(communityPostCommandService.write(eq(MEMBER_ID), any())).thenReturn(57L);
 
         // when
-        MvcTestResult result = send(
-                mvc.post().uri(POSTS),
-                verified(),
-                "{\"category\":\"FREE\",\"title\":\"안녕\",\"content\":\"반가워요\",\"imageIds\":[12,11]}");
+        MvcTestResult result =
+                send(mvc.post().uri(POSTS), verified(), "{\"title\":\"안녕\",\"content\":\"반가워요\",\"imageIds\":[12,11]}");
 
         // then
         assertThat(result).hasStatus(HttpStatus.CREATED);
         verify(communityPostCommandService)
-                .write(
-                        MEMBER_ID,
-                        new CommunityPostWriteCommand(CommunityCategory.FREE, "안녕", "반가워요", null, List.of(12L, 11L)));
+                .write(MEMBER_ID, new CommunityPostWriteCommand("안녕", "반가워요", null, List.of(12L, 11L)));
     }
 
     @Test
@@ -667,7 +594,7 @@ class CommunityPostControllerTest {
     }
 
     private static String body(String title, String content) {
-        return "{\"category\":\"FREE\",\"title\":\"" + title + "\",\"content\":\"" + content + "\"}";
+        return "{\"title\":\"" + title + "\",\"content\":\"" + content + "\"}";
     }
 
     private MvcTestResult send(MockMvcTester.MockMvcRequestBuilder builder, RequestPostProcessor login, String body) {

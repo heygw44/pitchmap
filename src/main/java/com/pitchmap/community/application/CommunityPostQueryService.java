@@ -2,7 +2,6 @@ package com.pitchmap.community.application;
 
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
-import com.pitchmap.community.domain.CommunityCategory;
 import com.pitchmap.community.infra.CommunityPostMapper;
 import com.pitchmap.community.infra.CommunityPostRow;
 import java.util.List;
@@ -19,16 +18,15 @@ public class CommunityPostQueryService {
     private final CommunityPostItemReader communityPostItemReader;
 
     /**
-     * 호출하면 ACTIVE인 글을 최신순으로 한 페이지 돌려준다. category와 spotId는 null이면 거르지 않는다.
+     * 호출하면 ACTIVE인 글을 최신순으로 한 페이지 돌려준다. spotId는 null이면 거르지 않는다.
      *
      * <p>spotId로 거를 때는 그 장소가 지금 ACTIVE인지 보지 않는다. 서비스는 다음 페이지가 있는지 알려고 한 행을 더 읽고, 그 행은 결과에서
      * 뺀다. 그래서 전체 개수를 세는 쿼리를 따로 보내지 않는다.
      */
     @Transactional(readOnly = true)
-    public CommunityPostPage list(CommunityCategory category, Long spotId, int page, int size) {
+    public CommunityPostPage list(Long spotId, int page, int size) {
         long offset = (long) page * size;
-        String categoryName = category == null ? null : category.name();
-        List<CommunityPostRow> rows = communityPostMapper.selectActive(categoryName, spotId, offset, size + 1);
+        List<CommunityPostRow> rows = communityPostMapper.selectActive(spotId, offset, size + 1);
         boolean hasNext = rows.size() > size;
         List<CommunityPostItem> content = rows.stream()
                 .limit(size)

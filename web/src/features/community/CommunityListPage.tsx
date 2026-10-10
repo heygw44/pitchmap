@@ -2,60 +2,36 @@ import { useEffect, useMemo, useState } from 'react';
 import { listPosts } from '../../api/community';
 import type { CommunityPostQuery } from '../../api/community';
 import { fetchSpotDetail } from '../../api/spots';
-import type { CommunityCategory, CommunityPostSummary } from '../../api/types';
+import type { CommunityPostSummary } from '../../api/types';
 import { Link, navigate, useLocation } from '../../app/router';
-import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { AsideSection, HubLayout, ListPanel } from '../../components/HubLayout';
 import { Icon } from '../../components/icons';
 import { Notice } from '../../components/Notice';
 import { Skeleton } from '../../components/Skeleton';
-import { UnderlineTabs } from '../../components/UnderlineTabs';
 import { useDelayedFlag } from '../../components/useDelayedFlag';
 import { formatRelativeKst } from '../../lib/datetime';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
 import { usePagedList } from '../program/usePagedList';
-import {
-  CATEGORY_META,
-  CATEGORY_ORDER,
-  isCategory,
-  LINK_BUTTON_CLASS,
-  CATEGORY_DESCRIPTIONS,
-  parseSpotId,
-  SECONDARY_LINK_CLASS,
-  UNVERIFIED_WRITE_REASON,
-} from './communityLabels';
-
-type CategoryFilter = CommunityCategory | 'ALL';
-
-const CATEGORY_FILTERS: ReadonlyArray<{ value: CategoryFilter; label: string }> = [
-  { value: 'ALL', label: '전체' },
-  ...CATEGORY_ORDER.map((value) => ({ value, label: CATEGORY_META[value].label })),
-];
+import { LINK_BUTTON_CLASS, parseSpotId, SECONDARY_LINK_CLASS, UNVERIFIED_WRITE_REASON } from './communityLabels';
 
 function fetchPosts(filter: CommunityPostQuery, page: number, signal?: AbortSignal) {
   return listPosts(filter, page, signal);
 }
 
-function listPath(category: CategoryFilter, spotId: number | null): string {
-  const params = new URLSearchParams();
-  if (category !== 'ALL') params.set('category', category);
-  if (spotId !== null) params.set('spotId', String(spotId));
-  const query = params.toString();
-  return query ? `/community?${query}` : '/community';
+function listPath(spotId: number | null): string {
+  return spotId === null ? '/community' : `/community?spotId=${spotId}`;
 }
 
 export function CommunityListPage() {
   const { search } = useLocation();
-  const rawCategory = new URLSearchParams(search).get('category');
-  const category: CategoryFilter = isCategory(rawCategory) ? rawCategory : 'ALL';
   const spotId = parseSpotId(new URLSearchParams(search).get('spotId'));
 
   // 필터가 바뀔 때만 새 객체를 만들어야 목록을 처음부터 다시 받는다.
   const filter = useMemo<CommunityPostQuery>(
-    () => ({ category: category === 'ALL' ? undefined : category, spotId: spotId ?? undefined }),
-    [category, spotId],
+    () => ({ spotId: spotId ?? undefined }),
+    [spotId],
   );
   const { current, loadingMore, loadMore, retry } = usePagedList(true, filter, fetchPosts);
   const showSkeleton = useDelayedFlag(current === null);
@@ -64,18 +40,15 @@ export function CommunityListPage() {
     document.title = '커뮤니티 · 피치맵';
   }, []);
 
-  const selectCategory = (next: CategoryFilter) => navigate(listPath(next, spotId), { replace: true });
-
   return (
     <HubLayout
       title="커뮤니티"
-      description="다녀온 백패킹 이야기와 장비를 나누는 곳이에요."
+      description="백패킹 이야기를 자유롭게 나누는 곳이에요."
       actions={<WriteAction spotId={spotId} />}
-      tabs={<UnderlineTabs label="분류" options={CATEGORY_FILTERS} value={category} onChange={selectCategory} />}
-      aside={<CommunityAside onSelect={selectCategory} />}
+      aside={<CommunityAside />}
     >
       {spotId !== null && (
-        <SpotFilterLine key={spotId} spotId={spotId} onRemove={() => navigate(listPath(category, null), { replace: true })} />
+        <SpotFilterLine key={spotId} spotId={spotId} onRemove={() => navigate(listPath(null), { replace: true })} />
       )}
       {current?.error && (
         <div role="alert" className="flex flex-col gap-3">
@@ -105,7 +78,7 @@ export function CommunityListPage() {
           ) : current.items.length === 0 ? (
             current.error ? null : (
               <li>
-                <CommunityEmpty category={category} spotId={spotId} onResetCategory={() => selectCategory('ALL')} />
+                <CommunityEmpty spotId={spotId} />
               </li>
             )
           ) : (
@@ -128,47 +101,18 @@ export function CommunityListPage() {
   );
 }
 
-const CATEGORY_EMPTY_LINES = CATEGORY_DESCRIPTIONS;
-
-function CommunityEmpty({
-  category,
-  spotId,
-  onResetCategory,
-}: {
-  category: CategoryFilter;
-  spotId: number | null;
-  onResetCategory: () => void;
-}) {
-  const lines = category === 'ALL' ? CATEGORY_ORDER : [category];
+function CommunityEmpty({ spotId }: { spotId: number | null }) {
   return (
     <div className="flex flex-col items-start gap-3 p-6">
       <Icon name="chat" size={24} className="text-ink-muted" />
       <p className="font-serif text-lg text-ink">아직 올라온 글이 없어요</p>
-      <p className="text-sm text-ink-muted">이런 이야기로 첫 글을 남겨 보세요.</p>
-      <ul className="flex flex-col gap-1 text-sm text-ink-muted">
-        {lines.map((value) => (
-          <li key={value}>
-            {CATEGORY_META[value].label} · {CATEGORY_EMPTY_LINES[value]}
-          </li>
-        ))}
-      </ul>
-      <div className="flex flex-wrap items-center gap-3">
-        <WriteAction spotId={spotId} />
-        {category !== 'ALL' && (
-          <button
-            type="button"
-            onClick={onResetCategory}
-            className="inline-flex min-h-11 items-center text-base font-semibold text-forest underline underline-offset-2"
-          >
-            다른 분류 보기
-          </button>
-        )}
-      </div>
+      <p className="text-sm text-ink-muted">다녀온 박지, 써 본 장비, 준비하며 궁금한 것을 첫 글로 남겨 보세요.</p>
+      <WriteAction spotId={spotId} />
     </div>
   );
 }
 
-function CommunityAside({ onSelect }: { onSelect: (next: CategoryFilter) => void }) {
+function CommunityAside() {
   return (
     <>
       <AsideSection title="이용 안내">
@@ -183,22 +127,6 @@ function CommunityAside({ onSelect }: { onSelect: (next: CategoryFilter) => void
           <li>송금을 요구하면 신고해 주세요.</li>
           <li>공원 안 야영을 권하는 글은 신고 대상이에요.</li>
           <li>신고가 5건 쌓이면 글이 잠시 내려가고 관리자가 검토해요.</li>
-        </ul>
-      </AsideSection>
-      <AsideSection title="분류">
-        <ul>
-          {CATEGORY_ORDER.map((value) => (
-            <li key={value}>
-              <button
-                type="button"
-                onClick={() => onSelect(value)}
-                className="flex min-h-11 w-full flex-col items-start justify-center text-left hover:text-ink"
-              >
-                <span className="text-base font-semibold text-ink">{CATEGORY_META[value].label}</span>
-                <span>{CATEGORY_DESCRIPTIONS[value]}</span>
-              </button>
-            </li>
-          ))}
         </ul>
       </AsideSection>
       <AsideSection title="둘러보기">
@@ -285,15 +213,11 @@ function SpotFilterLine({ spotId, onRemove }: { spotId: number; onRemove: () => 
 }
 
 function PostRow({ item }: { item: CommunityPostSummary }) {
-  const category = CATEGORY_META[item.category];
   return (
     <li>
       <Link to={`/community/${item.postId}`} className="flex min-h-11 gap-3 px-4 py-3 hover:bg-paper-deep">
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0">
-              <Badge tone={category.tone}>{category.label}</Badge>
-            </span>
             <span className="truncate text-base font-semibold text-ink">{item.title}</span>
             {item.commentCount > 0 && (
               <span className="shrink-0 font-mono text-sm text-forest-deep">

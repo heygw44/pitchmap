@@ -9,7 +9,6 @@ import java.time.Instant;
  */
 public record AdminCommunityPostRow(
         long postId,
-        String category,
         String title,
         String content,
         long authorId,

@@ -1,12 +1,10 @@
 package com.pitchmap.community.api;
 
-import com.pitchmap.community.domain.CommunityCategory;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 // 화면이 쿼리 파라미터로 보내는 조건이다. 값이 없으면 기본값을 쓰거나 거르지 않으려고 래퍼 타입으로 받는다.
 public record CommunityPostListRequest(
-        CommunityCategory category,
         Long spotId,
 
         @Min(value = 0, message = "페이지 번호는 0 이상이어야 합니다.") Integer page,
