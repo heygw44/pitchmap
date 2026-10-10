@@ -118,7 +118,8 @@ class BasecampController {
                     + "로그인한 요청자의 응답에서는 members에 연령대·성별(각각 본인확인한 값인지 verified로 구분), 신뢰 단계, "
                     + "완료한 동행 횟수가 더해지고, leader에는 신뢰 단계가 더해진다. 연령대는 TWENTIES, THIRTIES, FORTIES, FIFTIES, SIXTIES_PLUS 같은 이름이다. "
                     + "myRelation은 NONE, APPLICANT(대기 중인 신청이 있음), MEMBER, LEADER 중 하나다. "
-                    + "contactInfo는 베이스캠프가 확정된 뒤부터 완료 후 7일까지 ACTIVE 멤버(캠프 리더 포함)에게만, 등록된 값이 있을 때만 응답에 나타난다. "
+                    + "contactInfo는 베이스캠프가 확정된 뒤부터 완료 후 7일까지 ACTIVE 멤버(캠프 리더 포함)에게, "
+                    + "모집 중이거나 마감된 동안에는 캠프 리더에게만, 등록된 값이 있을 때만 응답에 나타난다. "
                     + "그 밖의 요청자에게는 필드 자체가 없다. safetyNotice는 항상 있다. 이메일과 출생연도는 어떤 경우에도 응답하지 않는다. "
                     + "베이스캠프가 없으면 404 NOT_FOUND로, basecampId가 숫자가 아니면 400 INVALID_INPUT으로 응답한다.")
     @GetMapping("/api/basecamps/{basecampId}")

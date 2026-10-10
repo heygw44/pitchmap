@@ -89,8 +89,8 @@ public sealed interface BasecampDetailResponse {
             implements BasecampDetailResponse {}
 
     /**
-     * 로그인한 요청자가 보는 상세다. contactInfo는 요청자가 확정된 베이스캠프의 멤버이고 등록된 값이 있을 때만 응답에 나타나고,
-     * 아니면 필드 자체가 없다. canApply와 unmetReasons는 모집 중인 베이스캠프일 때만 나타난다.
+     * 로그인한 요청자가 보는 상세다. contactInfo는 등록된 값이 있고, 요청자가 확정된 베이스캠프의 멤버이거나
+     * 확정 전 베이스캠프의 캠프 리더일 때만 응답에 나타나고, 아니면 필드 자체가 없다. canApply와 unmetReasons는 모집 중인 베이스캠프일 때만 나타난다.
      */
     record Member(
             long basecampId,
