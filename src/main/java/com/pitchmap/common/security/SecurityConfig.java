@@ -36,6 +36,7 @@ public class SecurityConfig {
         "/api/programs/*",
         "/api/community/posts",
         "/api/community/posts/*",
+        "/api/community/posts/*/comments",
     };
 
     private static final String[] PUBLIC_POST_PATTERNS = {
@@ -56,6 +57,7 @@ public class SecurityConfig {
         "/api/bakjis/*/reports",
         "/api/spots/*/reviews",
         "/api/community/posts",
+        "/api/community/posts/*/comments",
         "/api/basecamps",
         "/api/basecamps/*/close",
         "/api/basecamps/*/reopen",
@@ -76,13 +78,19 @@ public class SecurityConfig {
     private static final String[] VERIFIED_PUT_PATTERNS = {"/api/basecamps/*/contact"};
 
     private static final String[] VERIFIED_PATCH_PATTERNS = {
-        "/api/me", "/api/bakjis/*", "/api/reviews/*", "/api/basecamps/*", "/api/community/posts/*",
+        "/api/me",
+        "/api/bakjis/*",
+        "/api/reviews/*",
+        "/api/basecamps/*",
+        "/api/community/posts/*",
+        "/api/community/comments/*",
     };
 
     private static final String[] VERIFIED_DELETE_PATTERNS = {
         "/api/bakjis/*",
         "/api/reviews/*",
         "/api/community/posts/*",
+        "/api/community/comments/*",
         "/api/basecamps/*/applications/me",
         "/api/basecamps/*/members/me",
         "/api/programs/*/vacancy-alerts",

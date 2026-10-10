@@ -15,6 +15,7 @@ public record CommunityPostDetailResponse(
         String content,
         Author author,
         @JsonInclude(JsonInclude.Include.NON_NULL) LinkedSpot spot,
+        long commentCount,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -26,6 +27,7 @@ public record CommunityPostDetailResponse(
                 item.text(),
                 new Author(item.authorId(), item.authorNickname()),
                 LinkedSpot.of(item),
+                item.commentCount(),
                 item.createdAt(),
                 item.updatedAt());
     }
