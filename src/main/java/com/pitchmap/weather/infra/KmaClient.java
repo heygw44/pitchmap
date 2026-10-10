@@ -55,8 +55,9 @@ public class KmaClient {
             "/MidFcstInfoService/getMidTa?" + COMMON_QUERY + "&regId={regId}&tmFc={tmFc}";
 
     private static final int PAGE_NO = 1;
-    // 단기예보는 한 발표에 항목이 900건 안팎(격자 하나, 약 3일치)이다. 한 페이지로 다 받으려고 넉넉히 잡는다.
-    private static final int VILAGE_FCST_ROWS = 1000;
+    // 단기예보는 한 발표에 격자 하나의 항목이 800~1,050건쯤이다. 발표 시각에 따라 달라서, 2026-10-10에 잰 값은 14시 발표가 798건으로
+    // 가장 적고 17시 발표가 1,052건으로 가장 많았다. 호출 한도를 아끼려고 클라이언트는 한 페이지로 다 받는다. 그래서 행 수는 최댓값보다 넉넉히 잡는다.
+    private static final int VILAGE_FCST_ROWS = 1500;
     private static final int MID_FCST_ROWS = 10;
     private static final String RESPONSE_TYPE = "JSON";
     private static final String SUCCESS_RESULT_CODE = "00";

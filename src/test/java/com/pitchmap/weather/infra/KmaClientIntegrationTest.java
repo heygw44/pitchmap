@@ -28,6 +28,8 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,7 +87,7 @@ class KmaClientIntegrationTest {
                 .withQueryParam("nx", equalTo("60"))
                 .withQueryParam("ny", equalTo("127"))
                 .withQueryParam("pageNo", equalTo("1"))
-                .withQueryParam("numOfRows", equalTo("1000"))
+                .withQueryParam("numOfRows", equalTo("1500"))
                 .withQueryParam("dataType", equalTo("JSON")));
     }
 
@@ -147,6 +149,28 @@ class KmaClientIntegrationTest {
     }
 
     @Test
+    @DisplayName("[F-09][NFR-05] 17시 발표처럼 단기예보가 1,000건을 넘어도 한 번의 요청으로 모두 받는다")
+    void readsShortTermResponseOverOneThousandItems() {
+        // given
+        // 기상청은 numOfRows만큼만 항목을 담고 totalCount에는 전체 개수를 준다. 2026-10-10 17시 발표는 1,052건이었다.
+        int totalCount = 1052;
+        wireMock.stubFor(get(urlPathEqualTo(VILAGE_FCST_PATH))
+                .atPriority(1)
+                .withQueryParam("numOfRows", equalTo("1000"))
+                .willReturn(okJson(shortTermResponse(1000, totalCount))));
+        wireMock.stubFor(get(urlPathEqualTo(VILAGE_FCST_PATH))
+                .atPriority(2)
+                .willReturn(okJson(shortTermResponse(totalCount, totalCount))));
+
+        // when
+        List<KmaShortTermItem> items = client.getVilageFcst(LocalDateTime.of(2026, 10, 10, 17, 0), 60, 127);
+
+        // then
+        assertThat(items).hasSize(totalCount);
+        assertThat(requestCount(VILAGE_FCST_PATH)).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("[F-09] 단기예보 전체 개수가 받은 항목 수보다 크면 일부만 받은 응답이라 실패로 본다")
     void throwsWhenShortTermResponseIsIncomplete() {
         // given
@@ -154,14 +178,14 @@ class KmaClientIntegrationTest {
                 {"response": {"header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
                   "body": {"dataType": "JSON", "items": {"item": [
                     {"category": "TMP", "fcstDate": "20261004", "fcstTime": "0600", "fcstValue": "15"}]},
-                  "pageNo": 1, "numOfRows": 1000, "totalCount": 1500}}}
+                  "pageNo": 1, "numOfRows": 1500, "totalCount": 2000}}}
                 """));
 
         // when
         KmaApiException thrown = catchThrowableOfType(KmaApiException.class, () -> client.getVilageFcst(BASE, 60, 127));
 
         // then
-        assertThat(thrown).hasMessageContaining("totalCount=1500");
+        assertThat(thrown).hasMessageContaining("totalCount=2000");
         assertThat(requestCount(VILAGE_FCST_PATH)).isEqualTo(1);
     }
 
@@ -319,6 +343,16 @@ class KmaClientIntegrationTest {
         for (Throwable current = thrown; current != null; current = current.getCause()) {
             assertThat(String.valueOf(current.getMessage())).doesNotContain(SERVICE_KEY, ENCODED_SERVICE_KEY);
         }
+    }
+
+    private static String shortTermResponse(int itemCount, int totalCount) {
+        String items = IntStream.range(0, itemCount).mapToObj(i -> """
+                        {"category": "TMP", "fcstDate": "20261010", "fcstTime": "1800", "fcstValue": "15"}""").collect(Collectors.joining(","));
+        return """
+                {"response": {"header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+                  "body": {"dataType": "JSON", "items": {"item": [%s]},
+                  "pageNo": 1, "numOfRows": %d, "totalCount": %d}}}
+                """.formatted(items, itemCount, totalCount);
     }
 
     private static String readFixture(String fileName) {
