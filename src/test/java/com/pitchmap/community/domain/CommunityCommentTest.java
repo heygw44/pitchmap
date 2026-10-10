@@ -3,11 +3,13 @@ package com.pitchmap.community.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.testsupport.MutableClock;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CommunityCommentTest {
@@ -138,5 +140,110 @@ class CommunityCommentTest {
         assertThat(comment.isWrittenBy(8L)).isFalse();
         assertThat(comment.belongsTo(3L)).isTrue();
         assertThat(comment.belongsTo(4L)).isFalse();
+    }
+
+    private CommunityComment commentIn(CommunityCommentStatus status) {
+        CommunityComment comment = CommunityComment.write(3L, 7L, null, "내용", NOW);
+        switch (status) {
+            case ACTIVE -> {}
+            case PENDING_REVIEW -> comment.markPendingReview(NOW);
+            case HIDDEN -> comment.hide(NOW);
+            case DELETED -> comment.delete(NOW);
+        }
+        return comment;
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-07] ACTIVE 댓글을 검토 대기로 바꾸면 상태와 수정 시각이 바뀐다")
+    void markPendingReviewFromActive() {
+        // given
+        CommunityComment comment = commentIn(CommunityCommentStatus.ACTIVE);
+
+        // when
+        comment.markPendingReview(LATER);
+
+        // then
+        assertThat(comment.getStatus()).isEqualTo(CommunityCommentStatus.PENDING_REVIEW);
+        assertThat(comment.getUpdatedAt()).isEqualTo(LATER);
+        assertThat(comment.isActive()).isFalse();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(
+            value = CommunityCommentStatus.class,
+            names = {"PENDING_REVIEW", "HIDDEN", "DELETED"})
+    @DisplayName("[F-29][CM-07] ACTIVE가 아닌 댓글을 검토 대기로 바꾸려 하면 IllegalStateException을 던진다")
+    void markPendingReviewRejectsNonActive(CommunityCommentStatus status) {
+        // given
+        CommunityComment comment = commentIn(status);
+
+        // when // then
+        assertThatThrownBy(() -> comment.markPendingReview(LATER)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(
+            value = CommunityCommentStatus.class,
+            names = {"ACTIVE", "PENDING_REVIEW"})
+    @DisplayName("[F-29][CM-08] ACTIVE나 검토 대기 댓글을 숨기면 HIDDEN이 되고 수정 시각이 바뀐다")
+    void hideFromActiveOrPending(CommunityCommentStatus status) {
+        // given
+        CommunityComment comment = commentIn(status);
+
+        // when
+        comment.hide(LATER);
+
+        // then
+        assertThat(comment.getStatus()).isEqualTo(CommunityCommentStatus.HIDDEN);
+        assertThat(comment.getUpdatedAt()).isEqualTo(LATER);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(
+            value = CommunityCommentStatus.class,
+            names = {"HIDDEN", "DELETED"})
+    @DisplayName("[F-29][CM-08] 이미 숨겼거나 작성자가 지운 댓글을 숨기면 COMMUNITY_INVALID_STATE로 거부한다")
+    void hideRejectsHiddenOrDeleted(CommunityCommentStatus status) {
+        // given
+        CommunityComment comment = commentIn(status);
+
+        // when // then
+        assertThatThrownBy(() -> comment.hide(LATER))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommunityErrorCode.COMMUNITY_INVALID_STATE));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(
+            value = CommunityCommentStatus.class,
+            names = {"PENDING_REVIEW", "HIDDEN"})
+    @DisplayName("[F-29][CM-08] 검토 대기나 숨긴 댓글을 복구하면 ACTIVE가 되고 수정 시각이 바뀐다")
+    void restoreFromPendingOrHidden(CommunityCommentStatus status) {
+        // given
+        CommunityComment comment = commentIn(status);
+
+        // when
+        comment.restore(LATER);
+
+        // then
+        assertThat(comment.getStatus()).isEqualTo(CommunityCommentStatus.ACTIVE);
+        assertThat(comment.getUpdatedAt()).isEqualTo(LATER);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(
+            value = CommunityCommentStatus.class,
+            names = {"ACTIVE", "DELETED"})
+    @DisplayName("[F-29][CM-08] 이미 ACTIVE이거나 작성자가 지운 댓글을 복구하면 COMMUNITY_INVALID_STATE로 거부한다")
+    void restoreRejectsActiveOrDeleted(CommunityCommentStatus status) {
+        // given
+        CommunityComment comment = commentIn(status);
+
+        // when // then
+        assertThatThrownBy(() -> comment.restore(LATER))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(CommunityErrorCode.COMMUNITY_INVALID_STATE));
     }
 }

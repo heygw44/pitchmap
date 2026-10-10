@@ -8,6 +8,8 @@ public enum AdminAuditAction {
     SANCTION_LIFT,
     SPOT_HIDE,
     SPOT_RESTORE,
+    COMMUNITY_HIDE,
+    COMMUNITY_RESTORE,
     SYNC_JOB_RUN,
     PROGRAM_CREATE,
     PROGRAM_UPDATE,

@@ -37,6 +37,8 @@ public class SecurityConfig {
         "/api/community/posts",
         "/api/community/posts/*",
         "/api/community/posts/*/comments",
+        "/api/community/posts/*/reports",
+        "/api/community/comments/*/reports",
     };
 
     private static final String[] PUBLIC_POST_PATTERNS = {
@@ -58,6 +60,8 @@ public class SecurityConfig {
         "/api/spots/*/reviews",
         "/api/community/posts",
         "/api/community/posts/*/comments",
+        "/api/community/posts/*/reports",
+        "/api/community/comments/*/reports",
         "/api/basecamps",
         "/api/basecamps/*/close",
         "/api/basecamps/*/reopen",
