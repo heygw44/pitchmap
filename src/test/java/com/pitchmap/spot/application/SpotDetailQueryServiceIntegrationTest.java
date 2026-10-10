@@ -475,6 +475,69 @@ class SpotDetailQueryServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("[F-05] 숙박 행사의 확정 참가자를 예상 인원에 더하고, 같은 밤의 확정 베이스캠프 인원과 합산한다")
+    void addsConfirmedProgramParticipantsToExpectedPeople() {
+        // given: 한국 날짜 2026-11-01. 행사는 한국 시각 11-07 10:00에 시작해 11-08 12:00에 끝나서 11-07 한 밤을 보낸다.
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long programId = insertProgram(spotId, "2026-11-07T01:00:00Z", "2026-11-08T03:00:00Z", true, "SCHEDULED");
+        insertProgramApplications(programId, "CONFIRMED", 2);
+        insertProgramApplications(programId, "PENDING_PAYMENT", 1);
+        insertProgramApplications(programId, "CANCELED", 1);
+        insertProgramApplications(programId, "EXPIRED", 1);
+        insertBasecampMembers(insertBasecamp(spotId, "CONFIRMED", "2026-11-07", "2026-11-09"), "ACTIVE", 3);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople())
+                .containsExactly(
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-07"), 5),
+                        new SpotExpectedPeople(LocalDate.parse("2026-11-08"), 3));
+    }
+
+    @Test
+    @DisplayName("[F-05] 행사의 야영 밤은 시작·종료 시각의 UTC 날짜가 아니라 한국 날짜로 정한다")
+    void countsProgramNightsByKoreanDate() {
+        // given: 시작 UTC 11-06 16:00은 한국 11-07 01:00, 종료 UTC 11-07 16:00은 한국 11-08 01:00이다.
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long programId = insertProgram(spotId, "2026-11-06T16:00:00Z", "2026-11-07T16:00:00Z", true, "SCHEDULED");
+        insertProgramApplications(programId, "CONFIRMED", 4);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).containsExactly(new SpotExpectedPeople(LocalDate.parse("2026-11-07"), 4));
+    }
+
+    @Test
+    @DisplayName("[F-05] 당일 행사, 취소된 행사, 다른 장소의 행사, 끝난 행사의 참가자는 예상 인원에 세지 않는다")
+    void excludesDayCanceledOtherSpotAndPastPrograms() {
+        // given: 한국 날짜 2026-11-01
+        clock.setInstant(Instant.parse("2026-11-01T03:00:00Z"));
+        long spotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        long otherSpotId = insertSpot("BAKJI", "ACTIVE", TestSequence.unique("박지"), null, false, RIDGE);
+        String start = "2026-11-07T01:00:00Z";
+        String end = "2026-11-08T03:00:00Z";
+        insertProgramApplications(insertProgram(spotId, start, end, false, "SCHEDULED"), "CONFIRMED", 2);
+        insertProgramApplications(insertProgram(spotId, start, end, true, "CANCELED"), "CONFIRMED", 2);
+        insertProgramApplications(insertProgram(otherSpotId, start, end, true, "SCHEDULED"), "CONFIRMED", 2);
+        insertProgramApplications(
+                insertProgram(spotId, "2026-10-30T01:00:00Z", "2026-10-31T03:00:00Z", true, "SCHEDULED"),
+                "CONFIRMED",
+                2);
+
+        // when
+        SpotDetail detail = spotDetailQueryService.findDetail(spotId);
+
+        // then
+        assertThat(detail.expectedPeople()).isEmpty();
+    }
+
+    @Test
     @DisplayName("[F-05] 모집 중인 베이스캠프만 출발일, ID 순서로 인원과 합류 조건을 채워 준다")
     void listsOnlyRecruitingBasecampsInOrder() {
         // given
@@ -674,6 +737,41 @@ class SpotDetailQueryServiceIntegrationTest {
                     insertMember(TestSequence.nickname()),
                     status);
         }
+    }
+
+    // 신청이 열려 있던 행사를 장소에 연결해 저장한다. 시작·종료 시각은 UTC다.
+    private long insertProgram(long spotId, String startAt, String endAt, boolean overnight, String status) {
+        String title = TestSequence.unique("행사");
+        jdbcTemplate.update(
+                "INSERT INTO program (title, description, spot_id, location_text, start_at, end_at, capacity, fee,"
+                        + " apply_open_at, apply_close_at, payment_deadline_minutes, overnight, status, created_by,"
+                        + " created_at, updated_at) VALUES (?, '설명', ?, '입구', ?, ?, 20, 30000, '2026-10-01 00:00:00',"
+                        + " '2026-10-20 00:00:00', 15, ?, ?, ?, NOW(6), NOW(6))",
+                title,
+                spotId,
+                toUtcDateTime(startAt),
+                toUtcDateTime(endAt),
+                overnight,
+                status,
+                insertMember(TestSequence.nickname()));
+        return jdbcTemplate.queryForObject("SELECT id FROM program WHERE title = ?", Long.class, title);
+    }
+
+    // 신청 수만큼 새 회원을 만들어 주어진 상태의 행사 신청 행으로 넣는다.
+    private void insertProgramApplications(long programId, String status, int count) {
+        for (int i = 0; i < count; i++) {
+            jdbcTemplate.update(
+                    "INSERT INTO program_application (program_id, member_id, status, payment_due_at, created_at,"
+                            + " updated_at) VALUES (?, ?, ?, '2026-10-31 00:00:00', NOW(6), NOW(6))",
+                    programId,
+                    insertMember(TestSequence.nickname()),
+                    status);
+        }
+    }
+
+    // DATETIME 컬럼은 UTC 시각을 시간대 없이 저장하므로, ISO 시각에서 Z와 T를 지운 문자열로 넣는다.
+    private static String toUtcDateTime(String isoInstant) {
+        return Instant.parse(isoInstant).toString().replace("T", " ").replace("Z", "");
     }
 
     private long insertMember(String nickname) {

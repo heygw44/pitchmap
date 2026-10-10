@@ -3,6 +3,7 @@ package com.pitchmap.spot.application;
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.spot.domain.SpotType;
+import com.pitchmap.spot.infra.SpotConfirmedProgramRow;
 import com.pitchmap.spot.infra.SpotConfirmedStayRow;
 import com.pitchmap.spot.infra.SpotDetailMapper;
 import com.pitchmap.spot.infra.SpotDetailRow;
@@ -10,8 +11,10 @@ import com.pitchmap.spot.infra.SpotRatingRow;
 import com.pitchmap.spot.infra.SpotRecentReviewRow;
 import com.pitchmap.spot.infra.SpotRecruitingBasecampRow;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -70,7 +73,7 @@ class SpotDetailReader {
                 spotDetailMapper.selectRecentReviews(spotId, RECENT_REVIEW_COUNT).stream()
                         .map(SpotDetailReader::toRecentReview)
                         .toList(),
-                toExpectedPeople(spotDetailMapper.selectConfirmedStays(spotId, today), today),
+                toExpectedPeople(readStays(spotId, today), today),
                 spotDetailMapper.selectRecruitingBasecamps(spotId).stream()
                         .map(SpotDetailReader::toRecruitingBasecamp)
                         .toList(),
@@ -78,8 +81,22 @@ class SpotDetailReader {
         return new Read(detail, row.weatherNx(), row.weatherNy());
     }
 
-    // 확정 베이스캠프마다 시작일부터 종료일 전날까지 밤마다 인원을 더한다. 종료일은 이미 집으로 돌아간 날이라 세지 않는다.
-    // 겹치는 베이스캠프는 같은 날짜에 합산한다. 이미 지난 밤은 건너뛴다. 날짜 순서는 TreeMap이 맞춘다.
+    // 확정 베이스캠프와, 이 장소에 연결된 숙박 공식 행사의 확정 참가자를 같은 모양의 야영 기간으로 모은다.
+    // 행사는 시작·종료를 UTC 시각으로 저장하므로, 각 시각의 한국 날짜를 출발일과 종료일로 본다.
+    private List<SpotConfirmedStayRow> readStays(long spotId, LocalDate today) {
+        List<SpotConfirmedStayRow> stays = new ArrayList<>(spotDetailMapper.selectConfirmedStays(spotId, today));
+        Instant startOfToday = today.atStartOfDay(KOREA).toInstant();
+        for (SpotConfirmedProgramRow program : spotDetailMapper.selectConfirmedPrograms(spotId, startOfToday)) {
+            stays.add(new SpotConfirmedStayRow(
+                    LocalDate.ofInstant(program.startAt(), KOREA),
+                    LocalDate.ofInstant(program.endAt(), KOREA),
+                    program.headcount()));
+        }
+        return stays;
+    }
+
+    // 야영 기간마다 시작일부터 종료일 전날까지 밤마다 인원을 더한다. 종료일은 이미 집으로 돌아간 날이라 세지 않는다.
+    // 겹치는 기간은 같은 날짜에 합산한다. 이미 지난 밤은 건너뛴다. 날짜 순서는 TreeMap이 맞춘다.
     private static List<SpotExpectedPeople> toExpectedPeople(List<SpotConfirmedStayRow> stays, LocalDate today) {
         Map<LocalDate, Integer> countByNight = new TreeMap<>();
         for (SpotConfirmedStayRow stay : stays) {
