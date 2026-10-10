@@ -307,7 +307,7 @@ function ActionArea({ detail, onChanged }: { detail: ProgramDetail; onChanged: (
                 ) : (
                   <>
                     남은 시간{' '}
-                    <span className="font-mono text-base tabular-nums">{countdownText(dueAt, now)}</span>
+                    <span className="font-mono text-base tabular-nums">{countdownText(dueAt, now, detail.paymentDeadlineMinutes * 60)}</span>
                   </>
                 )}
               </p>

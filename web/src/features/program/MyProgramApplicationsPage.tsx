@@ -104,6 +104,11 @@ export function MyProgramApplicationsPage() {
   );
 }
 
+// 신청 시각부터 결제 기한까지가 그 신청의 결제 기한 길이다. 행사마다 기한 길이가 다를 수 있어서 응답의 두 시각으로 구한다.
+function paymentWindowSeconds(createdAt: string, paymentDueAt: string): number {
+  return Math.floor((Date.parse(paymentDueAt) - Date.parse(createdAt)) / 1000);
+}
+
 function ApplicationCard({ item, now }: { item: MyProgramApplicationItem; now: number }) {
   const status = APPLICATION_STATUS_META[item.status];
   const pending = item.status === 'PENDING_PAYMENT' && item.paymentDueAt !== null;
@@ -118,7 +123,7 @@ function ApplicationCard({ item, now }: { item: MyProgramApplicationItem; now: n
           {item.program.status === 'CANCELED' && <Badge tone="neutral">행사 취소</Badge>}
           {pending && item.paymentDueAt && (
             <span className="font-mono text-sm tabular-nums text-warning">
-              <span className="font-sans">남은 시간</span> {countdownText(item.paymentDueAt, now)}
+              <span className="font-sans">남은 시간</span> {countdownText(item.paymentDueAt, now, paymentWindowSeconds(item.createdAt, item.paymentDueAt))}
             </span>
           )}
         </span>

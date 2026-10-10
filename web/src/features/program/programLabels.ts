@@ -50,8 +50,10 @@ export function seatsText(remainingSeats: number, capacity: number): string {
 }
 
 // 남은 시간을 mm:ss로 적는다. 이미 지났으면 00:00이다.
-export function countdownText(dueAtIso: string, nowMs: number): string {
-  const seconds = Math.max(0, Math.floor((Date.parse(dueAtIso) - nowMs) / 1000));
+// 서버 시각 보정에 1초 안쪽 오차가 있어서, 남은 시간이 결제 기한(maxSeconds)보다 길게 나오지 않게 자른다.
+export function countdownText(dueAtIso: string, nowMs: number, maxSeconds: number): string {
+  const remaining = Math.floor((Date.parse(dueAtIso) - nowMs) / 1000);
+  const seconds = Math.max(0, Math.min(maxSeconds, remaining));
   const minutes = Math.floor(seconds / 60);
   return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
