@@ -67,7 +67,7 @@ export function SiteHeader({ mobileAccount = false, minimal = false, fluid = fal
               </Link>
             )}
             <NotificationBellLink className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-control px-2 text-ink hover:bg-paper-deep lg:hidden" />
-            <div className={mobileAccount ? 'flex' : 'hidden lg:flex'}>
+            <div className={mobileAccount ? 'flex min-w-0' : 'hidden min-w-0 lg:flex'}>
               <AccountChip />
             </div>
             {!mobileAccount && !signedIn && session.status !== 'loading' && (

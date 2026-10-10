@@ -44,7 +44,7 @@ export function AccountChip() {
   }
 
   return (
-    <div className="pointer-events-auto inline-flex min-w-0 items-center rounded-control border border-contour bg-card pl-3">
+    <div className="pointer-events-auto inline-flex min-w-0 items-center gap-2 rounded-control border border-contour bg-card py-0.5 pl-3 pr-0.5">
       <Link
         to="/me"
         aria-label={`내 정보: ${session.me.nickname}`}
@@ -53,17 +53,17 @@ export function AccountChip() {
         {session.me.nickname}
       </Link>
       {session.me.identityVerified ? (
-        <span className="ml-2">
+        <span>
           <Badge tone="sea" icon="check">
             본인확인
           </Badge>
         </span>
       ) : (
-        <Link to="/identity-verification" className="ml-2 min-h-11 content-center text-sm font-semibold text-forest">
+        <Link to="/identity-verification" className="min-h-11 content-center text-sm font-semibold text-forest">
           본인확인
         </Link>
       )}
-      <Button variant="ghost" loading={loggingOut} onClick={handleLogout} className="px-3">
+      <Button variant="ghost" loading={loggingOut} onClick={handleLogout}>
         로그아웃
       </Button>
     </div>
