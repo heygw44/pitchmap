@@ -227,18 +227,53 @@ class MemberControllerTest {
                 .uri("/api/members")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"hiker@example.com\",\"nickname\":\"hiker\"}")
+                .content("{\"email\":\"hiker@example.com\",\"passwordConfirm\":\"%s\",\"nickname\":\"hiker\"}"
+                        .formatted(VALID_PASSWORD))
                 .exchange();
 
         assertInvalidInput(result, "password");
     }
 
     @Test
+    @DisplayName("[F-01][PW-01] 비밀번호 확인이 없으면 passwordConfirm 필드 오류로 400을 응답한다")
+    void missingPasswordConfirmReturnsFieldError() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/members")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"hiker@example.com\",\"password\":\"%s\",\"nickname\":\"hiker\"}"
+                        .formatted(VALID_PASSWORD))
+                .exchange();
+
+        assertInvalidInput(result, "passwordConfirm");
+    }
+
+    @Test
+    @DisplayName("[F-01][PW-01] 비밀번호 확인이 비밀번호와 다르면 passwordConfirm 필드 오류 하나로 400을 응답하고 서비스를 부르지 않는다")
+    void mismatchedPasswordConfirmReturnsSingleFieldError() {
+        MvcTestResult result = mvc.post()
+                .uri("/api/members")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"hiker@example.com\",\"password\":\"%s\",\"passwordConfirm\":\"Other-pass-2!\","
+                                .formatted(VALID_PASSWORD)
+                        + "\"nickname\":\"hiker\"}")
+                .exchange();
+
+        assertInvalidInput(result, "passwordConfirm");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors").asList().hasSize(1);
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors[0].field").isEqualTo("passwordConfirm");
+    }
+
+    @Test
     @DisplayName("[F-01] 요청 객체의 문자열 표현에는 이메일과 비밀번호가 없다")
     void requestToStringHidesSecrets() {
-        SignupRequest request = new SignupRequest("hiker@example.com", VALID_PASSWORD, "hiker");
+        SignupRequest request = new SignupRequest("hiker@example.com", VALID_PASSWORD, "Confirm-value-9?", "hiker");
 
-        assertThat(request.toString()).doesNotContain("hiker@example.com").doesNotContain(VALID_PASSWORD);
+        assertThat(request.toString())
+                .doesNotContain("hiker@example.com")
+                .doesNotContain(VALID_PASSWORD)
+                .doesNotContain("Confirm-value-9?");
     }
 
     private void assertInvalidInput(MvcTestResult result, String field) {
@@ -253,7 +288,8 @@ class MemberControllerTest {
     }
 
     private MvcTestResult post(String email, String password, String nickname) {
-        String body = "{\"email\":\"%s\",\"password\":\"%s\",\"nickname\":\"%s\"}".formatted(email, password, nickname);
+        String body = "{\"email\":\"%s\",\"password\":\"%s\",\"passwordConfirm\":\"%s\",\"nickname\":\"%s\"}"
+                .formatted(email, password, password, nickname);
         return mvc.post()
                 .uri("/api/members")
                 .with(csrf())

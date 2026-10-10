@@ -40,7 +40,8 @@ class PasswordResetController {
             summary = "비밀번호 재설정 확인",
             description = "메일로 받은 토큰으로 새 비밀번호를 정한다. 성공하면 그 회원의 모든 세션이 삭제된다. "
                     + "토큰이 만료됐거나 이미 사용됐으면 400 PASSWORD_RESET_TOKEN_INVALID, 비밀번호가 규칙을 어기면 "
-                    + "400 MEMBER_PASSWORD_POLICY이고 이때 토큰은 그대로 쓸 수 있다.")
+                    + "400 MEMBER_PASSWORD_POLICY이고 이때 토큰은 그대로 쓸 수 있다. "
+                    + "newPasswordConfirm이 newPassword와 다르면 400 INVALID_INPUT이고 이때도 토큰은 쓰이지 않는다.")
     @PostMapping("/confirm")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void confirm(@Valid @RequestBody PasswordResetConfirmRequest request) {

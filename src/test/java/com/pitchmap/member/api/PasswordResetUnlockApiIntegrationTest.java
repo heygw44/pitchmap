@@ -260,7 +260,10 @@ class PasswordResetUnlockApiIntegrationTest {
     }
 
     private MvcTestResult confirm(String token, String newPassword) {
-        return postJson(CONFIRM_PATH, "{\"token\":\"%s\",\"newPassword\":\"%s\"}".formatted(token, newPassword));
+        return postJson(
+                CONFIRM_PATH,
+                "{\"token\":\"%s\",\"newPassword\":\"%s\",\"newPasswordConfirm\":\"%s\"}"
+                        .formatted(token, newPassword, newPassword));
     }
 
     private MvcTestResult postJson(String path, String body) {
