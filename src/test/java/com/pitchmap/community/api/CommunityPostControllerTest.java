@@ -15,11 +15,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import com.pitchmap.common.error.BusinessException;
 import com.pitchmap.common.error.CommonErrorCode;
 import com.pitchmap.common.error.GlobalExceptionHandler;
+import com.pitchmap.common.error.InvalidFieldException;
 import com.pitchmap.common.security.LoginMember;
 import com.pitchmap.common.security.SecurityConfig;
 import com.pitchmap.common.trace.TraceIdFilter;
 import com.pitchmap.common.web.PatchField;
 import com.pitchmap.community.application.CommunityPostCommandService;
+import com.pitchmap.community.application.CommunityPostImage;
 import com.pitchmap.community.application.CommunityPostItem;
 import com.pitchmap.community.application.CommunityPostPage;
 import com.pitchmap.community.application.CommunityPostQueryService;
@@ -64,13 +66,31 @@ class CommunityPostControllerTest {
             "새벽능선",
             101L,
             "능선 끝 평지",
+            null,
+            0L,
+            List.of(),
             5L,
             3L,
             CREATED_AT,
             UPDATED_AT,
             null);
     private static final CommunityPostItem ITEM_WITHOUT_SPOT = new CommunityPostItem(
-            10L, CommunityCategory.FREE, "안녕", "반가워요", 31L, "새벽능선", null, null, 0L, 0L, CREATED_AT, CREATED_AT, null);
+            10L,
+            CommunityCategory.FREE,
+            "안녕",
+            "반가워요",
+            31L,
+            "새벽능선",
+            null,
+            null,
+            null,
+            0L,
+            List.of(),
+            0L,
+            0L,
+            CREATED_AT,
+            CREATED_AT,
+            null);
 
     @Autowired
     private MockMvcTester mvc;
@@ -82,7 +102,8 @@ class CommunityPostControllerTest {
     private CommunityPostQueryService communityPostQueryService;
 
     @Test
-    @DisplayName("[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 좋아요 수와 댓글 수는 있고 이미지 필드와 likedByMe는 없다")
+    @DisplayName(
+            "[F-29] 로그인하지 않은 사용자도 글 목록을 조회하면 항목의 모든 필드와 페이지 정보를 받고, 좋아요 수와 댓글 수와 이미지 수는 있고 이미지가 없으면 thumbnailUrl과 likedByMe는 없다")
     void anonymousReadsPostList() {
         // given
         when(communityPostQueryService.list(null, null, 0, 20))
@@ -102,6 +123,7 @@ class CommunityPostControllerTest {
                     "excerpt": "가볍다",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
                     "spot": { "spotId": 101, "name": "능선 끝 평지" },
+                    "imageCount": 0,
                     "likeCount": 5,
                   "commentCount": 3,
                     "createdAt": "2026-10-05T03:00:00Z"
@@ -131,6 +153,7 @@ class CommunityPostControllerTest {
                     "title": "안녕",
                     "excerpt": "반가워요",
                     "author": { "memberId": 31, "nickname": "새벽능선" },
+                    "imageCount": 0,
                     "likeCount": 0,
                   "commentCount": 0,
                     "createdAt": "2026-10-05T03:00:00Z"
@@ -192,6 +215,7 @@ class CommunityPostControllerTest {
                   "category": "GEAR",
                   "title": "텐트 후기",
                   "content": "가볍다",
+                  "images": [],
                   "author": { "memberId": 31, "nickname": "새벽능선" },
                   "spot": { "spotId": 101, "name": "능선 끝 평지" },
                   "likeCount": 5,
@@ -215,6 +239,9 @@ class CommunityPostControllerTest {
                 "새벽능선",
                 null,
                 null,
+                null,
+                0L,
+                List.of(),
                 5L,
                 3L,
                 CREATED_AT,
@@ -511,6 +538,132 @@ class CommunityPostControllerTest {
         // then
         assertThat(result).hasStatus(HttpStatus.OK);
         verify(communityPostQueryService).list(null, null, 0, 20);
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-06] 목록 항목에 첫 이미지가 있으면 imageCount와 thumbnailUrl을 spot 다음에 함께 응답한다")
+    void listIncludesThumbnailAndImageCount() {
+        // given
+        CommunityPostItem withImages = new CommunityPostItem(
+                9L,
+                CommunityCategory.GEAR,
+                "텐트 후기",
+                "가볍다",
+                31L,
+                "새벽능선",
+                null,
+                null,
+                "https://example.test/view/first",
+                2L,
+                List.of(),
+                5L,
+                3L,
+                CREATED_AT,
+                UPDATED_AT,
+                null);
+        when(communityPostQueryService.list(null, null, 0, 20))
+                .thenReturn(new CommunityPostPage(List.of(withImages), 0, 20, false));
+
+        // when
+        MvcTestResult result = mvc.get().uri(POSTS).exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result)
+                .bodyJson()
+                .extractingPath("$.content[0].thumbnailUrl")
+                .isEqualTo("https://example.test/view/first");
+        assertThat(result).bodyJson().extractingPath("$.content[0].imageCount").isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-06] 글 상세는 이미지를 글 안 순서대로 imageId와 url로 응답하고 thumbnailUrl과 imageCount는 내보내지 않는다")
+    void detailIncludesImagesInOrder() {
+        // given
+        CommunityPostItem withImages = new CommunityPostItem(
+                9L,
+                CommunityCategory.GEAR,
+                "텐트 후기",
+                "가볍다",
+                31L,
+                "새벽능선",
+                null,
+                null,
+                null,
+                2L,
+                List.of(
+                        new CommunityPostImage(41L, "https://example.test/view/a"),
+                        new CommunityPostImage(40L, "https://example.test/view/b")),
+                5L,
+                3L,
+                CREATED_AT,
+                UPDATED_AT,
+                null);
+        when(communityPostQueryService.detail(9L, null)).thenReturn(withImages);
+
+        // when
+        MvcTestResult result = mvc.get().uri(POSTS + "/9").exchange();
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.OK);
+        assertThat(result).bodyJson().extractingPath("$.images[0].imageId").isEqualTo(41);
+        assertThat(result).bodyJson().extractingPath("$.images[1].url").isEqualTo("https://example.test/view/b");
+        assertThat(result).bodyJson().doesNotHavePath("$.thumbnailUrl");
+        assertThat(result).bodyJson().doesNotHavePath("$.imageCount");
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-06] 글을 쓸 때 imageIds를 보내면 순서를 지켜 서비스에 넘기고, 보내지 않으면 빈 목록이다")
+    void writePassesImageIds() {
+        // given
+        when(communityPostCommandService.write(eq(MEMBER_ID), any())).thenReturn(57L);
+
+        // when
+        MvcTestResult result = send(
+                mvc.post().uri(POSTS),
+                verified(),
+                "{\"category\":\"FREE\",\"title\":\"안녕\",\"content\":\"반가워요\",\"imageIds\":[12,11]}");
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.CREATED);
+        verify(communityPostCommandService)
+                .write(
+                        MEMBER_ID,
+                        new CommunityPostWriteCommand(CommunityCategory.FREE, "안녕", "반가워요", null, List.of(12L, 11L)));
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-06] 수정에서 imageIds를 보내면 요청에 있는 필드로, null로 보내면 값이 null인 필드로 서비스에 넘긴다")
+    void updatePassesImageIdsAsPatchField() {
+        // given
+        when(communityPostCommandService.revise(eq(MEMBER_ID), eq(9L), any())).thenReturn(ITEM);
+
+        // when
+        send(mvc.patch().uri(POSTS + "/9"), verified(), "{\"imageIds\":[3,2]}");
+        send(mvc.patch().uri(POSTS + "/9"), verified(), "{\"imageIds\":null}");
+
+        // then
+        ArgumentCaptor<CommunityPostReviseCommand> captor = ArgumentCaptor.forClass(CommunityPostReviseCommand.class);
+        verify(communityPostCommandService, org.mockito.Mockito.times(2))
+                .revise(eq(MEMBER_ID), eq(9L), captor.capture());
+        assertThat(captor.getAllValues().get(0).imageIds()).isEqualTo(PatchField.of(List.of(3L, 2L)));
+        assertThat(captor.getAllValues().get(1).imageIds()).isEqualTo(PatchField.of(null));
+    }
+
+    @Test
+    @DisplayName("[F-29][CM-06] 서비스가 imageIds 필드 오류를 던지면 400 INVALID_INPUT과 fieldErrors의 imageIds를 응답한다")
+    void imageIdsFieldErrorIsReportedAsFieldError() {
+        // given
+        when(communityPostCommandService.write(anyLong(), any()))
+                .thenThrow(new InvalidFieldException("imageIds", "붙일 수 없는 이미지가 있습니다."));
+
+        // when
+        MvcTestResult result = send(mvc.post().uri(POSTS), verified(), VALID_BODY);
+
+        // then
+        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.code").isEqualTo("INVALID_INPUT");
+        assertThat(result).bodyJson().extractingPath("$.fieldErrors[0].field").isEqualTo("imageIds");
     }
 
     private static String body(String title, String content) {

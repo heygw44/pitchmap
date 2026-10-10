@@ -1,6 +1,7 @@
 package com.pitchmap.common.testsupport;
 
 import com.pitchmap.common.mail.TestMailSenderConfig;
+import com.pitchmap.community.infra.TestCommunityImageStorageConfig;
 import com.pitchmap.notification.application.RecordingOutboxEventHandler;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -27,10 +28,16 @@ import org.springframework.test.context.ActiveProfiles;
     MySqlTestContainerConfig.class,
     TestClockConfig.class,
     TestMailSenderConfig.class,
+    TestCommunityImageStorageConfig.class,
     RecordingOutboxEventHandler.Config.class,
     WireMockTestConfig.class
 })
-@ExtendWith({DatabaseCleanupExtension.class, ClockResetExtension.class, WireMockResetExtension.class})
+@ExtendWith({
+    DatabaseCleanupExtension.class,
+    ClockResetExtension.class,
+    WireMockResetExtension.class,
+    CommunityImageStorageResetExtension.class
+})
 public @interface IntegrationTest {
 
     // 기본은 서버를 띄우지 않는 MOCK이다. Tomcat이 직접 처리하는 동작(프록시 헤더 등)을 확인하는 테스트만 RANDOM_PORT를 고른다.

@@ -32,6 +32,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
         ErrorCode errorCode = e.getErrorCode();
+        if (e instanceof InvalidFieldException invalidField) {
+            log.debug("invalid field field={} message={}", invalidField.getField(), e.getMessage());
+            return ResponseEntity.status(errorCode.httpStatus())
+                    .body(ErrorResponse.ofInvalidInput(
+                            List.of(new ErrorResponse.FieldError(invalidField.getField(), e.getMessage()))));
+        }
         if (errorCode.httpStatus().is5xxServerError()) {
             log.error("business exception code={}", errorCode.name(), e);
         } else {

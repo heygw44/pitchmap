@@ -7,6 +7,7 @@
          likedByMe는 상세에서 조회하는 회원을 넘겼을 때만 값이 있고, 목록과 비회원 상세에서는 NULL이다.
          likeCount는 좋아요 행의 수이고, 기본 키 (글 ID, 회원 ID)의 앞부분 글 ID로 센다.
          commentCount는 ACTIVE인 댓글과 답글의 수다. 삭제·숨김·검토 대기 댓글은 세지 않는다.
+         thumbnailKey는 글 안 순서가 가장 앞선 이미지의 저장소 객체 키이고, 이미지가 없으면 NULL이다. imageCount는 글에 붙은 이미지 수다.
          글 ID는 순서대로 커지므로 ID 내림차순이 곧 최신순이다. 그래서 작성 시각 정렬 없이 기본 키 순서로 읽는다. -->
     <sql id="postColumns">
         p.id AS post_id,
@@ -16,6 +17,8 @@
         m.nickname AS author_nickname,
         s.id AS spot_id,
         s.name AS spot_name,
+        (SELECT i.object_key FROM community_image i WHERE i.post_id = p.id ORDER BY i.display_order LIMIT 1) AS thumbnail_key,
+        (SELECT COUNT(*) FROM community_image i2 WHERE i2.post_id = p.id) AS image_count,
         (SELECT COUNT(*) FROM community_post_like l WHERE l.post_id = p.id) AS like_count,
         (SELECT COUNT(*) FROM community_comment c WHERE c.post_id = p.id AND c.status = 'ACTIVE') AS comment_count,
         p.created_at AS created_at,

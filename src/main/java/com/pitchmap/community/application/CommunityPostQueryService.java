@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommunityPostQueryService {
 
     private final CommunityPostMapper communityPostMapper;
+    private final CommunityPostItemReader communityPostItemReader;
 
     /**
      * 호출하면 ACTIVE인 글을 최신순으로 한 페이지 돌려준다. category와 spotId는 null이면 거르지 않는다.
@@ -29,20 +30,21 @@ public class CommunityPostQueryService {
         String categoryName = category == null ? null : category.name();
         List<CommunityPostRow> rows = communityPostMapper.selectActive(categoryName, spotId, offset, size + 1);
         boolean hasNext = rows.size() > size;
-        List<CommunityPostItem> content =
-                rows.stream().limit(size).map(CommunityPostItem::from).toList();
+        List<CommunityPostItem> content = rows.stream()
+                .limit(size)
+                .map(communityPostItemReader::toListItem)
+                .toList();
         return new CommunityPostPage(content, page, size, hasNext);
     }
 
     /**
-     * 호출하면 postId인 글 한 건을 본문 전체와 함께 돌려준다. viewerId가 null이 아니면 그 회원이 좋아요를 눌렀는지(likedByMe)도 담는다.
+     * 호출하면 postId인 글 한 건을 본문 전체와 이미지 목록과 함께 돌려준다. viewerId가 null이 아니면 그 회원이 좋아요를 눌렀는지(likedByMe)도 담는다.
      * 글이 없거나 ACTIVE가 아니면 NOT_FOUND로 거부한다.
      */
     @Transactional(readOnly = true)
     public CommunityPostItem detail(long postId, Long viewerId) {
-        return communityPostMapper
-                .selectActiveById(postId, viewerId)
-                .map(CommunityPostItem::from)
+        return communityPostItemReader
+                .findDetail(postId, viewerId)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
     }
 }
