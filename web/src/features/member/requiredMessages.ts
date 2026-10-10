@@ -3,3 +3,5 @@
 export const EMAIL_REQUIRED = '이메일을 입력해 주세요.';
 export const PASSWORD_REQUIRED = '비밀번호를 입력해 주세요.';
 export const NICKNAME_REQUIRED = '닉네임을 입력해 주세요.';
+export const EMAIL_DOMAIN_REQUIRED = '이메일 도메인을 골라 주세요.';
+export const EMAIL_CUSTOM_DOMAIN_REQUIRED = '도메인을 입력해 주세요.';
