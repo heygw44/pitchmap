@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, navigate, useLocation } from '../../app/router';
-import { Badge } from '../../components/Badge';
+import { BottomTabBar } from '../../app/layout/BottomTabBar';
+import { SiteHeader } from '../../app/layout/SiteHeader';
+import { Link, navigate } from '../../app/router';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/icons';
@@ -17,10 +18,11 @@ import { BasecampListPanel } from '../basecamp/BasecampListPanel';
 import { BasecampOpenPanel } from '../basecamp/BasecampOpenPanel';
 import { useBasecampsInView } from '../basecamp/useBasecampsInView';
 import type { BasecampFilters, BasecampsInView } from '../basecamp/useBasecampsInView';
-import { useUnreadCount, useUnreadCountSync } from '../notification/unreadCount';
 import { withNext } from '../member/nextPath';
 import { useSession } from '../member/session';
+import { AnnouncementBar } from '../program/AnnouncementBar';
 import { BakjiReportPanel } from './BakjiReportPanel';
+import { MapSafetyNotice } from './MapSafetyNotice';
 import { SpotDetailPanel } from './SpotDetailPanel';
 import { SpotListRow } from './SpotListRow';
 import { useSpotsInView } from './useSpotsInView';
@@ -32,9 +34,6 @@ type MapFailure = { reason: MapLoadErrorReason; message: string };
 
 // 처음에는 전국이 한 화면에 들어오도록 국토 가운데쯤을 중심으로 크게 축소해서 연다.
 const INITIAL_VIEW = { center: { lat: 36.35, lng: 127.85 }, level: 12 };
-
-// Sheet가 데스크톱 패널로 바뀌는 너비(lg)와 같은 값이다.
-const DESKTOP_QUERY = '(min-width: 64rem)';
 
 // 묶음을 누르면 이만큼 확대해서 안의 장소가 풀려 보이게 한다.
 const CLUSTER_ZOOM_STEP = 2;
@@ -128,13 +127,13 @@ export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: Map
     };
   }, [mapAttempt]);
 
-  // 모바일과 데스크톱 배치가 바뀌면 지도 요소의 크기가 달라지므로 지도에 알린다.
+  // 지도 요소의 크기가 바뀌면 지도에 알린다. 모바일·데스크톱 배치가 바뀔 때와, 위의 알림 띠를 닫아 지도 칸이 커질 때다.
   useEffect(() => {
-    if (!map) return;
-    const query = window.matchMedia(DESKTOP_QUERY);
-    const handleChange = () => map.relayout();
-    query.addEventListener('change', handleChange);
-    return () => query.removeEventListener('change', handleChange);
+    const host = hostRef.current;
+    if (!map || !host) return;
+    const observer = new ResizeObserver(() => map.relayout());
+    observer.observe(host);
+    return () => observer.disconnect();
   }, [map]);
 
   useEffect(() => {
@@ -188,7 +187,7 @@ export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: Map
     if (reporting) document.title = '박지 제보 · 피치맵';
     else if (opening) document.title = '베이스캠프 열기 · 피치맵';
     else if (basecampMode) document.title = '베이스캠프 · 피치맵';
-    else document.title = '피치맵';
+    else document.title = '지도 · 피치맵';
   }, [spotId, basecampId, reporting, opening, basecampMode]);
 
   let sheetLabel = '장소 목록';
@@ -204,104 +203,107 @@ export function MapPage({ spotId, basecampId, openSpotId, mode = 'browse' }: Map
   }
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-paper lg:flex">
-      <Sheet
-        snap={snap}
-        onSnapChange={setSnap}
-        label={sheetLabel}
-        header={contentOpen ? undefined : basecampMode ? <BasecampListHeader result={basecamps} /> : <ListHeader area={area} />}
-      >
-        {opening && openSpotId !== undefined ? (
-          <BasecampOpenPanel key={openSpotId} spotId={openSpotId} onBack={() => navigate(`/spots/${openSpotId}`)} />
-        ) : basecampId !== undefined ? (
-          <BasecampDetailPanel key={basecampId} basecampId={basecampId} onBack={() => navigate('/basecamps')} />
-        ) : basecampMode ? (
-          <BasecampListPanel
-            result={basecamps}
-            filters={filters}
-            onFiltersChange={setFilters}
-            spotFilterId={spotFilterId}
-            onClearSpotFilter={() => setSpotFilterId(null)}
-            waitingForMap={map === null && mapFailure === null}
-          />
-        ) : reporting ? (
-          <BakjiReportPanel
-            draft={draft}
-            onCancel={() => navigate('/')}
-            onSubmitted={() => {
-              // 새 박지가 지도에 보이도록 마커를 다시 불러오고, 등록이 끝났으니 임시 핀은 치운다.
-              setSubmitted(true);
-              setDraft(null);
-              area.retry();
-            }}
-          />
-        ) : spotId === undefined ? (
-          <SpotList area={area} waitingForMap={map === null && mapFailure === null} />
-        ) : (
-          <SpotDetailPanel key={spotId} spotId={spotId} onBack={() => navigate('/')} />
-        )}
-      </Sheet>
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-paper">
+      <AnnouncementBar />
+      <SiteHeader fluid className="hidden lg:block" />
+      <div className="relative min-h-0 flex-1 lg:flex">
+        <Sheet
+          aboveBottomNav={!contentOpen}
+          snap={snap}
+          onSnapChange={setSnap}
+          label={sheetLabel}
+          header={
+            contentOpen ? undefined : basecampMode ? <BasecampListHeader result={basecamps} /> : <ListHeader area={area} />
+          }
+        >
+          {opening && openSpotId !== undefined ? (
+            <BasecampOpenPanel key={openSpotId} spotId={openSpotId} onBack={() => navigate(`/spots/${openSpotId}`)} />
+          ) : basecampId !== undefined ? (
+            <BasecampDetailPanel key={basecampId} basecampId={basecampId} onBack={() => navigate('/basecamps')} />
+          ) : basecampMode ? (
+            <BasecampListPanel
+              result={basecamps}
+              filters={filters}
+              onFiltersChange={setFilters}
+              spotFilterId={spotFilterId}
+              onClearSpotFilter={() => setSpotFilterId(null)}
+              waitingForMap={map === null && mapFailure === null}
+            />
+          ) : reporting ? (
+            <BakjiReportPanel
+              draft={draft}
+              onCancel={() => navigate('/map')}
+              onSubmitted={() => {
+                // 새 박지가 지도에 보이도록 마커를 다시 불러오고, 등록이 끝났으니 임시 핀은 치운다.
+                setSubmitted(true);
+                setDraft(null);
+                area.retry();
+              }}
+            />
+          ) : spotId === undefined ? (
+            <SpotList area={area} waitingForMap={map === null && mapFailure === null} />
+          ) : (
+            <SpotDetailPanel key={spotId} spotId={spotId} onBack={() => navigate('/map')} />
+          )}
+        </Sheet>
 
-      {/* z-0으로 쌓임 맥락을 따로 만들어서, 지도와 위에 뜬 버튼이 모바일 시트보다 아래에 그려지게 한다. */}
-      <div className="absolute inset-0 z-0 lg:relative lg:flex-1">
-        <div ref={hostRef} role="region" aria-label="지도" className="absolute inset-0" />
+        {/* z-0으로 쌓임 맥락을 따로 만들어서, 지도와 위에 뜬 버튼이 모바일 시트보다 아래에 그려지게 한다. */}
+        <div className="absolute inset-0 z-0 lg:relative lg:flex-1">
+          <div ref={hostRef} role="region" aria-label="지도" className="absolute inset-0" />
 
-        {mapFailure && (
-          <div className="absolute inset-0 flex items-center justify-center bg-paper p-4">
-            <div className="w-full max-w-sm">
-              <Notice tone="danger" title="지도를 불러오지 못했어요">
-                <div className="flex flex-col gap-3">
-                  <p>{mapFailure.message}</p>
-                  {mapFailure.reason === 'NO_KEY' ? (
-                    <p>저장소 루트의 .env에 VITE_KAKAO_JS_KEY를 넣고 개발 서버를 다시 켜 주세요.</p>
-                  ) : (
-                    <div>
-                      <Button variant="secondary" onClick={retryMap}>
-                        다시 시도
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </Notice>
+          {mapFailure && (
+            <div className="absolute inset-0 flex items-center justify-center bg-paper p-4">
+              <div className="w-full max-w-sm">
+                <Notice tone="danger" title="지도를 불러오지 못했어요">
+                  <div className="flex flex-col gap-3">
+                    <p>{mapFailure.message}</p>
+                    {mapFailure.reason === 'NO_KEY' ? (
+                      <p>저장소 루트의 .env에 VITE_KAKAO_JS_KEY를 넣고 개발 서버를 다시 켜 주세요.</p>
+                    ) : (
+                      <div>
+                        <Button variant="secondary" onClick={retryMap}>
+                          다시 시도
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Notice>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 px-4 pt-3">
-          <div className="flex items-start justify-between gap-2">
-            <h1 className="pointer-events-auto">
-              <Link to="/" className={`${CHIP_CLASS} font-serif text-lg font-semibold text-forest-deep`}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 px-4 pt-3">
+            <h1 className="sr-only">피치맵 지도</h1>
+            <div className="flex items-start justify-between gap-2">
+              {/* 데스크톱은 위의 머리글이 서비스 이름과 메뉴를 보여 주므로, 지도 위에는 모바일에서만 이름을 띄운다. */}
+              <Link to="/" className={`${CHIP_CLASS} font-serif text-lg font-semibold text-forest-deep lg:invisible`}>
                 피치맵
               </Link>
-            </h1>
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              <NotificationLink />
-              <AccountChip />
+              {map && (
+                <div className="flex flex-wrap justify-end gap-2">
+                  {!reporting && !basecampMode && !opening && <ReportButton />}
+                  <button
+                    type="button"
+                    aria-pressed={terrainOn}
+                    onClick={() => setTerrainOn((value) => !value)}
+                    className={
+                      terrainOn
+                        ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
+                        : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
+                    }
+                  >
+                    <Icon name="terrain" size={20} />
+                    지형
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            {reporting || opening ? <span /> : <ModeToggle basecampMode={basecampMode} />}
-            {map && (
-              <div className="flex flex-wrap justify-end gap-2">
-                {!reporting && !basecampMode && !opening && <ReportButton />}
-                <button
-                  type="button"
-                  aria-pressed={terrainOn}
-                  onClick={() => setTerrainOn((value) => !value)}
-                  className={
-                    terrainOn
-                      ? 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-forest bg-forest-soft px-3 text-base font-semibold text-forest-deep'
-                      : 'pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-control border border-contour bg-card px-3 text-base font-semibold text-ink hover:bg-paper-deep'
-                  }
-                >
-                  <Icon name="terrain" size={20} />
-                  지형
-                </button>
-              </div>
-            )}
+            <MapSafetyNotice />
           </div>
         </div>
       </div>
+      {/* 상세·폼이 열려 있을 때는 시트 아래 고정 버튼 자리를 지키려고 하단 탭을 숨긴다. 패널의 뒤로 가기로 목록에 돌아오면 다시 보인다. */}
+      {!contentOpen && <BottomTabBar />}
     </div>
   );
 }
@@ -334,30 +336,6 @@ function BasecampListHeader({ result }: { result: BasecampsInView }) {
         </span>
       )}
     </h2>
-  );
-}
-
-// 지도 위에서 장소를 찾을지 베이스캠프를 찾을지 고른다. 두 화면은 주소가 달라서 링크로 옮긴다.
-function ModeToggle({ basecampMode }: { basecampMode: boolean }) {
-  const baseClass = 'pointer-events-auto inline-flex min-h-11 items-center px-3 text-base font-semibold';
-  const activeClass = `${baseClass} bg-forest-soft text-forest-deep`;
-  const idleClass = `${baseClass} bg-card text-ink hover:bg-paper-deep`;
-  return (
-    <nav aria-label="찾기 종류" className="pointer-events-auto flex overflow-hidden rounded-control border border-contour">
-      <Link to="/" aria-current={basecampMode ? undefined : 'page'} className={basecampMode ? idleClass : activeClass}>
-        장소
-      </Link>
-      <Link
-        to="/basecamps"
-        aria-current={basecampMode ? 'page' : undefined}
-        className={basecampMode ? activeClass : idleClass}
-      >
-        베이스캠프
-      </Link>
-      <Link to="/programs" className={idleClass}>
-        행사
-      </Link>
-    </nav>
   );
 }
 
@@ -435,95 +413,5 @@ function ReportButton() {
       <Icon name="backpack" size={20} />
       박지 제보
     </Link>
-  );
-}
-
-// 로그인한 회원에게만 보인다. 안 읽은 알림이 있으면 개수를 배지로 보여 준다.
-function NotificationLink() {
-  const session = useSession();
-  const active = session.status === 'authenticated' && session.me !== null;
-  useUnreadCountSync(active);
-  const count = useUnreadCount();
-
-  if (!active) return null;
-
-  return (
-    <Link
-      to="/me/notifications"
-      aria-label={count > 0 ? `알림, 안 읽음 ${count}개` : '알림'}
-      className={`${CHIP_CLASS} relative text-ink hover:bg-paper-deep`}
-    >
-      <Icon name="bell" size={20} />
-      <span className="hidden text-sm sm:inline">알림</span>
-      {count > 0 && (
-        <span
-          aria-hidden="true"
-          className="rounded-control bg-forest px-1.5 font-mono text-xs font-semibold tabular-nums text-white"
-        >
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-function AccountChip() {
-  const session = useSession();
-  const { pathname, search } = useLocation();
-  const [loggingOut, setLoggingOut] = useState(false);
-
-  if (session.status === 'loading') return null;
-
-  if (session.status === 'anonymous' || session.me === null) {
-    return (
-      <Link to={withNext('/login', pathname + search)} className={`${CHIP_CLASS} text-base font-semibold text-forest`}>
-        로그인
-      </Link>
-    );
-  }
-
-  if (session.me.status === 'UNVERIFIED') {
-    return (
-      <Link to="/verify-email" className={CHIP_CLASS}>
-        <Badge tone="warning" icon="alert">
-          이메일 인증 필요
-        </Badge>
-      </Link>
-    );
-  }
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await session.logout();
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
-  return (
-    <div className="pointer-events-auto inline-flex min-w-0 items-center rounded-control border border-contour bg-card pl-3">
-      <Link
-        to="/me"
-        aria-label={`내 정보: ${session.me.nickname}`}
-        className="max-w-32 min-h-11 content-center truncate text-sm text-ink underline-offset-2 hover:underline"
-      >
-        {session.me.nickname}
-      </Link>
-      {session.me.identityVerified ? (
-        <span className="ml-2">
-          <Badge tone="sea" icon="check">
-            본인확인
-          </Badge>
-        </span>
-      ) : (
-        <Link to="/identity-verification" className="ml-2 min-h-11 content-center text-sm font-semibold text-forest">
-          본인확인
-        </Link>
-      )}
-      <Button variant="ghost" loading={loggingOut} onClick={handleLogout} className="px-3">
-        로그아웃
-      </Button>
-    </div>
   );
 }

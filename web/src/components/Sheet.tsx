@@ -9,6 +9,8 @@ type SheetProps = {
   header?: ReactNode;
   children: ReactNode;
   label: string;
+  // 모바일 하단 탭 위에 시트를 띄울 때 켠다. 시트의 아래 끝을 탭 높이만큼 올리고, 전체 높이에서도 그만큼 뺀다.
+  aboveBottomNav?: boolean;
 };
 
 const SNAP_ORDER: readonly SheetSnap[] = ['peek', 'half', 'full'];
@@ -25,6 +27,9 @@ const SNAP_HEIGHT_CLASSES: Record<SheetSnap, string> = {
   half: 'h-[55dvh]',
   full: 'h-[92dvh]',
 };
+
+// 하단 탭 위에 뜰 때의 전체 높이. 접힘·절반은 탭이 있어도 같은 높이라서 목록 미리보기 양이 바뀌지 않는다.
+const FULL_ABOVE_NAV_CLASS = 'h-[calc(92dvh-var(--bottom-nav-h))]';
 
 const SNAP_LABELS: Record<SheetSnap, string> = {
   peek: '접힘',
@@ -47,14 +52,22 @@ type DragState = {
   pointerId: number;
   startY: number;
   startHeight: number;
+  // 시트 아래 끝이 화면 아래에서 떨어진 거리(px). 하단 탭 위에 뜨면 탭 높이다.
+  bottomInset: number;
   moved: boolean;
 };
 
-function nearestSnap(height: number, viewportHeight: number): SheetSnap {
+// 단계별 목표 높이(px). 전체 단계만 시트 아래 여백(하단 탭 높이)을 뺀다.
+function snapHeight(snap: SheetSnap, viewportHeight: number, bottomInset: number): number {
+  const height = SNAP_RATIO[snap] * viewportHeight;
+  return snap === 'full' ? height - bottomInset : height;
+}
+
+function nearestSnap(height: number, viewportHeight: number, bottomInset: number): SheetSnap {
   let best: SheetSnap = 'peek';
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const snap of SNAP_ORDER) {
-    const distance = Math.abs(height - SNAP_RATIO[snap] * viewportHeight);
+    const distance = Math.abs(height - snapHeight(snap, viewportHeight, bottomInset));
     if (distance < bestDistance) {
       best = snap;
       bestDistance = distance;
@@ -64,7 +77,7 @@ function nearestSnap(height: number, viewportHeight: number): SheetSnap {
 }
 
 // 모바일에서는 지도 위에 뜨는 하단 시트이고, lg 이상에서는 같은 내용을 왼쪽 400px 고정 패널로 그린다.
-export function Sheet({ snap, onSnapChange, header, children, label }: SheetProps) {
+export function Sheet({ snap, onSnapChange, header, children, label, aboveBottomNav = false }: SheetProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   // 끌기를 마친 직후에 브라우저가 보내는 click을 무시하려고 기억해 둔다.
@@ -80,6 +93,7 @@ export function Sheet({ snap, onSnapChange, header, children, label }: SheetProp
       pointerId: event.pointerId,
       startY: event.clientY,
       startHeight: section.getBoundingClientRect().height,
+      bottomInset: parseFloat(getComputedStyle(section).bottom) || 0,
       moved: false,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -93,7 +107,7 @@ export function Sheet({ snap, onSnapChange, header, children, label }: SheetProp
     drag.moved = true;
     const viewportHeight = window.innerHeight;
     const minHeight = SNAP_RATIO.peek * viewportHeight;
-    const maxHeight = SNAP_RATIO.full * viewportHeight;
+    const maxHeight = snapHeight('full', viewportHeight, drag.bottomInset);
     setDragHeight(Math.min(maxHeight, Math.max(minHeight, drag.startHeight - deltaY)));
   }
 
@@ -108,7 +122,7 @@ export function Sheet({ snap, onSnapChange, header, children, label }: SheetProp
     suppressClickRef.current = true;
     const finalHeight = drag.startHeight - (event.clientY - drag.startY);
     setDragHeight(null);
-    const next = nearestSnap(finalHeight, window.innerHeight);
+    const next = nearestSnap(finalHeight, window.innerHeight, drag.bottomInset);
     if (next !== snap) onSnapChange(next);
   }
 
@@ -146,8 +160,11 @@ export function Sheet({ snap, onSnapChange, header, children, label }: SheetProp
       onKeyDown={handleKeyDown}
       style={dragging ? { height: `${dragHeight}px` } : undefined}
       className={[
-        'fixed inset-x-0 bottom-0 z-10 flex flex-col rounded-t-sheet border-t border-contour bg-card shadow-raise',
-        dragging ? 'transition-none' : `${SNAP_HEIGHT_CLASSES[snap]} transition-[height] duration-200 ease-out motion-reduce:transition-none`,
+        'fixed inset-x-0 z-10 flex flex-col rounded-t-sheet border-t border-contour bg-card shadow-raise',
+        aboveBottomNav ? 'bottom-(--bottom-nav-h)' : 'bottom-0',
+        dragging
+          ? 'transition-none'
+          : `${aboveBottomNav && snap === 'full' ? FULL_ABOVE_NAV_CLASS : SNAP_HEIGHT_CLASSES[snap]} transition-[height] duration-200 ease-out motion-reduce:transition-none`,
         'lg:static lg:z-auto lg:h-full lg:w-[400px] lg:shrink-0 lg:rounded-none lg:border-t-0 lg:border-r lg:shadow-none',
       ].join(' ')}
     >

@@ -284,7 +284,7 @@ function ActionArea({ detail, onChanged }: { detail: ProgramDetail; onChanged: (
   return (
     <section
       aria-label="신청"
-      className="sticky bottom-0 z-10 flex flex-col gap-3 rounded-control border border-contour bg-card p-4 shadow-raise"
+      className="sticky bottom-(--bottom-nav-h) z-10 flex flex-col gap-3 rounded-control border border-contour bg-card p-4 shadow-raise"
     >
       {notice && (
         <p role="status" className="text-sm font-semibold text-forest-deep">
